@@ -422,6 +422,34 @@
   .timeline strong { display: block; }
   .timeline span { color: var(--muted); font-size: 0.88rem; line-height: 1.45; }
 
+  /* ---------- PREMIUM: DIET TRACKER ---------- */
+  .diet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .diet-head h3 { font-size: 1.25rem; font-weight: 800; }
+  .premium-chip { font-size: 0.75rem; font-weight: 800; background: var(--gold); color: var(--ink); padding: 4px 10px; border-radius: 999px; }
+  .diet-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 16px; display: grid; gap: 14px; }
+  .diet-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .muted { color: var(--muted); margin: 0; }
+  .small { font-size: 0.8rem; }
+  .score-pill { font-size: 0.8rem; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--track); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .score-pill.good { background: var(--brand-soft); color: var(--brand-dark); }
+  .meal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .meal-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); cursor: pointer; line-height: 1.45; font-size: 0.92rem; }
+  .meal-row input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--brand); flex-shrink: 0; }
+  .meal-row small { color: var(--muted); font-weight: 600; }
+  .meal-row:has(input:checked) { background: var(--brand-soft); border-color: #bfe5cc; }
+  .counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .counter { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; }
+  .counter > span { font-weight: 600; font-size: 0.92rem; line-height: 1.3; }
+  .counter small { display: block; font-weight: 400; color: var(--muted); font-size: 0.78rem; }
+  .counter > div { display: flex; align-items: center; gap: 10px; }
+  .counter strong { min-width: 1.6em; text-align: center; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .count-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); font-size: 1.2rem; font-weight: 700; cursor: pointer; color: var(--text); }
+  .count-btn:hover { border-color: var(--brand); }
+  .week-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 120px; align-items: end; }
+  .week-bar { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; }
+  .week-bar span { width: 100%; max-width: 34px; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, var(--lime), var(--brand)); }
+  .week-bar em { font-style: normal; font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+
   /* ---------- MODAL & TOAST ---------- */
   .modal { position: fixed; inset: 0; z-index: 100; background: rgba(8, 16, 12, 0.5); display: grid; place-items: center; padding: 16px; }
   .modal-card { width: min(420px, 100%); background: var(--card); border-radius: 26px; padding: 30px 26px; text-align: center; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.5); }
@@ -478,6 +506,7 @@
       <li>📅 Weekly plans for your position, age &amp; kit</li>
       <li>💬 Ask a coach anything, any time</li>
       <li>⭐ Check-ins that adapt your next week</li>
+      <li>🥗 AI diet plan &amp; tracker (Premium)</li>
     </ul>
   </section>
 
@@ -561,6 +590,7 @@
         <li>Everything in Pro</li>
         <li>Unlimited "Ask a Coach" questions</li>
         <li>Weekly check-ins that change next week's plan based on how training went</li>
+        <li>AI diet plan &amp; tracker: meals for training, rest and match days, plus daily water and energy tracking</li>
         <li>Match-day warm-up plans, fitness tips and food tips</li>
         <li>Download the plan as a PDF</li>
       </ul>
@@ -941,6 +971,37 @@ async function getTrainingPlan(profile) {
   }
   await wait(1200);
   return fakeTrainingPlan(profile);
+}
+
+/** Premium diet tracker: returns a fuel plan { waterTarget, notes: [..], days: { training|rest|match: [{ slot, time, food }] } }. */
+async function getDietPlan(input) {
+  if (USE_REAL_AI) {
+    const reply = await callAI(
+      "You are a sports nutrition coach for young footballers. Reply ONLY with JSON shaped like " +
+      '{"waterTarget":8,"notes":["..."],"days":{"training":[{"slot":"Breakfast","time":"7:30","food":"..."}],"rest":[...],"match":[...]}}. ' +
+      "Use normal family foods and food groups – never calorie targets, weight-loss advice or supplements, especially for under-18s. " +
+      "Respect the diet type and every food to avoid. Training days include a pre-training snack and a recovery snack; " +
+      "match days include a pre-match meal about 3 hours before kick-off and a half-time top-up.",
+      [{ role: "user", content: JSON.stringify(input) }]
+    );
+    return JSON.parse(reply);
+  }
+  await wait(1100);
+  return fakeDietPlan(input);
+}
+
+/** Premium diet tracker: returns a list of short feedback lines about the last 7 days of logs. */
+async function getDietFeedback(input) {
+  if (USE_REAL_AI) {
+    const reply = await callAI(
+      "You are a friendly sports nutrition coach for young footballers. Look at the player's last 7 days of food tracking " +
+      "and reply with 3–5 short, encouraging, practical tips as a JSON array of strings. No calorie or weight talk.",
+      [{ role: "user", content: JSON.stringify(input) }]
+    );
+    return JSON.parse(reply);
+  }
+  await wait(900);
+  return fakeDietFeedback(input);
 }
 
 /* ==========================================================================
@@ -2115,7 +2176,7 @@ function renderPremium() {
   if (!currentUser) return;
   if (!hasFeature(currentUser, "premium")) {
     root.innerHTML = upsellHTML("⭐", "Premium tools for rising stars", "Get a coach that adapts to you week by week.",
-      ["Weekly check-ins that change next week's plan", "Match-day warm-up plans", "Fitness tips and food tips", "Unlimited Ask a Coach questions", "Download your plan as a PDF"]);
+      ["Weekly check-ins that change next week's plan", "AI diet plan & daily food tracker", "Match-day warm-up plans", "Fitness tips and food tips", "Unlimited Ask a Coach questions", "Download your plan as a PDF"]);
     addUpsellButton(root, "⭐ Go Premium");
     return;
   }
@@ -2123,6 +2184,7 @@ function renderPremium() {
   root.innerHTML = `<div class="panel-body">
     <div class="sub-tabs" role="tablist">
       <button type="button" class="sub-tab" data-section="checkin">📝 Weekly check-in</button>
+      <button type="button" class="sub-tab" data-section="diet">🥗 Diet tracker</button>
       <button type="button" class="sub-tab" data-section="matchday">🏟️ Match-day warm-up</button>
       <button type="button" class="sub-tab" data-section="fitness">💪 Fitness tips</button>
       <button type="button" class="sub-tab" data-section="food">🍝 Food tips</button>
@@ -2141,11 +2203,343 @@ function renderPremium() {
       <ol class="timeline">${matchDayWarmup(answers).map(([t, name, d]) => `<li><time>${t}</time><div><strong>${escapeHTML(name)}</strong><span>${escapeHTML(d)}</span></div></li>`).join("")}</ol>`;
   } else if (premiumSection === "fitness") {
     section.innerHTML = `<h3>💪 Fitness tips</h3>${tipList(fitnessTips(answers))}`;
+  } else if (premiumSection === "diet") {
+    renderDiet(section);
   } else if (premiumSection === "food") {
     section.innerHTML = `<h3>🍝 Food tips for training & matches</h3>${tipList(foodTips(answers))}`;
   } else {
     renderCheckin(section);
   }
+}
+
+/* ==========================================================================
+   PREMIUM: AI DIET PLAN & TRACKER
+   --------------------------------------------------------------------------
+   Pretend AI for now (see getDietPlan / getDietFeedback at the top).
+   Healthy fuelling for young players: food groups, water and fruit & veg –
+   no calorie counting or weight-loss goals.
+   ========================================================================== */
+// Each food lists what it contains so diets and "foods to avoid" can be respected.
+const FOODS = {
+  breakfast: [
+    ["Porridge made with milk, topped with banana and a drizzle of honey", ["dairy", "gluten"]],
+    ["Wholegrain toast with scrambled eggs and a glass of orange juice", ["egg", "gluten"]],
+    ["Greek yoghurt with berries and a sprinkle of granola", ["dairy", "nuts", "gluten"]],
+    ["Wholegrain cereal with milk and sliced strawberries", ["dairy", "gluten"]],
+    ["Peanut butter on wholegrain toast with a banana", ["nuts", "gluten"]],
+    ["Overnight oats with oat milk, chia seeds and berries", ["gluten"]],
+    ["Smoothie bowl: banana, berries and soy yoghurt, topped with seeds", []]
+  ],
+  snack: [
+    ["Carrot and cucumber sticks with hummus", []],
+    ["A yoghurt and a pear", ["dairy"]],
+    ["A banana and two rice cakes", []],
+    ["An apple and a handful of mixed nuts", ["nuts"]],
+    ["Cheese on oatcakes with a handful of grapes", ["dairy", "gluten"]],
+    ["A handful of dried apricots and an orange", []]
+  ],
+  lunch: [
+    ["Chicken and salad wholegrain wrap, plus a piece of fruit", ["meat", "gluten"]],
+    ["Tuna pasta salad with sweetcorn and peppers", ["fish", "gluten"]],
+    ["Jacket potato with baked beans, grated cheese and a side salad", ["dairy"]],
+    ["Rice with a lentil and vegetable curry", []],
+    ["Egg and cress sandwich on wholegrain bread with cherry tomatoes", ["egg", "gluten"]],
+    ["Falafel and hummus pitta with crunchy salad", ["gluten"]],
+    ["Rice bowl with beans, sweetcorn, avocado and salsa", []]
+  ],
+  preTraining: [
+    ["A banana and a glass of water", []],
+    ["Toast with jam", ["gluten"]],
+    ["Rice cakes with honey", []],
+    ["A small bowl of cereal with milk", ["dairy", "gluten"]],
+    ["A handful of grapes and a couple of dried figs", []]
+  ],
+  recovery: [
+    ["A glass of milk and a banana", ["dairy"]],
+    ["Yoghurt with chopped fruit", ["dairy"]],
+    ["Chocolate milk and a handful of grapes", ["dairy"]],
+    ["Soy milk smoothie with banana and oats", ["gluten"]],
+    ["Hummus and a wholegrain pitta", ["gluten"]],
+    ["Edamame beans and a piece of fruit", []]
+  ],
+  dinner: [
+    ["Grilled chicken with rice and steamed broccoli", ["meat"]],
+    ["Salmon with new potatoes and green beans", ["fish"]],
+    ["Spaghetti bolognese with a side salad", ["meat", "gluten"]],
+    ["Bean chilli with rice and avocado", []],
+    ["Tofu and vegetable stir-fry with rice noodles", []],
+    ["Veggie omelette with wholegrain toast and salad", ["egg", "gluten"]],
+    ["Turkey burger in a wholegrain bun with sweet potato wedges", ["meat", "gluten"]],
+    ["Lentil bolognese with wholewheat pasta", ["gluten"]],
+    ["Chickpea and spinach curry with rice", []]
+  ],
+  preMatch: [
+    ["Pasta with tomato sauce and chicken", ["meat", "gluten"]],
+    ["Rice with scrambled eggs and vegetables", ["egg"]],
+    ["Jacket potato with baked beans", []],
+    ["Wholegrain turkey and salad sandwich, plus a banana", ["meat", "gluten"]],
+    ["Pasta with a tomato and lentil sauce", ["gluten"]],
+    ["Rice with tomato, pepper and bean sauce", []]
+  ],
+  halfTime: [
+    ["Water and a few orange slices", []],
+    ["Water and half a banana", []]
+  ]
+};
+
+const DIET_EXCLUDES = { any: [], pescatarian: ["meat"], vegetarian: ["meat", "fish"], vegan: ["meat", "fish", "dairy", "egg"] };
+const AVOID_WORDS = {
+  nut: "nuts", peanut: "nuts", almond: "nuts", milk: "dairy", dairy: "dairy", lactose: "dairy", cheese: "dairy", yoghurt: "dairy", yogurt: "dairy",
+  egg: "egg", fish: "fish", tuna: "fish", salmon: "fish", seafood: "fish", gluten: "gluten", wheat: "gluten", bread: "gluten", pasta: "gluten",
+  meat: "meat", chicken: "meat", beef: "meat", pork: "meat", turkey: "meat"
+};
+
+const DAY_SLOTS = {
+  training: [["Breakfast", "7:30", "breakfast"], ["Morning snack", "10:30", "snack"], ["Lunch", "12:30", "lunch"],
+             ["Pre-training snack", "1–2 h before", "preTraining"], ["Recovery snack", "within 1 h after", "recovery"], ["Dinner", "18:30", "dinner"]],
+  rest:     [["Breakfast", "8:00", "breakfast"], ["Lunch", "12:30", "lunch"], ["Afternoon snack", "15:30", "snack"], ["Dinner", "18:30", "dinner"]],
+  match:    [["Breakfast", "3–4 h before kick-off", "breakfast"], ["Pre-match meal", "3 h before", "preMatch"], ["Top-up snack", "1 h before", "preTraining"],
+             ["Half-time", "half-time", "halfTime"], ["Recovery snack", "within 1 h after", "recovery"], ["Dinner", "evening", "dinner"]]
+};
+const DAY_TYPES = { training: "⚽ Training day", rest: "😴 Rest day", match: "🏟️ Match day" };
+const WATER_TARGET = { "Under 10": 6, "10-13": 7, "14-17": 8, "18+": 9 };
+const VEG_TARGET = 5;
+
+const GOAL_NOTES = {
+  energy: "Energy for training: have carbs (bread, rice, pasta, potatoes, fruit) at every meal, and never train on an empty stomach.",
+  recover: "Recover faster: get your recovery snack in within an hour of training, and sleep well – that's when muscles repair.",
+  strength: "Build strength: include a protein food ({protein}) at every meal, spread through the day.",
+  allround: "Healthy all-round: aim for a rainbow of fruit and veg every day and keep sugary drinks for special occasions."
+};
+
+function fakeDietPlan({ diet, avoid, goal, ageGroup, seed = 0 }) {
+  const excluded = new Set(DIET_EXCLUDES[diet] || []);
+  const avoidText = String(avoid || "").toLowerCase();
+  Object.entries(AVOID_WORDS).forEach(([word, tag]) => { if (avoidText.includes(word)) excluded.add(tag); });
+  const avoidWords = avoidText.split(/[,;\n]| and /).map(w => w.trim()).filter(w => w.length > 2);
+  const ok = ([text, tags]) => !tags.some(t => excluded.has(t)) && !avoidWords.some(w => text.toLowerCase().includes(w));
+
+  const pick = (slotKey, i) => {
+    const options = FOODS[slotKey].filter(ok);
+    if (!options.length) return "A piece of fruit and a glass of water";
+    return options[(i + seed) % options.length][0];
+  };
+  const days = {};
+  Object.entries(DAY_SLOTS).forEach(([type, slots], t) => {
+    days[type] = slots.map(([slot, time, key], i) => ({ slot, time, food: pick(key, i + t * 2) }));
+  });
+  const young = ["Under 10", "10-13"].includes(ageGroup);
+  const protein = { vegan: "beans, lentils, tofu, soy yoghurt, hummus", vegetarian: "eggs, milk, yoghurt, beans, lentils, tofu",
+    pescatarian: "fish, eggs, milk, yoghurt, beans, tofu" }[diet] || "eggs, milk, yoghurt, beans, fish, chicken, tofu";
+  return {
+    waterTarget: WATER_TARGET[ageGroup] || 8,
+    notes: [
+      (GOAL_NOTES[goal] || GOAL_NOTES.allround).replace("{protein}", protein),
+      "Portion guide: a fist of carbs, a palm of protein and two handfuls of veg on your plate. On training and match days, make the carb portion a bit bigger.",
+      `Drink about ${WATER_TARGET[ageGroup] || 8} glasses of water a day, plus 2 more on training and match days.`,
+      young ? "You're still growing – eat regular meals and snacks, and never skip breakfast." : "Keep meal times regular, especially around training.",
+      "This is general healthy-eating guidance. For allergies, medical conditions or special diets, check with a parent, doctor or dietitian."
+    ],
+    days
+  };
+}
+
+// Pretend AI feedback from the last 7 days of logs.
+function fakeDietFeedback({ logs, waterTarget, diet }) {
+  const days = Object.values(logs);
+  if (days.length < 2) return ["Track at least 2 days and I'll spot patterns in your eating and energy. 📋"];
+  const avg = f => days.reduce((s, d) => s + f(d), 0) / days.length;
+  const water = avg(d => d.water || 0);
+  const target = Math.round(avg(d => waterTarget + (d.dayType === "rest" ? 0 : 2))); // +2 glasses on training & match days
+  const quickBreakfast = diet === "vegan" ? "a banana and some soy yoghurt" : "a banana and a yoghurt";
+  const veg = avg(d => d.veg || 0);
+  const breakfastRate = avg(d => (d.meals && d.meals.Breakfast ? 1 : 0));
+  const mealRate = avg(d => { const m = d.meals || {}; const total = d.totalMeals || 4; return Object.values(m).filter(Boolean).length / total; });
+  const energy = days.filter(d => d.energy).map(d => d.energy);
+  const tips = [];
+  if (mealRate >= 0.8) tips.push(`Great consistency – you've hit about ${Math.round(mealRate * 100)}% of your planned meals. That's what fuels good training. 💪`);
+  else tips.push(`You're hitting about ${Math.round(mealRate * 100)}% of your planned meals. Try packing a snack the night before so you don't miss the pre-training one.`);
+  if (breakfastRate < 0.8) tips.push(`You've skipped breakfast on some days. Even something quick like ${quickBreakfast} makes a big difference to morning energy.`);
+  if (water < target) tips.push(`You're averaging ${water.toFixed(1)} glasses of water – your target is about ${target}. Keep a bottle in your bag and sip through the day.`);
+  else tips.push(`Brilliant hydration – ${water.toFixed(1)} glasses a day on average. 💧`);
+  if (veg < VEG_TARGET) tips.push(`About ${veg.toFixed(1)} portions of fruit & veg a day. Add one to lunch and one to dinner to reach ${VEG_TARGET}.`);
+  if (energy.length >= 2) {
+    const low = days.filter(d => d.energy && d.energy <= 2);
+    const lowSkipped = low.filter(d => !(d.meals && d.meals.Breakfast)).length;
+    if (low.length && lowSkipped >= Math.ceil(low.length / 2)) tips.push("Your low-energy days line up with skipped breakfasts – a good reason not to miss it!");
+    else if (energy.reduce((a, b) => a + b, 0) / energy.length >= 4) tips.push("Your energy scores are high – whatever you're doing, keep it up. ⚡");
+  }
+  return tips.slice(0, 5);
+}
+
+/* ---------- tracker state ---------- */
+const dietData = () => (userData.diet ||= { prefs: null, plan: null, logs: {}, feedback: null, seed: 0 });
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+
+// Today's default day type from the latest training plan.
+function todaysDayType() {
+  const latest = userData.latest;
+  if (!latest) return "training";
+  const name = new Date().toLocaleDateString("en-GB", { weekday: "long" });
+  const day = latest.plan.find(d => d.day === name);
+  return day && !day.rest ? "training" : "rest";
+}
+
+function todayLog() {
+  const data = dietData();
+  const key = dayKey();
+  data.logs[key] ||= { dayType: todaysDayType(), meals: {}, water: 0, veg: 0, energy: 0 };
+  const log = data.logs[key];
+  log.totalMeals = DAY_SLOTS[log.dayType].length;
+  return log;
+}
+
+function dayScore(log, waterTarget) {
+  if (!log) return 0;
+  const total = log.totalMeals || DAY_SLOTS[log.dayType || "training"].length;
+  const meals = Object.values(log.meals || {}).filter(Boolean).length / total;
+  return Math.round(Math.min(1, meals) * 50 + Math.min(1, (log.water || 0) / waterTarget) * 30 + Math.min(1, (log.veg || 0) / VEG_TARGET) * 20);
+}
+
+/* ---------- rendering ---------- */
+function renderDiet(section) {
+  if (!hasFeature(currentUser, "premium")) return; // Premium only
+  const data = dietData();
+  if (!data.plan) return renderDietSetup(section);
+
+  const plan = data.plan;
+  const log = todayLog();
+  const extraWater = log.dayType === "rest" ? 0 : 2;
+  const waterTarget = plan.waterTarget + extraWater;
+  const meals = plan.days[log.dayType] || [];
+  const score = dayScore(log, waterTarget);
+
+  const last7 = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d; });
+  const bars = last7.map(d => {
+    const l = data.logs[dayKey(d)];
+    const s = l ? dayScore(l, plan.waterTarget + (l.dayType === "rest" ? 0 : 2)) : 0;
+    return `<div class="week-bar" title="${escapeHTML(niceDate(d))}: ${s}%"><span style="height:${Math.max(4, s)}%"></span><em>${escapeHTML(d.toLocaleDateString(undefined, { weekday: "narrow" }))}</em></div>`;
+  }).join("");
+
+  section.innerHTML = `
+    <div class="diet-head"><h3>🥗 AI Diet Plan &amp; Tracker</h3><span class="premium-chip">⭐ Premium</span></div>
+    <p class="panel-intro">Your fuel plan for ${escapeHTML(DIET_LABELS[data.prefs.diet])} eating${data.prefs.avoid ? `, avoiding ${escapeHTML(data.prefs.avoid)}` : ""}. Tick things off as you go.</p>
+
+    <div class="diet-card">
+      <div class="diet-card-top">
+        <strong>Today · ${escapeHTML(niceDate(new Date()))}</strong>
+        <span class="score-pill ${score >= 80 ? "good" : ""}">${score}% on track</span>
+      </div>
+      <div class="choice-row" role="group" aria-label="Type of day">
+        ${Object.entries(DAY_TYPES).map(([k, label]) => `<label><input type="radio" name="daytype" value="${k}" ${log.dayType === k ? "checked" : ""}><span>${label}</span></label>`).join("")}
+      </div>
+      <ul class="meal-list">
+        ${meals.map((m, i) => `<li><label class="meal-row">
+          <input type="checkbox" data-meal="${escapeHTML(m.slot)}" ${log.meals[m.slot] ? "checked" : ""}>
+          <span><strong>${escapeHTML(m.slot)}</strong> <small>${escapeHTML(m.time)}</small><br>${escapeHTML(m.food)}</span></label></li>`).join("")}
+      </ul>
+      <div class="counters">
+        <div class="counter"><span>💧 Water <small>target ${waterTarget} glasses</small></span>
+          <div><button type="button" class="count-btn" data-count="water" data-step="-1" aria-label="One less glass">−</button><strong>${log.water}</strong><button type="button" class="count-btn" data-count="water" data-step="1" aria-label="One more glass">+</button></div></div>
+        <div class="counter"><span>🍎 Fruit &amp; veg <small>target ${VEG_TARGET} portions</small></span>
+          <div><button type="button" class="count-btn" data-count="veg" data-step="-1" aria-label="One less portion">−</button><strong>${log.veg}</strong><button type="button" class="count-btn" data-count="veg" data-step="1" aria-label="One more portion">+</button></div></div>
+      </div>
+      <div><span class="fieldset-label">⚡ How was your energy today?</span>
+        <div class="choice-row" role="group" aria-label="Energy">
+          ${[[1, "😴"], [2, "😕"], [3, "🙂"], [4, "😀"], [5, "🔥"]].map(([v, e]) => `<label><input type="radio" name="energy" value="${v}" ${log.energy === v ? "checked" : ""}><span>${e} ${v}</span></label>`).join("")}
+        </div></div>
+    </div>
+
+    <div class="diet-card">
+      <div class="diet-card-top"><strong>Last 7 days</strong><small class="muted">% of meals, water and fruit &amp; veg targets hit</small></div>
+      <div class="week-bars">${bars}</div>
+    </div>
+
+    <div class="diet-card">
+      <div class="diet-card-top"><strong>🤖 AI coach feedback</strong></div>
+      <div id="diet-feedback">${data.feedback
+        ? `<ul class="tip-list">${data.feedback.tips.map(t => `<li>${escapeHTML(t)}</li>`).join("")}</ul><p class="muted small">Updated ${escapeHTML(niceDate(new Date(data.feedback.date)))}</p>`
+        : `<p class="muted">Track a few days, then ask your AI coach how you're doing.</p>`}</div>
+      <button type="button" class="btn btn-primary btn-sm" id="diet-feedback-btn">Get AI feedback on my week</button>
+    </div>
+
+    <div class="diet-card">
+      <div class="diet-card-top"><strong>📋 Your fuel plan notes</strong></div>
+      <ul class="tip-list">${plan.notes.map(n => `<li>${escapeHTML(n)}</li>`).join("")}</ul>
+      <div class="plan-actions" style="padding:0">
+        <button type="button" class="btn btn-ghost btn-sm" id="diet-rebuild">🔄 New meal ideas</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="diet-prefs">⚙️ Change preferences</button>
+      </div>
+    </div>`;
+
+  const persist = () => { saveData(); renderDiet(section); };
+  section.querySelectorAll('input[name="daytype"]').forEach(r => r.addEventListener("change", () => { log.dayType = r.value; log.meals = {}; persist(); }));
+  section.querySelectorAll("[data-meal]").forEach(c => c.addEventListener("change", () => { log.meals[c.dataset.meal] = c.checked; persist(); }));
+  section.querySelectorAll(".count-btn").forEach(b => b.addEventListener("click", () => {
+    log[b.dataset.count] = Math.max(0, Math.min(20, (log[b.dataset.count] || 0) + Number(b.dataset.step)));
+    persist();
+  }));
+  section.querySelectorAll('input[name="energy"]').forEach(r => r.addEventListener("change", () => { log.energy = Number(r.value); persist(); }));
+  $("diet-feedback-btn").addEventListener("click", async () => {
+    $("diet-feedback").innerHTML = `<div class="spinner"></div>`;
+    const recent = {};
+    last7.forEach(d => { const l = data.logs[dayKey(d)]; if (l) recent[dayKey(d)] = l; });
+    try {
+      const tips = await getDietFeedback({ logs: recent, waterTarget: plan.waterTarget, diet: data.prefs.diet, ageGroup: data.prefs.ageGroup, goal: data.prefs.goal });
+      data.feedback = { tips, date: new Date().toISOString() };
+      persist();
+    } catch (err) {
+      $("diet-feedback").innerHTML = `<p class="muted">Couldn't get feedback right now. Please try again.</p>`;
+    }
+  });
+  $("diet-rebuild").addEventListener("click", async () => {
+    data.seed = (data.seed || 0) + 1;
+    section.innerHTML = `<div class="spinner"></div>`;
+    data.plan = await getDietPlan({ ...data.prefs, seed: data.seed });
+    persist();
+    toast("New meal ideas ready. 🥗");
+  });
+  $("diet-prefs").addEventListener("click", () => renderDietSetup(section, data.prefs));
+}
+
+const DIET_LABELS = { any: "any", vegetarian: "vegetarian", vegan: "vegan", pescatarian: "pescatarian" };
+
+function renderDietSetup(section, prefs = {}) {
+  const answers = (userData.latest && userData.latest.answers) || {};
+  const radios = (name, options, current) => `<div class="choice-row">${options.map(([v, label], i) =>
+    `<label><input type="radio" name="${name}" value="${v}" ${(current ? current === v : i === 0) ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
+  section.innerHTML = `
+    <div class="diet-head"><h3>🥗 AI Diet Plan &amp; Tracker</h3><span class="premium-chip">⭐ Premium</span></div>
+    <p class="panel-intro">Answer a few questions and your AI coach builds a fuel plan for training days, rest days and match days. Then track your meals, water and energy every day.</p>
+    <form class="checkin-form" id="diet-form" novalidate>
+      <div><span class="fieldset-label">How do you eat?</span>
+        ${radios("diet", [["any", "Everything"], ["vegetarian", "Vegetarian"], ["vegan", "Vegan"], ["pescatarian", "Pescatarian"]], prefs.diet)}</div>
+      <label class="field"><span>Foods to avoid or allergies <small>(optional)</small></span>
+        <input type="text" id="diet-avoid" value="${escapeHTML(prefs.avoid || "")}" placeholder="e.g. nuts, mushrooms"></label>
+      <div><span class="fieldset-label">What's your main goal?</span>
+        ${radios("goal", [["energy", "⚡ Energy for training"], ["recover", "🔁 Recover faster"], ["strength", "💪 Build strength"], ["allround", "🌈 Healthy all-round"]], prefs.goal)}</div>
+      <label class="field"><span>Age group</span>
+        <select id="diet-age">${["Under 10", "10-13", "14-17", "18+"].map(a => `<option ${(prefs.ageGroup || answers.ageGroup || "14-17") === a ? "selected" : ""}>${a}</option>`).join("")}</select></label>
+      <button type="submit" class="btn btn-primary">${prefs.diet ? "Update my diet plan" : "Create my diet plan"}</button>
+      <p class="muted small">General healthy-eating guidance, not medical advice. With allergies or a medical condition, check with a parent, doctor or dietitian.</p>
+    </form>`;
+  $("diet-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    if (!hasFeature(currentUser, "premium")) return;
+    const form = e.target;
+    const data = dietData();
+    data.prefs = { diet: form.diet.value, avoid: $("diet-avoid").value.trim().slice(0, 120), goal: form.goal.value, ageGroup: $("diet-age").value };
+    section.innerHTML = `<div class="spinner"></div><p class="muted" style="text-align:center">Your AI coach is building your fuel plan…</p>`;
+    try {
+      data.plan = await getDietPlan({ ...data.prefs, seed: data.seed || 0 });
+      saveData();
+      renderDiet(section);
+      toast("Your diet plan is ready! 🥗");
+    } catch (err) {
+      renderDietSetup(section, data.prefs);
+      toast("Couldn't build your diet plan. Please try again.");
+    }
+  });
 }
 
 function renderCheckin(section) {
