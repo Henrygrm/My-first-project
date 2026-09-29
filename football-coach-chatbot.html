@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Football Coach Chatbot</title>
+<style>
+  /* ============ THEME ============ */
+  :root {
+    --green-dark: #0b5d2a;
+    --green: #12833b;
+    --green-light: #1fae52;
+    --green-pale: #e9f7ee;
+    --white: #ffffff;
+    --text: #13261a;
+    --muted: #5d7264;
+    --border: #d4e8da;
+    --shadow: 0 8px 24px rgba(11, 93, 42, 0.15);
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    color: var(--text);
+    background:
+      repeating-linear-gradient(90deg, #0f7434 0 60px, #12833b 60px 120px);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .fc-app {
+    width: 100%;
+    max-width: 760px;
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 32px);
+    min-height: 520px;
+  }
+
+  /* ============ HEADER ============ */
+  .fc-header {
+    background: linear-gradient(135deg, var(--green-dark), var(--green-light));
+    color: var(--white);
+    padding: 18px 20px 0;
+    position: relative;
+  }
+  .fc-header::after { /* pitch centre-circle decoration */
+    content: "";
+    position: absolute;
+    right: -40px; top: -40px;
+    width: 140px; height: 140px;
+    border: 3px solid rgba(255,255,255,0.18);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .fc-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 1.35rem; font-weight: 800; letter-spacing: 0.3px;
+    margin: 0 0 4px;
+  }
+  .fc-subtitle { margin: 0 0 14px; opacity: 0.9; font-size: 0.9rem; }
+
+  .fc-tabs { display: flex; gap: 6px; }
+  .fc-tab {
+    flex: 1;
+    border: none;
+    background: rgba(255,255,255,0.15);
+    color: var(--white);
+    padding: 12px 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    border-radius: 12px 12px 0 0;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .fc-tab:hover { background: rgba(255,255,255,0.28); }
+  .fc-tab.active { background: var(--white); color: var(--green-dark); }
+
+  /* ============ PANELS ============ */
+  .fc-panel { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  .fc-panel.active { display: flex; }
+
+  .fc-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 16px;
+    background: var(--green-pale);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .fc-msg { display: flex; gap: 8px; align-items: flex-end; max-width: 88%; animation: pop 0.25s ease; }
+  .fc-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .fc-avatar {
+    width: 34px; height: 34px; flex-shrink: 0;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 1.1rem;
+    background: var(--white);
+    border: 2px solid var(--green);
+  }
+  .fc-msg.user .fc-avatar { background: var(--green); border-color: var(--green-dark); }
+  .fc-bubble {
+    padding: 11px 14px;
+    border-radius: 16px;
+    line-height: 1.45;
+    font-size: 0.95rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .fc-msg.bot .fc-bubble { background: var(--white); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .fc-msg.user .fc-bubble { background: var(--green); color: var(--white); border-bottom-right-radius: 4px; }
+
+  @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* typing dots */
+  .fc-typing span {
+    display: inline-block; width: 7px; height: 7px; margin: 0 2px;
+    background: var(--green); border-radius: 50%;
+    animation: blink 1.2s infinite;
+  }
+  .fc-typing span:nth-child(2) { animation-delay: 0.2s; }
+  .fc-typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+
+  /* ============ INPUT AREA ============ */
+  .fc-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px 0; background: var(--white); }
+  .fc-options:empty { display: none; }
+  .fc-chip {
+    border: 2px solid var(--green);
+    background: var(--white);
+    color: var(--green-dark);
+    padding: 9px 16px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .fc-chip:hover { background: var(--green); color: var(--white); }
+
+  .fc-inputbar {
+    display: flex; gap: 8px;
+    padding: 12px 16px 16px;
+    background: var(--white);
+    border-top: 1px solid var(--border);
+  }
+  .fc-input {
+    flex: 1;
+    padding: 12px 14px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    font-size: 1rem; /* 16px stops iOS zooming in */
+    outline: none;
+    min-width: 0;
+  }
+  .fc-input:focus { border-color: var(--green); }
+  .fc-input:disabled { background: #f3f5f4; }
+  .fc-btn {
+    border: none;
+    background: var(--green);
+    color: var(--white);
+    font-weight: 800;
+    padding: 0 18px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.95rem;
+  }
+  .fc-btn:hover { background: var(--green-dark); }
+  .fc-btn:disabled { background: #9cc9aa; cursor: default; }
+  .fc-btn.secondary { background: var(--white); color: var(--green-dark); border: 2px solid var(--green); padding: 10px 16px; }
+
+  /* ============ TRAINING PLAN ============ */
+  .fc-plan { width: 100%; max-width: 100%; }
+  .fc-plan-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(11,93,42,0.08);
+  }
+  .fc-plan-head {
+    background: linear-gradient(135deg, var(--green-dark), var(--green));
+    color: var(--white);
+    padding: 14px 16px;
+  }
+  .fc-plan-head h3 { margin: 0 0 6px; font-size: 1.1rem; }
+  .fc-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fc-tag { background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+
+  .fc-days { display: grid; grid-template-columns: 1fr; gap: 0; }
+  .fc-day { padding: 14px 16px; border-top: 1px solid var(--border); }
+  .fc-day.rest { background: #f6faf7; }
+  .fc-day-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .fc-day-name { font-weight: 800; color: var(--green-dark); }
+  .fc-day-focus {
+    font-size: 0.75rem; font-weight: 700;
+    background: var(--green-pale); color: var(--green-dark);
+    padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+  }
+  .fc-day.rest .fc-day-focus { background: #e6ece8; color: var(--muted); }
+  .fc-day ul { margin: 0; padding-left: 18px; }
+  .fc-day li { margin: 3px 0; font-size: 0.92rem; }
+  .fc-day li small { color: var(--muted); }
+  .fc-plan-note { padding: 12px 16px; font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--border); }
+  .fc-plan-actions { padding: 12px 16px 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ============ PHONES ============ */
+  @media (max-width: 560px) {
+    body { padding: 0; }
+    .fc-app { height: 100vh; height: 100dvh; border-radius: 0; }
+    .fc-title { font-size: 1.15rem; }
+    .fc-tab { font-size: 0.85rem; padding: 11px 6px; }
+    .fc-msg { max-width: 95%; }
+    .fc-messages { padding: 14px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="fc-app">
+  <header class="fc-header">
+    <h1 class="fc-title">⚽ Football Coach</h1>
+    <p class="fc-subtitle">Your personal training buddy</p>
+    <nav class="fc-tabs">
+      <button class="fc-tab active" data-tab="planner">📅 Weekly Training Planner</button>
+      <button class="fc-tab" data-tab="coach">💬 Ask a Coach</button>
+    </nav>
+  </header>
+
+  <!-- TAB 1: WEEKLY TRAINING PLANNER -->
+  <section class="fc-panel active" id="panel-planner">
+    <div class="fc-messages" id="planner-messages"></div>
+    <div class="fc-options" id="planner-options"></div>
+    <form class="fc-inputbar" id="planner-form">
+      <input class="fc-input" id="planner-input" type="text" placeholder="Pick an option above..." autocomplete="off" disabled>
+      <button class="fc-btn" id="planner-send" type="submit" disabled>Send</button>
+    </form>
+  </section>
+
+  <!-- TAB 2: ASK A COACH -->
+  <section class="fc-panel" id="panel-coach">
+    <div class="fc-messages" id="coach-messages"></div>
+    <form class="fc-inputbar" id="coach-form">
+      <input class="fc-input" id="coach-input" type="text" placeholder="Ask any football question..." autocomplete="off">
+      <button class="fc-btn" type="submit">Send</button>
+    </form>
+  </section>
+</div>
+
+<script>
+/* ==========================================================================
+   🔌 AI CONNECTION POINT
+   --------------------------------------------------------------------------
+   Right now the chatbot uses PRETEND answers (USE_REAL_AI = false).
+   To connect a real AI later:
+     1. Set USE_REAL_AI = true
+     2. Set AI_ENDPOINT to YOUR OWN backend / serverless function URL.
+        (Never put a secret API key directly in this file — anyone can see it.)
+     3. Your backend should accept:  { system, messages: [{role, content}] }
+        and return JSON:              { reply: "text answer" }
+   Only the two functions below talk to the "AI", so that's all you change.
+   ========================================================================== */
+const USE_REAL_AI = false;
+const AI_ENDPOINT = "https://your-backend.example.com/api/coach";
+
+async function callAI(systemPrompt, messages) {
+  const res = await fetch(AI_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ system: systemPrompt, messages })
+  });
+  if (!res.ok) throw new Error("AI request failed: " + res.status);
+  const data = await res.json();
+  return data.reply;
+}
+
+/** Tab 2: returns the coach's answer to a question. */
+async function getCoachReply(question, history) {
+  if (USE_REAL_AI) {
+    return callAI(
+      "You are a friendly, encouraging football (soccer) coach. Give short, practical tips for young players.",
+      history
+    );
+  }
+  await wait(700 + Math.random() * 600); // pretend the AI is "thinking"
+  return fakeCoachReply(question);
+}
+
+/** Tab 1: returns a 7-day plan as an array of { day, focus, rest, drills: [{name, detail}] }. */
+async function getTrainingPlan(profile) {
+  if (USE_REAL_AI) {
+    const reply = await callAI(
+      "You are a football coach. Reply ONLY with a JSON array of 7 objects (Monday to Sunday) " +
+      'shaped like {"day":"Monday","focus":"...","rest":false,"drills":[{"name":"...","detail":"..."}]}. ' +
+      "Include at least one full rest day and suit the player's age.",
+      [{ role: "user", content: JSON.stringify(profile) }]
+    );
+    return JSON.parse(reply);
+  }
+  await wait(1200);
+  return fakeTrainingPlan(profile);
+}
+
+/* ==========================================================================
+   PRETEND DATA (delete or ignore once a real AI is connected)
+   ========================================================================== */
+const POSITION_DRILLS = {
+  Goalkeeper: [
+    { name: "Diving saves", detail: "10 each side, low and high" },
+    { name: "Reaction ball catches", detail: "3 × 2 min against a wall" },
+    { name: "Distribution practice", detail: "15 throws + 15 goal kicks at a target" },
+    { name: "1v1 smothering", detail: "Partner runs in, you close down the angle" },
+    { name: "Cross claiming", detail: "10 crosses – call 'Keeper!' and catch at the highest point" }
+  ],
+  Defender: [
+    { name: "Jockeying & body shape", detail: "4 × 1 min side-on, staying on your toes" },
+    { name: "Heading clearances", detail: "20 headers aiming high and wide" },
+    { name: "Recovery sprints", detail: "8 × 30 m turn-and-chase sprints" },
+    { name: "Long passing", detail: "20 switches of play to a target 30 m away" },
+    { name: "1v1 defending", detail: "Stop a partner getting past you, 6 rounds" }
+  ],
+  Midfielder: [
+    { name: "Scanning & first touch", detail: "Look over shoulder before every receive, 5 min" },
+    { name: "Passing triangles", detail: "10 min one-and-two-touch with cones" },
+    { name: "Box-to-box runs", detail: "6 × 60 m at 80% pace" },
+    { name: "Through-ball practice", detail: "15 passes between two cones into space" },
+    { name: "Turning under pressure", detail: "Receive, half-turn, play forward – 20 reps" }
+  ],
+  Winger: [
+    { name: "Cone dribbling at speed", detail: "6 runs through a slalom" },
+    { name: "Crossing from the byline", detail: "15 crosses to a target area" },
+    { name: "1v1 moves", detail: "Step-overs, scissors & drag-backs – 10 each" },
+    { name: "Acceleration sprints", detail: "10 × 15 m explosive starts" },
+    { name: "Cut inside & shoot", detail: "12 reps from the wide channel" }
+  ],
+  Striker: [
+    { name: "Finishing drill", detail: "20 shots – aim for the corners" },
+    { name: "First-time finishing", detail: "Partner rolls ball in, shoot first time ×15" },
+    { name: "Hold-up play", detail: "Receive with back to goal, shield, lay off ×15" },
+    { name: "Runs in behind", detail: "Timing runs off the last defender ×10" },
+    { name: "Headers on goal", detail: "15 headers aimed downwards" }
+  ]
+};
+
+// Words a player might type → extra drills that target them.
+const FOCUS_LIBRARY = [
+  { keys: ["weak foot", "left foot", "right foot", "both feet", "other foot"], drill: { name: "Weak-foot wall passes", detail: "100 touches with your weaker foot only" } },
+  { keys: ["speed", "pace", "fast", "slow", "quick", "sprint"], drill: { name: "Speed ladder + sprints", detail: "5 ladder patterns, then 6 × 20 m sprints" } },
+  { keys: ["stamina", "fitness", "tired", "endurance", "running"], drill: { name: "Interval running", detail: "8 × (1 min fast, 1 min jog)" } },
+  { keys: ["shoot", "shot", "finish", "goal", "scoring"], drill: { name: "Shooting accuracy", detail: "Aim at 4 targets in the goal corners, 20 shots" } },
+  { keys: ["pass", "passing"], drill: { name: "Wall passing", detail: "50 passes each foot, two-touch" } },
+  { keys: ["dribbl", "skill", "ball control", "close control"], drill: { name: "Tight-space dribbling", detail: "Keep the ball inside a 5 m box for 3 × 2 min" } },
+  { keys: ["touch", "first touch", "control"], drill: { name: "First-touch juggling", detail: "Juggle, then trap dead – 10 min" } },
+  { keys: ["header", "heading", "aerial", "jump"], drill: { name: "Heading & jumping", detail: "15 jump-headers + 3 × 10 squat jumps" } },
+  { keys: ["strength", "strong", "weak", "physical", "muscle"], drill: { name: "Bodyweight strength", detail: "3 × (10 squats, 10 lunges, 20 s plank)" } },
+  { keys: ["confidence", "nervous", "mental", "focus"], drill: { name: "Visualisation", detail: "5 min picturing yourself playing your best game" } },
+  { keys: ["defend", "tackl", "marking"], drill: { name: "Tackling technique", detail: "Block-tackle practice with a partner, 15 reps" } },
+  { keys: ["cross", "crossing"], drill: { name: "Crossing accuracy", detail: "15 crosses into a coned area" } },
+  { keys: ["positioning", "vision", "awareness", "decision"], drill: { name: "Scanning game", detail: "Watch 10 min of pro highlights for your position and note positioning" } }
+];
+
+function findFocusDrills(text) {
+  const lower = (text || "").toLowerCase();
+  return FOCUS_LIBRARY.filter(f => f.keys.some(k => lower.includes(k))).map(f => f.drill);
+}
+
+function fakeTrainingPlan(p) {
+  const drills = POSITION_DRILLS[p.position] || POSITION_DRILLS.Midfielder;
+  let focus = findFocusDrills(p.weaknesses + " " + p.goal);
+  if (focus.length === 0) focus = [{ name: "Ball mastery", detail: "Toe taps, sole rolls & inside-outside touches – 10 min" }];
+
+  const weakFoot = p.foot === "Left" ? "right" : p.foot === "Right" ? "left" : null;
+  const footDrill = weakFoot
+    ? { name: "Weaker-foot practice", detail: `50 passes and 10 shots with your ${weakFoot} foot` }
+    : { name: "Two-footed combos", detail: "Alternate feet on every touch – 5 min" };
+
+  // Younger players get shorter sessions and more fun.
+  const minutes = { "Under 10": "30–40 min", "10-13": "45 min", "14-17": "60 min", "18+": "60–75 min" }[p.ageGroup] || "45 min";
+  const young = p.ageGroup === "Under 10";
+  const warmUp = { name: "Warm-up", detail: young ? "Tag game + dynamic stretches, 8 min" : "Jog, dynamic stretches & rondo, 10 min" };
+  const coolDown = { name: "Cool-down", detail: "Light jog + stretching, 5 min" };
+  const pick = (arr, i) => arr[i % arr.length];
+
+  return [
+    { day: "Monday", focus: `${p.position} skills`, drills: [warmUp, drills[0], drills[1], coolDown] },
+    { day: "Tuesday", focus: "Your main goal", drills: [warmUp, pick(focus, 0), pick(focus, 1), footDrill, coolDown] },
+    { day: "Wednesday", focus: "Rest & recovery", rest: true, drills: [
+      { name: "Full rest", detail: "Let your body recover and grow stronger" },
+      { name: "Optional", detail: "Light walk or stretching, drink plenty of water" }
+    ] },
+    { day: "Thursday", focus: "Weak spots", drills: [warmUp, pick(focus, 1), drills[2], footDrill, coolDown] },
+    { day: "Friday", focus: young ? "Fun games" : "Speed & fitness", drills: young
+      ? [warmUp, { name: "Small-sided game", detail: "3v3 or 4v4 with friends, 20 min" }, drills[3], coolDown]
+      : [warmUp, { name: "Agility circuit", detail: "Cones, ladders & short sprints, 15 min" }, drills[3], coolDown] },
+    { day: "Saturday", focus: "Match day / game play", drills: [
+      warmUp,
+      { name: "Match or scrimmage", detail: "Try to use what you practised this week" },
+      drills[4],
+      coolDown
+    ] },
+    { day: "Sunday", focus: "Rest day", rest: true, drills: [
+      { name: "Full rest", detail: "Sleep well and eat good food" },
+      { name: "Reflect", detail: "Write down one thing you improved this week" }
+    ] }
+  ].map(d => ({ ...d, minutes: d.rest ? "" : minutes }));
+}
+
+const COACH_ANSWERS = [
+  { keys: ["weak foot", "left foot", "right foot", "other foot"], reply: "Great question! To improve your weaker foot:\n\n1. Do 100 wall passes with ONLY your weak foot every day.\n2. Juggle using just that foot.\n3. In training games, challenge yourself to use it at least 5 times.\n\nIt feels awkward at first, but after 3–4 weeks you'll notice a big difference! 💪" },
+  { keys: ["faster", "speed", "pace", "quick"], reply: "To get faster:\n\n• Short sprints (10–20 m) with full rest between them\n• Ladder drills for quick feet\n• Work on your first 3 steps – that's where games are won\n• Sleep well – your body gets faster while you rest!\n\nTry 2 speed sessions a week. 🏃" },
+  { keys: ["shoot", "shot", "finish", "score", "goal"], reply: "Better shooting tips:\n\n1. Plant your non-kicking foot next to the ball, pointing at the target.\n2. Keep your head down and body over the ball to keep it low.\n3. Strike with your laces for power, inside of the foot for accuracy.\n4. Aim for the corners – keepers hate them!\n\nPractise 20 shots, 3 times a week. ⚽" },
+  { keys: ["stamina", "fitness", "tired", "run more", "endurance"], reply: "To build stamina:\n\n• Interval runs: 1 min fast, 1 min jog, repeat 8 times\n• Play small-sided games – they're fitness in disguise\n• Drink water and eat carbs (pasta, rice) before training\n\nBuild it up slowly over a few weeks. 🔋" },
+  { keys: ["dribbl", "skill", "trick"], reply: "Dribbling tips:\n\n• Keep the ball close – lots of small touches\n• Use both the inside and outside of your feet\n• Look up between touches to see space\n• Learn 2 moves really well (like a step-over and a drag-back) before adding more\n\nSet up cones and dribble through them every day! 🌀" },
+  { keys: ["pass", "passing"], reply: "For better passing:\n\n• Use the inside of your foot for short, accurate passes\n• Point your standing foot where you want the ball to go\n• Check your shoulder BEFORE the ball arrives so you know where to pass\n• Pass to your teammate's stronger foot\n\nWall passing is the best way to practise alone. 🎯" },
+  { keys: ["first touch", "control", "touch"], reply: "First touch is everything! Try this:\n\n• Kick the ball against a wall and control it with different parts of your foot\n• Cushion the ball – relax your foot as it arrives\n• Take your first touch AWAY from pressure, into space\n\n10 minutes a day will make a huge difference. 👟" },
+  { keys: ["nervous", "confidence", "scared", "pressure", "mental"], reply: "Feeling nervous is normal – even pros feel it!\n\n• Breathe slowly: in for 4 seconds, out for 4\n• Focus on your first simple action (a short pass or a tackle)\n• Remember: mistakes are how you learn\n• Picture yourself playing well the night before\n\nYou've got this! 🙌" },
+  { keys: ["eat", "food", "diet", "drink", "water", "nutrition"], reply: "Fuel like a pro:\n\n• 2–3 hours before: pasta, rice or a sandwich\n• Drink water all day, not just during games\n• After: some protein (chicken, eggs, yoghurt) + fruit\n• Avoid lots of sweets and fizzy drinks before matches 🍝💧" },
+  { keys: ["header", "heading"], reply: "Heading tips:\n\n• Use your forehead, not the top of your head\n• Keep your eyes open and mouth closed\n• Attack the ball – don't let it hit you\n• Use your arms for balance when you jump\n\nYounger players should practise with a soft/light ball. 🧠" },
+  { keys: ["goalkeeper", "keeper", "save", "diving"], reply: "Goalkeeper tips:\n\n• Stay on your toes in the 'ready' position\n• Make your hands into a 'W' shape to catch\n• Narrow the angle by stepping off your line\n• Communicate loudly with your defenders!\n\nPractise diving on soft grass first. 🧤" },
+  { keys: ["defend", "tackl", "defender"], reply: "Defending tips:\n\n• Stand side-on so you can turn quickly\n• Stay patient – don't dive in!\n• Watch the ball, not the player's tricks\n• Show the attacker onto their weaker foot or towards the sideline\n\nGood defenders are patient defenders. 🛡️" },
+  { keys: ["injur", "hurt", "pain", "sore"], reply: "If something hurts, stop and rest – and tell a parent, coach or doctor, especially if the pain lasts more than a couple of days. For small knocks, rest and ice can help. Always warm up properly to help prevent injuries. 🩹" }
+];
+
+function fakeCoachReply(question) {
+  const lower = question.toLowerCase();
+  if (/^(hi|hello|hey)\b/.test(lower)) {
+    return "Hey! 👋 I'm your coach. Ask me anything – shooting, passing, speed, confidence, food… whatever you want to get better at!";
+  }
+  const match = COACH_ANSWERS.find(a => a.keys.some(k => lower.includes(k)));
+  if (match) return match.reply;
+  return "Good question! 🤔 Here's my general advice:\n\n• Practise a little every day – 20 minutes beats 2 hours once a week\n• Work on your weaker foot\n• Watch pros who play your position\n• Rest well and have fun!\n\nTry asking me about shooting, passing, speed, stamina, dribbling or confidence for more specific tips.";
+}
+
+/* ==========================================================================
+   HELPERS
+   ========================================================================== */
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+function escapeHTML(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function addMessage(container, sender, text) {
+  const msg = document.createElement("div");
+  msg.className = "fc-msg " + sender;
+  msg.innerHTML = `<div class="fc-avatar">${sender === "bot" ? "🧑‍🏫" : "⚽"}</div><div class="fc-bubble"></div>`;
+  msg.querySelector(".fc-bubble").textContent = text;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+  return msg;
+}
+
+function showTyping(container) {
+  const msg = document.createElement("div");
+  msg.className = "fc-msg bot";
+  msg.innerHTML = `<div class="fc-avatar">🧑‍🏫</div><div class="fc-bubble fc-typing"><span></span><span></span><span></span></div>`;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+  return () => msg.remove();
+}
+
+async function botSay(container, text) {
+  const stop = showTyping(container);
+  await wait(500);
+  stop();
+  addMessage(container, "bot", text);
+}
+
+/* ==========================================================================
+   TABS
+   ========================================================================== */
+document.querySelectorAll(".fc-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".fc-tab").forEach(t => t.classList.toggle("active", t === tab));
+    document.querySelectorAll(".fc-panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + tab.dataset.tab));
+  });
+});
+
+/* ==========================================================================
+   TAB 1: WEEKLY TRAINING PLANNER
+   ========================================================================== */
+const QUESTIONS = [
+  { key: "position", text: "First up – what position do you play? ⚽", options: ["Goalkeeper", "Defender", "Midfielder", "Winger", "Striker"] },
+  { key: "ageGroup", text: "Nice! What is your age group?", options: ["Under 10", "10-13", "14-17", "18+"] },
+  { key: "foot", text: "Which is your strong foot? 👟", options: ["Left", "Right", "Both"] },
+  { key: "weaknesses", text: "What are your weaknesses? Be honest – that's how we improve! 💪", placeholder: "e.g. my left foot, I get tired quickly..." },
+  { key: "goal", text: "Last one! What do you want to work on most? 🎯", placeholder: "e.g. scoring more goals, getting faster..." }
+];
+
+const plannerMsgs = document.getElementById("planner-messages");
+const plannerOptions = document.getElementById("planner-options");
+const plannerForm = document.getElementById("planner-form");
+const plannerInput = document.getElementById("planner-input");
+const plannerSend = document.getElementById("planner-send");
+
+let step = 0;
+let profile = {};
+
+function setTextInput(enabled, placeholder) {
+  plannerInput.disabled = !enabled;
+  plannerSend.disabled = !enabled;
+  plannerInput.placeholder = placeholder || "Pick an option above...";
+  if (enabled) plannerInput.focus();
+}
+
+async function askQuestion() {
+  const q = QUESTIONS[step];
+  plannerOptions.innerHTML = "";
+  setTextInput(false);
+  await botSay(plannerMsgs, q.text);
+
+  if (q.options) {
+    q.options.forEach(opt => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "fc-chip";
+      chip.textContent = opt;
+      chip.addEventListener("click", () => handleAnswer(opt));
+      plannerOptions.appendChild(chip);
+    });
+  } else {
+    setTextInput(true, q.placeholder);
+  }
+}
+
+function handleAnswer(answer) {
+  answer = answer.trim();
+  if (!answer) return;
+  addMessage(plannerMsgs, "user", answer);
+  profile[QUESTIONS[step].key] = answer;
+  plannerOptions.innerHTML = "";
+  plannerInput.value = "";
+  step++;
+  if (step < QUESTIONS.length) askQuestion();
+  else buildPlan();
+}
+
+plannerForm.addEventListener("submit", e => {
+  e.preventDefault();
+  if (!plannerInput.disabled) handleAnswer(plannerInput.value);
+});
+
+async function buildPlan() {
+  setTextInput(false, "Your plan is ready!");
+  await botSay(plannerMsgs, "Brilliant! Give me a second to build your personal 7-day plan... 📝");
+  const stop = showTyping(plannerMsgs);
+  let plan;
+  try {
+    plan = await getTrainingPlan(profile);
+  } catch (err) {
+    stop();
+    addMessage(plannerMsgs, "bot", "Sorry, something went wrong making your plan. Please try again!");
+    showRestart();
+    return;
+  }
+  stop();
+  renderPlan(plan);
+  showRestart();
+}
+
+function renderPlan(plan) {
+  const wrap = document.createElement("div");
+  wrap.className = "fc-plan";
+  const tags = [profile.position, profile.ageGroup, profile.foot + " foot"].map(t => `<span class="fc-tag">${escapeHTML(t)}</span>`).join("");
+
+  wrap.innerHTML = `
+    <div class="fc-plan-card">
+      <div class="fc-plan-head">
+        <h3>🏆 Your 7-Day Training Plan</h3>
+        <div class="fc-tags">${tags}</div>
+      </div>
+      <div class="fc-days">
+        ${plan.map(d => `
+          <div class="fc-day ${d.rest ? "rest" : ""}">
+            <div class="fc-day-top">
+              <span class="fc-day-name">${d.rest ? "😴" : "⚽"} ${escapeHTML(d.day)}</span>
+              <span class="fc-day-focus">${escapeHTML(d.focus)}${d.minutes ? " · " + escapeHTML(d.minutes) : ""}</span>
+            </div>
+            <ul>
+              ${d.drills.map(dr => `<li><strong>${escapeHTML(dr.name)}</strong> <small>– ${escapeHTML(dr.detail)}</small></li>`).join("")}
+            </ul>
+          </div>`).join("")}
+      </div>
+      <div class="fc-plan-note">
+        🎯 Focus: <strong>${escapeHTML(profile.goal)}</strong><br>
+        💪 Working on: <strong>${escapeHTML(profile.weaknesses)}</strong><br>
+        Always warm up, drink water and stop if anything hurts.
+      </div>
+    </div>`;
+  plannerMsgs.appendChild(wrap);
+  wrap.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function showRestart() {
+  plannerOptions.innerHTML = "";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "fc-chip";
+  btn.textContent = "🔄 Make a new plan";
+  btn.addEventListener("click", startPlanner);
+  plannerOptions.appendChild(btn);
+}
+
+async function startPlanner() {
+  step = 0;
+  profile = {};
+  plannerMsgs.innerHTML = "";
+  plannerOptions.innerHTML = "";
+  await botSay(plannerMsgs, "Hi! 👋 I'm your football coach. Answer 5 quick questions and I'll make you a training plan for the whole week!");
+  askQuestion();
+}
+
+/* ==========================================================================
+   TAB 2: ASK A COACH
+   ========================================================================== */
+const coachMsgs = document.getElementById("coach-messages");
+const coachForm = document.getElementById("coach-form");
+const coachInput = document.getElementById("coach-input");
+const coachHistory = []; // [{ role: "user" | "assistant", content }] – ready to send to a real AI
+
+coachForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const question = coachInput.value.trim();
+  if (!question) return;
+  coachInput.value = "";
+  addMessage(coachMsgs, "user", question);
+  coachHistory.push({ role: "user", content: question });
+
+  const stop = showTyping(coachMsgs);
+  let reply;
+  try {
+    reply = await getCoachReply(question, coachHistory);
+  } catch (err) {
+    reply = "Sorry, I couldn't answer that right now. Please try again in a moment!";
+  }
+  stop();
+  addMessage(coachMsgs, "bot", reply);
+  coachHistory.push({ role: "assistant", content: reply });
+});
+
+addMessage(coachMsgs, "bot", "Hey! 👋 Ask me anything about getting better at football – shooting, passing, speed, fitness, confidence and more.");
+
+/* START */
+startPlanner();
+</script>
+</body>
+</html>
