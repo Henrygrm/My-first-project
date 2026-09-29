@@ -1,4 +1,4 @@
--- CoachAI database. Paste into Supabase → SQL Editor → New query → Run.
+-- Pitchside Coaching AI database. Paste into Supabase → SQL Editor → New query → Run.
 -- Safe to run more than once.
 
 -- One row per account: plan and billing state. Only the server (service-role key) writes it.

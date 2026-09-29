@@ -1,4 +1,4 @@
-// Creates the CoachAI products and prices in your Stripe account (run once per account/mode).
+// Creates the Pitchside Coaching AI products and prices in your Stripe account (run once per account/mode).
 //   STRIPE_SECRET_KEY=sk_test_... node scripts/setup-stripe.js
 // Safe to re-run: prices that already exist (by lookup key) are left alone.
 import Stripe from "stripe";
@@ -20,9 +20,9 @@ for (const plan of ["pro", "premium"]) {
   const { data: existing } = await stripe.prices.list({ lookup_keys: keys, limit: 10 });
   let productId = existing[0]?.product;
   if (!productId) {
-    const product = await stripe.products.create({ name: `CoachAI ${PLANS[plan].name}`, description: DESCRIPTIONS[plan] });
+    const product = await stripe.products.create({ name: `Pitchside Coaching AI ${PLANS[plan].name}`, description: DESCRIPTIONS[plan] });
     productId = product.id;
-    console.log(`Created product CoachAI ${PLANS[plan].name}`);
+    console.log(`Created product Pitchside Coaching AI ${PLANS[plan].name}`);
   }
   for (const interval of ["month", "year"]) {
     const key = lookupKey(plan, interval);

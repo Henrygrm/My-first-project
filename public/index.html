@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CoachAI – Your Personal AI Football Coach</title>
+<title>Pitchside Coaching AI – Your Personal AI Football Coach</title>
 <meta name="description" content="Personalised weekly football training plans built around your position, age, kit and time – plus an AI coach you can ask anything.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,18 +11,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <script>
   // Apply the saved theme before first paint so there's no flash.
-  try { const t = localStorage.getItem("coachai-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  try { const t = localStorage.getItem("pitchside-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
 </script>
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="locked">
 
 <!-- ============ NAV ============ -->
 <header class="nav">
   <div class="nav-inner">
     <a href="#top" class="brand">
       <span class="brand-logo">⚽</span>
-      <span class="brand-name">CoachAI</span>
+      <span class="brand-name">Pitchside<small>Coaching AI</small></span>
     </a>
     <nav class="nav-links">
       <a href="#features">Features</a>
@@ -113,7 +113,7 @@
       <div class="section-head">
         <span class="eyebrow">Features</span>
         <h2>Everything a coach would ask – <span class="gradient-text">built into one plan.</span></h2>
-        <p>Answer 8 quick questions and CoachAI builds a week of training that actually fits your life.</p>
+        <p>Answer 8 quick questions and Pitchside Coaching AI builds a week of training that actually fits your life.</p>
       </div>
       <div class="feature-grid">
         <article class="feature">
@@ -179,7 +179,7 @@
           <div class="fc-coach">
             <div class="fc-logo">⚽</div>
             <div>
-              <div class="fc-coach-name">Coach AI</div>
+              <div class="fc-coach-name">Pitchside Coach</div>
               <div class="fc-status" id="coach-status">Connecting…</div>
             </div>
           </div>
@@ -331,7 +331,7 @@
 
 <footer class="footer">
   <div class="container footer-inner">
-    <a href="#top" class="brand"><span class="brand-logo sm">⚽</span><span class="brand-name">CoachAI</span></a>
+    <a href="#top" class="brand"><span class="brand-logo sm">⚽</span><span class="brand-name">Pitchside<small>Coaching AI</small></span></a>
     <nav class="footer-links">
       <a href="#features">Features</a>
       <a href="#pricing">Pricing</a>
@@ -345,7 +345,7 @@
 <div class="modal" id="auth-modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
     <button type="button" class="modal-close" data-close-modal aria-label="Close">×</button>
-    <span class="brand-logo sm">⚽</span>
+    <div class="gate-brand"><span class="brand-logo sm">⚽</span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
     <h2 id="auth-title">Create your free account</h2>
     <p class="modal-sub" id="auth-sub"></p>
     <div class="auth-tabs">
@@ -361,6 +361,7 @@
         <span>Password</span>
         <input type="password" id="auth-password" autocomplete="new-password" placeholder="At least 8 characters" minlength="8" required>
       </label>
+      <label class="remember" id="auth-remember-row"><input type="checkbox" id="auth-remember"> Keep me logged in on this device</label>
       <button type="button" class="link-button" id="auth-forgot" data-auth-mode="forgot" hidden>Forgot your password?</button>
       <p class="auth-message" id="auth-message" role="alert" hidden></p>
       <button type="submit" class="btn btn-primary btn-block" id="auth-submit">Create account</button>

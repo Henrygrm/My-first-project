@@ -1,4 +1,4 @@
-# CoachAI – Your Personal AI Football Coach
+# Pitchside Coaching AI – Your Personal AI Football Coach
 
 A website with a real AI football coach (Claude), player accounts, and paid subscriptions.
 

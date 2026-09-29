@@ -1,5 +1,5 @@
 /* ==========================================================================
-   CoachAI – accounts, pricing and checkout
+   Pitchside Coaching AI – accounts, pricing and checkout
    --------------------------------------------------------------------------
    Live mode:  Supabase for sign-up/log-in, Stripe Checkout for payments.
    Demo mode:  when those aren't configured (or the page runs without the
@@ -22,13 +22,18 @@ const Account = (() => {
   let demoPayments = false; // simulate Stripe Checkout
   let billingInterval = "year";
   const listeners = new Set();
-  const DEMO_KEY = "coachai-demo-account";
-  const PENDING_KEY = "coachai-pending-checkout";
+  const DEMO_KEY = "pitchside-demo-account";        // demo account + plan (kept on this device)
+  const DEMO_SESSION = "pitchside-demo-session";    // "logged in" flag for the demo account
+  const PENDING_KEY = "pitchside-pending-checkout";
+  const REMEMBER_KEY = "pitchside-remember";
 
-  const store = {
-    get(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } },
-    set(key, value) { try { value == null ? localStorage.removeItem(key) : localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
-  };
+  const makeStore = area => ({
+    get(key) { try { return JSON.parse(window[area].getItem(key)); } catch (e) { return null; } },
+    set(key, value) { try { value == null ? window[area].removeItem(key) : window[area].setItem(key, JSON.stringify(value)); } catch (e) {} }
+  });
+  const store = makeStore("localStorage");       // stays on this device
+  const tabStore = makeStore("sessionStorage");  // forgotten when the tab is closed
+  const rememberMe = () => Boolean(store.get(REMEMBER_KEY));
 
   /* ---------- state ---------- */
   function demoMe(account) {
@@ -47,7 +52,8 @@ const Account = (() => {
   async function refresh() {
     if (demoAccounts) {
       const account = store.get(DEMO_KEY);
-      me = account ? demoMe(account) : null;
+      const loggedIn = tabStore.get(DEMO_SESSION) || store.get(DEMO_SESSION);
+      me = account && loggedIn ? demoMe(account) : null;
     } else if (session) {
       try {
         const res = await fetch("/api/me", { headers: await authHeaders() });
@@ -69,7 +75,7 @@ const Account = (() => {
 
   /* ---------- auth modal ---------- */
   const modal = () => document.getElementById("auth-modal");
-  let modalMode = "signup";
+  let modalMode = "login";
   let afterAuth = null;
 
   function openAuth(mode = "signup", then = null) {
@@ -81,15 +87,19 @@ const Account = (() => {
   }
 
   function closeModals() {
-    document.querySelectorAll(".modal").forEach(m => (m.hidden = true));
-    document.body.classList.remove("modal-open");
+    document.querySelectorAll(".modal").forEach(m => {
+      // While logged out, the log-in screen can't be closed.
+      if (m.id === "auth-modal" && !me) return;
+      m.hidden = true;
+    });
+    if (me) document.body.classList.remove("modal-open");
   }
 
   function setMode(mode) {
     modalMode = mode;
     const copy = {
       signup: ["Create your free account", "Start with the Free plan – upgrade whenever you're ready.", "Create account"],
-      login: ["Welcome back", "Log in to your CoachAI account.", "Log in"],
+      login: ["Welcome back", "Log in to your Pitchside Coaching AI account.", "Log in"],
       forgot: ["Reset your password", "We'll email you a link to choose a new password.", "Send reset link"],
       reset: ["Choose a new password", "Enter a new password for your account.", "Save new password"]
     }[mode];
@@ -98,11 +108,12 @@ const Account = (() => {
     document.getElementById("auth-submit").textContent = copy[2];
     document.getElementById("auth-email-row").hidden = mode === "reset";
     document.getElementById("auth-password-row").hidden = mode === "forgot";
+    document.getElementById("auth-remember-row").hidden = mode === "forgot" || mode === "reset";
     document.getElementById("auth-password").autocomplete = mode === "login" ? "current-password" : "new-password";
     document.getElementById("auth-forgot").hidden = mode !== "login";
     document.getElementById("auth-switch").innerHTML =
       mode === "signup" ? `Already have an account? <button type="button" data-auth-mode="login">Log in</button>`
-      : mode === "login" ? `New to CoachAI? <button type="button" data-auth-mode="signup">Create a free account</button>`
+      : mode === "login" ? `New to Pitchside Coaching AI? <button type="button" data-auth-mode="signup">Create a free account</button>`
       : `<button type="button" data-auth-mode="login">Back to log in</button>`;
     document.querySelectorAll(".auth-tab").forEach(t => t.classList.toggle("active", t.dataset.authMode === mode));
     document.querySelector(".auth-tabs").hidden = mode === "forgot" || mode === "reset";
@@ -124,20 +135,25 @@ const Account = (() => {
     if (modalMode !== "reset" && !/^\S+@\S+\.\S+$/.test(email)) return showAuthMessage("Enter a valid email address.");
     if (modalMode !== "forgot" && password.length < 8) return showAuthMessage("Your password needs at least 8 characters.");
 
+    const remember = document.getElementById("auth-remember").checked;
     button.disabled = true;
     try {
       if (demoAccounts) {
         if (modalMode === "forgot") return showAuthMessage("In demo mode there's no email to send. Just log in with any password.", "info");
         const existing = store.get(DEMO_KEY);
         store.set(DEMO_KEY, { email: email || existing?.email, plan: existing?.email === email ? existing.plan : "free", interval: existing?.email === email ? existing.interval : null });
+        store.set(DEMO_SESSION, null);
+        tabStore.set(DEMO_SESSION, null);
+        (remember ? store : tabStore).set(DEMO_SESSION, true);
         await refresh();
-        return finishAuth(modalMode === "signup" ? "Account created – welcome to CoachAI! ⚽" : "You're logged in.");
+        return finishAuth(modalMode === "signup" ? "Account created – welcome to Pitchside Coaching AI! ⚽" : "You're logged in.");
       }
+      if (modalMode === "signup" || modalMode === "login") useRemember(remember);
       if (modalMode === "signup") {
         const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin } });
         if (error) throw error;
         if (!data.session) return showAuthMessage(`Check ${email} for a link to confirm your account, then log in.`, "info");
-        return finishAuth("Account created – welcome to CoachAI! ⚽");
+        return finishAuth("Account created – welcome to Pitchside Coaching AI! ⚽");
       }
       if (modalMode === "login") {
         const { error } = await sb.auth.signInWithPassword({ email, password });
@@ -171,9 +187,9 @@ const Account = (() => {
   }
 
   async function finishAuth(message) {
-    closeModals();
     document.getElementById("auth-password").value = "";
     await refresh();
+    closeModals();
     toast(message);
     const next = afterAuth || store.get(PENDING_KEY);
     afterAuth = null;
@@ -182,7 +198,7 @@ const Account = (() => {
   }
 
   async function signOut() {
-    if (demoAccounts) store.set(DEMO_KEY, null);
+    if (demoAccounts) { store.set(DEMO_SESSION, null); tabStore.set(DEMO_SESSION, null); }
     else if (sb) await sb.auth.signOut();
     session = null;
     closeMenu();
@@ -232,7 +248,7 @@ const Account = (() => {
       const p = PRICING[plan];
       const price = interval === "year" ? `$${p.year} / year` : `$${p.month} / month`;
       body.innerHTML = `
-        <p class="checkout-line"><span>CoachAI ${p.name} · ${interval === "year" ? "yearly" : "monthly"}</span><strong>${price}</strong></p>
+        <p class="checkout-line"><span>Pitchside Coaching AI ${p.name} · ${interval === "year" ? "yearly" : "monthly"}</span><strong>${price}</strong></p>
         ${interval === "year" ? `<p class="checkout-line deal"><span>🎁 ${TRIAL_DAYS}-day free trial</span><strong>$0 today</strong></p>
         <p class="checkout-line deal"><span>Yearly saving</span><strong>−$${p.month * 12 - p.year}</strong></p>` : ""}
         <p class="checkout-note">On the live site this is Stripe's secure checkout page, where the player enters their card.</p>
@@ -286,6 +302,9 @@ const Account = (() => {
 
   function render() {
     const signedIn = Boolean(me);
+    // Log-in wall: nothing but the log-in screen until the player is logged in.
+    document.body.classList.toggle("locked", !signedIn);
+    if (!signedIn && modal().hidden) openAuth(modalMode === "signup" ? "signup" : "login");
     document.getElementById("nav-guest").hidden = signedIn;
     document.getElementById("nav-user").hidden = !signedIn;
     if (signedIn) {
@@ -387,7 +406,26 @@ const Account = (() => {
     });
     document.getElementById("auth-form").addEventListener("submit", e => { e.preventDefault(); submitAuth(); });
     document.addEventListener("keydown", e => { if (e.key === "Escape") { closeModals(); closeMenu(); } });
+    document.getElementById("auth-remember").checked = rememberMe();
     document.querySelectorAll(".modal").forEach(m => m.addEventListener("click", e => { if (e.target === m) closeModals(); }));
+  }
+
+  // Supabase keeps the login in localStorage ("Keep me logged in") or sessionStorage (until the tab closes).
+  let clientRemembers = null;
+  function makeClient(remember) {
+    clientRemembers = remember;
+    let storage;
+    try { storage = remember ? window.localStorage : window.sessionStorage; } catch (e) { storage = undefined; }
+    sb = window.supabase.createClient(config.auth.url, config.auth.anonKey, { auth: { storage, persistSession: true, detectSessionInUrl: true } });
+    sb.auth.onAuthStateChange((event, s) => {
+      session = s;
+      if (event === "PASSWORD_RECOVERY") openAuth("reset");
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") refresh();
+    });
+  }
+  function useRemember(remember) {
+    store.set(REMEMBER_KEY, remember || null);
+    if (sb && clientRemembers !== remember) makeClient(remember);
   }
 
   async function init() {
@@ -398,14 +436,9 @@ const Account = (() => {
     } catch (e) { /* no server: demo mode */ }
 
     if (config.auth && window.supabase) {
-      sb = window.supabase.createClient(config.auth.url, config.auth.anonKey);
+      makeClient(rememberMe());
       const { data } = await sb.auth.getSession();
       session = data.session;
-      sb.auth.onAuthStateChange((event, s) => {
-        session = s;
-        if (event === "PASSWORD_RECOVERY") openAuth("reset");
-        if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") refresh();
-      });
     } else {
       demoAccounts = true;
     }

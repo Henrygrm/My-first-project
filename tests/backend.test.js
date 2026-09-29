@@ -86,7 +86,7 @@ function fakeStripe() {
     customers: { create: async (p) => { calls.push(["customer", p]); return { id: "cus_1" }; } },
     checkout: { sessions: { create: async (p) => { calls.push(["checkout", p]); return { url: "https://checkout.stripe.test/s1" }; } } },
     billingPortal: { sessions: { create: async (p) => { calls.push(["portal", p]); return { url: "https://billing.stripe.test/p1" }; } } },
-    subscriptions: { retrieve: async (id) => subscription(id, "coachai_pro_year", "trialing") }
+    subscriptions: { retrieve: async (id) => subscription(id, "pitchside_pro_year", "trialing") }
   };
 }
 const subscription = (id, key, status, extra = {}) => ({
@@ -120,7 +120,7 @@ before(async () => {
   Object.assign(process.env, {
     ANTHROPIC_API_KEY: "sk-ant-test", ANTHROPIC_BASE_URL: `http://localhost:${aiServer.address().port}`,
     SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon", SUPABASE_SERVICE_ROLE_KEY: "service",
-    STRIPE_SECRET_KEY: "sk_test_fake", STRIPE_WEBHOOK_SECRET: "whsec_test", SITE_URL: "https://coachai.test"
+    STRIPE_SECRET_KEY: "sk_test_fake", STRIPE_WEBHOOK_SECRET: "whsec_test", SITE_URL: "https://pitchside.test"
   });
   const supa = await import("../lib/supabase.js");
   const billing = await import("../lib/billing.js");
@@ -171,10 +171,10 @@ test("Checkout: yearly Pro gets a 7-day trial and links the account", async () =
   assert.equal(r.status, 200);
   assert.equal(r.body.url, "https://checkout.stripe.test/s1");
   const [, params] = stripe.calls.find(c => c[0] === "checkout");
-  assert.equal(params.line_items[0].price, "price_coachai_pro_year");
+  assert.equal(params.line_items[0].price, "price_pitchside_pro_year");
   assert.equal(params.subscription_data.trial_period_days, 7);
   assert.equal(params.client_reference_id, "u-ana");
-  assert.equal(params.success_url, "https://coachai.test/?checkout=success#pricing");
+  assert.equal(params.success_url, "https://pitchside.test/?checkout=success#pricing");
   assert.equal(db.tables.profiles[0].stripe_customer_id, "cus_1");
 
   const bad = await call("checkout", "POST", { token: "token-ana", body: { plan: "gold", interval: "year" } });
@@ -185,7 +185,7 @@ test("Monthly checkout has no trial", async () => {
   stripe.calls.length = 0;
   await call("checkout", "POST", { token: "token-ana", body: { plan: "premium", interval: "month" } });
   const [, params] = stripe.calls.find(c => c[0] === "checkout");
-  assert.equal(params.line_items[0].price, "price_coachai_premium_month");
+  assert.equal(params.line_items[0].price, "price_pitchside_premium_month");
   assert.equal(params.subscription_data.trial_period_days, undefined);
 });
 
@@ -222,7 +222,7 @@ test("Pro: higher limits and saved plans; already-subscribed checkout goes to th
 });
 
 test("Premium: elite plans and the coach remembers the player", async () => {
-  await webhook({ id: "evt_2", object: "event", type: "customer.subscription.updated", data: { object: subscription("sub_1", "coachai_premium_month", "active") } });
+  await webhook({ id: "evt_2", object: "event", type: "customer.subscription.updated", data: { object: subscription("sub_1", "pitchside_premium_month", "active") } });
   assert.equal(db.tables.profiles[0].plan, "premium");
 
   aiRequests.length = 0;
@@ -236,7 +236,7 @@ test("Premium: elite plans and the coach remembers the player", async () => {
 });
 
 test("Cancelled subscription drops back to Free", async () => {
-  await webhook({ id: "evt_3", object: "event", type: "customer.subscription.deleted", data: { object: subscription("sub_1", "coachai_premium_month", "canceled") } });
+  await webhook({ id: "evt_3", object: "event", type: "customer.subscription.deleted", data: { object: subscription("sub_1", "pitchside_premium_month", "canceled") } });
   const p = db.tables.profiles[0];
   assert.equal(p.plan, "free");
   assert.equal(p.billing_interval, null);

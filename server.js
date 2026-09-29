@@ -54,6 +54,6 @@ http.createServer(async (req, res) => {
   }
 }).listen(process.env.PORT || 3000, () => {
   const on = key => (process.env[key] ? "on" : "demo");
-  console.log(`CoachAI running at http://localhost:${process.env.PORT || 3000}`);
+  console.log(`Pitchside Coaching AI running at http://localhost:${process.env.PORT || 3000}`);
   console.log(`AI coach: ${on("ANTHROPIC_API_KEY")} · accounts: ${on("SUPABASE_URL")} · payments: ${on("STRIPE_SECRET_KEY")}`);
 });

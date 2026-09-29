@@ -1,9 +1,9 @@
 {
-  "name": "coachai",
+  "name": "pitchside-coaching-ai",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "CoachAI \u2013 personal AI football coach website",
+  "description": "Pitchside Coaching AI \u2013 personal AI football coach website",
   "scripts": {
     "dev": "node --env-file-if-exists=.env server.js",
     "start": "node --env-file-if-exists=.env server.js",

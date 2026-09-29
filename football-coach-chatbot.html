@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>CoachAI</title>
+<title>Pitchside Coaching AI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
@@ -262,7 +262,8 @@
     box-shadow: 0 8px 20px -6px rgba(31, 174, 82, 0.55); flex-shrink: 0;
   }
   .auth-hero .brand-logo { background: #fff; box-shadow: none; }
-  .brand-name { font-family: var(--heading); font-weight: 800; font-size: 1.45rem; letter-spacing: -0.03em; }
+  .brand-name { font-family: var(--heading); font-weight: 800; font-size: 1.45rem; letter-spacing: -0.03em; line-height: 1; }
+  .brand-name small { display: block; font-family: "Inter", sans-serif; font-size: 0.62em; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; margin-top: 3px; }
   .auth-hero h1 { font-weight: 800; font-size: clamp(2.2rem, 4.6vw, 3.8rem); line-height: 1.05; max-width: 14ch; text-wrap: balance; }
   .auth-hero p { font-size: 1.1rem; line-height: 1.6; max-width: 440px; opacity: 0.92; margin: 16px 0 0; }
   .auth-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
@@ -284,6 +285,8 @@
   .field textarea { resize: vertical; min-height: 70px; }
   .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px rgba(31, 174, 82, 0.15); }
   .field small { font-weight: 400; color: var(--muted); }
+  .remember { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
+  .remember input { width: 18px; height: 18px; accent-color: var(--brand); }
   .form-error { margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 0.9rem; background: #fdecec; border: 1px solid #f4c4c4; }
   .test-note { margin: 18px 0 0; font-size: 0.82rem; color: var(--muted); background: var(--surface); border: 1px dashed var(--border); padding: 10px 12px; border-radius: 12px; line-height: 1.45; }
 
@@ -466,7 +469,7 @@
      ===================================================================== -->
 <main class="screen auth-screen" id="screen-auth" hidden>
   <section class="auth-hero">
-    <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">CoachAI</span></div>
+    <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
     <div>
       <h1>Train smarter. Play better.</h1>
       <p>Your personal football coach: weekly training plans built around you, and answers whenever you're stuck.</p>
@@ -500,6 +503,7 @@
           <span>Password</span>
           <input type="password" id="auth-password" autocomplete="current-password" placeholder="At least 6 characters">
         </label>
+        <label class="remember"><input type="checkbox" id="auth-remember"> Keep me logged in on this device</label>
         <p class="form-error" id="auth-error" role="alert" hidden></p>
         <button type="submit" class="btn btn-primary btn-block" id="auth-submit">Log in</button>
       </form>
@@ -513,7 +517,7 @@
      ===================================================================== -->
 <main class="screen plans-screen" id="screen-plans" hidden>
   <div class="plans-top">
-    <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">CoachAI</span></div>
+    <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
     <button type="button" class="btn btn-ghost btn-sm" id="plans-back" hidden>← Back to my coach</button>
   </div>
   <div class="plans-head">
@@ -572,7 +576,7 @@
 <div class="screen" id="screen-app" hidden>
   <header class="app-header">
     <div class="app-header-inner">
-      <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">CoachAI</span></div>
+      <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
       <div class="user-area">
         <span class="user-hello" id="user-hello"></span>
         <button type="button" class="plan-badge" id="plan-badge" data-plan="free" title="Change plan">Free</button>
@@ -590,7 +594,7 @@
         <div class="fc-coach">
           <div class="fc-logo">⚽</div>
           <div>
-            <div class="fc-coach-name">Coach AI</div>
+            <div class="fc-coach-name">Pitchside Coach</div>
             <div class="fc-status">Online · replies instantly</div>
           </div>
         </div>
@@ -710,27 +714,46 @@ const Store = (() => {
   };
 })();
 
+// Like Store, but forgotten when the browser tab is closed (sessionStorage).
+const SessionStore = (() => {
+  const memory = {};
+  return {
+    get(key, fallback) {
+      try { const raw = sessionStorage.getItem(key); return raw == null ? fallback : JSON.parse(raw); }
+      catch (e) { return key in memory ? memory[key] : fallback; }
+    },
+    set(key, value) {
+      memory[key] = value;
+      try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+    },
+    remove(key) {
+      delete memory[key];
+      try { sessionStorage.removeItem(key); } catch (e) {}
+    }
+  };
+})();
+
 /* ==========================================================================
    3. 🔐 LOGIN – PRETEND VERSION (users are saved in this browser only)
    --------------------------------------------------------------------------
    To use a real login system (e.g. Supabase, Firebase or Auth0), replace the
    inside of these five functions with calls to that service. Keep the same
    names and return values and the rest of the app keeps working:
-     signUp({ name, email, password }) -> user   (throws Error with a message)
-     logIn({ email, password })        -> user   (throws Error with a message)
+     signUp({ name, email, password, remember }) -> user   (throws Error with a message)
+     logIn({ email, password, remember })        -> user   (throws Error with a message)
      logOut()
      currentUser()                     -> user or null
      savePlan(userId, plan)            -> user   (real apps: done by the payment webhook)
    A user looks like: { id, name, email, plan: "free" | "pro" | "premium", createdAt }
    ========================================================================== */
 const AuthService = (() => {
-  const USERS_KEY = "coachai_users";
-  const SESSION_KEY = "coachai_session";
+  const USERS_KEY = "pitchside_users";
+  const SESSION_KEY = "pitchside_session";
 
   // Pretend security only: hashes the password so it isn't stored as plain text.
   async function hash(text) {
     try {
-      const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("coachai:" + text));
+      const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("pitchside:" + text));
       return Array.from(new Uint8Array(bytes)).map(b => b.toString(16).padStart(2, "0")).join("");
     } catch (e) {
       return "plain:" + text; // very old browsers
@@ -738,9 +761,15 @@ const AuthService = (() => {
   }
   const users = () => Store.get(USERS_KEY, {});
   const publicUser = u => u && { id: u.id, name: u.name, email: u.email, plan: u.plan, createdAt: u.createdAt };
+  // Logged-in state lasts until the tab is closed, or stays on this device if "Keep me logged in" was ticked.
+  function startSession(email, remember) {
+    Store.remove(SESSION_KEY);
+    SessionStore.remove(SESSION_KEY);
+    (remember ? Store : SessionStore).set(SESSION_KEY, email);
+  }
 
   return {
-    async signUp({ name, email, password }) {
+    async signUp({ name, email, password, remember }) {
       email = String(email || "").trim().toLowerCase();
       name = String(name || "").trim();
       if (!name) throw new Error("Please enter your name.");
@@ -752,23 +781,24 @@ const AuthService = (() => {
         passwordHash: await hash(password), plan: "free", createdAt: new Date().toISOString() };
       all[email] = user;
       Store.set(USERS_KEY, all);
-      Store.set(SESSION_KEY, email);
+      startSession(email, remember);
       return publicUser(user);
     },
-    async logIn({ email, password }) {
+    async logIn({ email, password, remember }) {
       email = String(email || "").trim().toLowerCase();
       if (!email || !password) throw new Error("Enter your email and password.");
       const user = users()[email];
       if (!user) throw new Error("We couldn't find an account with that email. Want to sign up?");
       if (user.passwordHash !== await hash(password)) throw new Error("That password isn't right. Please try again.");
-      Store.set(SESSION_KEY, email);
+      startSession(email, remember);
       return publicUser(user);
     },
     async logOut() {
       Store.remove(SESSION_KEY);
+      SessionStore.remove(SESSION_KEY);
     },
     async currentUser() {
-      const email = Store.get(SESSION_KEY, null);
+      const email = SessionStore.get(SESSION_KEY, null) || Store.get(SESSION_KEY, null);
       return email ? publicUser(users()[email]) || null : null;
     },
     async savePlan(userId, plan) {
@@ -808,7 +838,7 @@ const BillingService = {
    these on the server too – anything in the browser can be changed by users.
    ========================================================================== */
 const UserData = (() => {
-  const key = id => "coachai_data_" + id;
+  const key = id => "pitchside_data_" + id;
   const empty = () => ({ questions: { day: "", count: 0 }, planDates: [], planSince: null, savedPlans: [], latest: null, checkins: [] });
   return {
     load: id => Object.assign(empty(), Store.get(key(id), {})),
@@ -1509,7 +1539,7 @@ $("auth-form").addEventListener("submit", async e => {
   const button = $("auth-submit");
   button.disabled = true;
   try {
-    const details = { name: $("auth-name").value, email: $("auth-email").value, password: $("auth-password").value };
+    const details = { name: $("auth-name").value, email: $("auth-email").value, password: $("auth-password").value, remember: $("auth-remember").checked };
     const user = authMode === "signup" ? await AuthService.signUp(details) : await AuthService.logIn(details);
     $("auth-password").value = "";
     if (authMode === "signup") {
@@ -2223,7 +2253,7 @@ async function downloadPlanPDF(plan, answers) {
         doc.text(part, M, y); y += size + gap;
       }
     };
-    line("CoachAI – 7-Day Training Plan", 20, "bold", [23, 138, 65], 8);
+    line("Pitchside Coaching AI – 7-Day Training Plan", 20, "bold", [23, 138, 65], 8);
     line(`${answers.position} · ${answers.ageGroup} · ${answers.foot} foot · ${answers.daysPerWeek} · ${answers.sessionTime} sessions`, 11, "normal", [95, 112, 104], 14);
     for (const d of plan) {
       y += 6;
@@ -2236,7 +2266,7 @@ async function downloadPlanPDF(plan, answers) {
     }
     y += 10;
     line("Always warm up, drink water and stop if anything hurts.", 9, "italic", [95, 112, 104]);
-    doc.save(`coachai-plan-${new Date().toISOString().slice(0, 10)}.pdf`);
+    doc.save(`pitchside-plan-${new Date().toISOString().slice(0, 10)}.pdf`);
     toast("Your plan PDF is downloading. 📄");
   } catch (err) {
     console.error(err);

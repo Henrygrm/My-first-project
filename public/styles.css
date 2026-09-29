@@ -1,5 +1,5 @@
 /* =====================================================================
-   CoachAI – site styles
+   Pitchside Coaching AI – site styles
    Colours are tokens so light and dark mode share one stylesheet.
    ===================================================================== */
 :root {
@@ -137,7 +137,8 @@ h1, h2, h3 { font-family: var(--heading); letter-spacing: -0.035em; margin: 0; }
   flex-shrink: 0;
 }
 .brand-logo.sm { width: 36px; height: 36px; border-radius: 11px; font-size: 1.05rem; }
-.brand-name { font-family: var(--heading); font-weight: 800; font-size: 1.5rem; letter-spacing: -0.03em; }
+.brand-name { font-family: var(--heading); font-weight: 800; font-size: 1.5rem; letter-spacing: -0.03em; line-height: 1; }
+.brand-name small { display: block; font-family: "Inter", sans-serif; font-size: 0.55em; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
 .nav-links { display: flex; gap: 36px; margin: 0 auto; }
 .nav-links a { color: var(--muted); font-weight: 500; font-size: 1.02rem; transition: color 0.2s; }
 .nav-links a:hover { color: var(--text); }
@@ -689,3 +690,22 @@ body.modal-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* =====================================================================
+   LOG-IN WALL – while logged out only the log-in screen is shown
+   ===================================================================== */
+body.locked > *:not(#auth-modal):not(.toast):not(script) { display: none !important; }
+body.locked #auth-modal {
+  display: grid !important;
+  backdrop-filter: none;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 118px, rgba(255, 255, 255, 0.35) 119px 122px, transparent 123px),
+    linear-gradient(90deg, transparent calc(50% - 1.5px), rgba(255, 255, 255, 0.35) calc(50% - 1.5px) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    repeating-linear-gradient(90deg, #13823a 0 80px, #16913f 80px 160px);
+}
+body.locked #auth-modal .modal-close { display: none; }
+.gate-brand { display: flex; align-items: center; gap: 10px; }
+.gate-brand .brand-name { font-size: 1.25rem; }
+.remember { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
+.remember[hidden] { display: none; }
+.remember input { width: 18px; height: 18px; accent-color: var(--brand); }

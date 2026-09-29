@@ -1,5 +1,5 @@
 /* ==========================================================================
-   CoachAI – front-end app
+   Pitchside Coaching AI – front-end app
    --------------------------------------------------------------------------
    🔌 AI CONNECTION
    The page talks to our own backend (/api/chat and /api/plan), which calls
@@ -42,7 +42,7 @@ async function detectAiMode() {
   updateAiStatus();
 }
 
-// Status line under "Coach AI": live/demo, and what's left on the player's plan.
+// Status line under "Pitchside Coach": live/demo, and what's left on the player's plan.
 function updateAiStatus() {
   const el = document.getElementById("coach-status");
   if (!el) return;
@@ -897,7 +897,7 @@ document.getElementById("theme-toggle").addEventListener("click", () => {
   const current = root.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   const next = current === "dark" ? "light" : "dark";
   root.dataset.theme = next;
-  try { localStorage.setItem("coachai-theme", next); } catch (e) {}
+  try { localStorage.setItem("pitchside-theme", next); } catch (e) {}
 });
 
 // Buttons like "Start training free" scroll to the coach and open the right tab.
