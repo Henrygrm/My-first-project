@@ -243,7 +243,7 @@
     <div class="fc-messages" id="planner-messages"></div>
     <div class="fc-options" id="planner-options"></div>
     <form class="fc-inputbar" id="planner-form">
-      <input class="fc-input" id="planner-input" type="text" placeholder="Pick an option above..." autocomplete="off" disabled>
+      <input class="fc-input" id="planner-input" type="text" placeholder="Tap an option or type your answer..." autocomplete="off" disabled>
       <button class="fc-btn" id="planner-send" type="submit" disabled>Send</button>
     </form>
   </section>
@@ -510,7 +510,7 @@ let profile = {};
 function setTextInput(enabled, placeholder) {
   plannerInput.disabled = !enabled;
   plannerSend.disabled = !enabled;
-  plannerInput.placeholder = placeholder || "Pick an option above...";
+  plannerInput.placeholder = placeholder || "";
   if (enabled) plannerInput.focus();
 }
 
@@ -529,14 +529,40 @@ async function askQuestion() {
       chip.addEventListener("click", () => handleAnswer(opt));
       plannerOptions.appendChild(chip);
     });
+    setTextInput(true, "Tap an option or type your answer...");
   } else {
     setTextInput(true, q.placeholder);
   }
 }
 
+// Turns a typed answer like "striker", "u10" or "12" into one of the options.
+function matchOption(text, options) {
+  const clean = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const typed = clean(text);
+  const found = options.find(o => typed.includes(clean(o)) || (typed.length > 2 && clean(o).includes(typed)));
+  if (found) return found;
+  if (options.includes("Under 10")) { // age group: accept a plain age
+    const age = parseInt(text.replace(/\D/g, ""), 10);
+    if (/^u\d/.test(typed) && age <= 10) return "Under 10";
+    if (!isNaN(age)) return age < 10 ? "Under 10" : age <= 13 ? "10-13" : age <= 17 ? "14-17" : "18+";
+  }
+  return null;
+}
+
 function handleAnswer(answer) {
   answer = answer.trim();
   if (!answer) return;
+  const q = QUESTIONS[step];
+  if (q.options) {
+    const match = matchOption(answer, q.options);
+    if (!match) {
+      addMessage(plannerMsgs, "user", answer);
+      plannerInput.value = "";
+      addMessage(plannerMsgs, "bot", "Hmm, I didn't catch that. Please choose one of: " + q.options.join(", "));
+      return;
+    }
+    answer = match;
+  }
   addMessage(plannerMsgs, "user", answer);
   profile[QUESTIONS[step].key] = answer;
   plannerOptions.innerHTML = "";
