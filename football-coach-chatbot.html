@@ -200,6 +200,15 @@
   .fc-tags { display: flex; flex-wrap: wrap; gap: 6px; }
   .fc-tag { background: var(--card); border: 1px solid var(--border); color: var(--brand-dark); padding: 4px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
 
+  .fc-rotation { margin: 16px 16px 0; padding: 16px; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(135deg, #ffffff, var(--brand-soft)); }
+  .fc-rotation-head h4 { font-family: var(--heading); font-weight: 800; letter-spacing: -0.01em; font-size: 1.05rem; margin: 0 0 4px; }
+  .fc-rotation-head p { margin: 0 0 14px; font-size: 0.87rem; color: var(--muted); line-height: 1.5; }
+  .fc-rotation-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .fc-rotation-step { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 12px 8px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; position: relative; }
+  .fc-rotation-step:not(:last-child)::after { content: "→"; position: absolute; left: 100%; width: 20px; top: 50%; transform: translateY(-50%); text-align: center; color: var(--brand); font-weight: 800; font-size: 1rem; }
+  .fc-rotation-day { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--brand-dark); }
+  .fc-rotation-icon { font-size: 1.4rem; }
+  .fc-rotation-name { font-size: 0.82rem; font-weight: 600; line-height: 1.3; }
   .fc-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; padding: 16px; }
   .fc-day { border: 1px solid var(--border); border-radius: 16px; padding: 14px; background: var(--card); }
   .fc-day.rest { background: var(--surface); border-style: dashed; }
@@ -225,6 +234,8 @@
     .fc-msg { max-width: 92%; }
     .fc-options, .fc-progress { padding-left: 14px; padding-right: 14px; }
     .fc-inputbar { padding: 10px 14px 14px; }
+    .fc-rotation-steps { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .fc-rotation-step::after { display: none; }
   }
 </style>
 </head>
@@ -327,13 +338,14 @@ async function getCoachReply(question, history) {
   return fakeCoachReply(question);
 }
 
-/** Tab 1: returns a 7-day plan as an array of { day, focus, rest, drills: [{name, detail}] }. */
+/** Tab 1: returns a 7-day plan as an array of { day, focus, rest, rotating, icon, drills: [{name, detail}] }. */
 async function getTrainingPlan(profile) {
   if (USE_REAL_AI) {
     const reply = await callAI(
       "You are a football coach. Reply ONLY with a JSON array of 7 objects (Monday to Sunday) " +
       'shaped like {"day":"Monday","focus":"...","rest":false,"drills":[{"name":"...","detail":"..."}]}. ' +
-      "Include at least one full rest day and suit the player's age.",
+      "Include at least one full rest day and suit the player's age. " +
+      'If focusMode is "rotating", give every training day a DIFFERENT main focus and add "rotating":true and an "icon" emoji to those days.',
       [{ role: "user", content: JSON.stringify(profile) }]
     );
     return JSON.parse(reply);
@@ -405,10 +417,53 @@ function findFocusDrills(text) {
   return FOCUS_LIBRARY.filter(f => f.keys.some(k => lower.includes(k))).map(f => f.drill);
 }
 
+// Used when a player has nothing specific to work on: each training day
+// picks a different one of these, so the week covers all-round skills.
+const ROTATION_FOCUSES = [
+  { focus: "Ball Mastery", icon: "⚽", drills: [
+    { name: "Toe taps & sole rolls", detail: "3 × 1 min as fast as you can" },
+    { name: "Juggling challenge", detail: "Try to beat your record – 10 min" } ] },
+  { focus: "Passing & Receiving", icon: "🎯", drills: [
+    { name: "Wall passes", detail: "50 with each foot, two-touch" },
+    { name: "Receive on the half-turn", detail: "Open your body and play forward – 20 reps" } ] },
+  { focus: "Shooting & Finishing", icon: "🥅", drills: [
+    { name: "Target shooting", detail: "20 shots aimed at the corners" },
+    { name: "Volleys & half-volleys", detail: "10 with each foot" } ] },
+  { focus: "Dribbling & 1v1", icon: "🌀", drills: [
+    { name: "Cone slalom", detail: "6 runs, using both feet" },
+    { name: "1v1 moves", detail: "Step-over, drag-back & scissors – 10 each" } ] },
+  { focus: "Speed & Agility", icon: "⚡", drills: [
+    { name: "Ladder footwork", detail: "5 different patterns, 3 times each" },
+    { name: "Reaction sprints", detail: "8 × 10 m starting on a partner's call" } ] },
+  { focus: "Fitness & Stamina", icon: "🔋", drills: [
+    { name: "Interval runs", detail: "8 × (1 min fast, 1 min jog)" },
+    { name: "Box-to-box shuttles", detail: "6 × 40 m with 30 s rest" } ] },
+  { focus: "First Touch", icon: "👟", drills: [
+    { name: "Wall control", detail: "Trap with inside, outside, sole & thigh – 10 min" },
+    { name: "High-ball control", detail: "Throw it up and cushion it dead – 20 reps" } ] },
+  { focus: "Game Intelligence", icon: "🧠", drills: [
+    { name: "Scanning drill", detail: "Check your shoulder before every touch – 5 min" },
+    { name: "Watch & learn", detail: "10 min of pro clips for your position – note their movement" } ] }
+];
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// True when the player's answers don't point at anything specific to train.
+function hasSpecificFocus(p) {
+  return findFocusDrills(p.weaknesses + " " + p.goal).length > 0;
+}
+
 function fakeTrainingPlan(p) {
   const drills = POSITION_DRILLS[p.position] || POSITION_DRILLS.Midfielder;
-  let focus = findFocusDrills(p.weaknesses + " " + p.goal);
-  if (focus.length === 0) focus = [{ name: "Ball mastery", detail: "Toe taps, sole rolls & inside-outside touches – 10 min" }];
+  if (p.focusMode === "rotating" || !hasSpecificFocus(p)) return rotatingPlan(p, drills);
+  const focus = findFocusDrills(p.weaknesses + " " + p.goal);
 
   const weakFoot = p.foot === "Left" ? "right" : p.foot === "Right" ? "left" : null;
   const footDrill = weakFoot
@@ -442,6 +497,41 @@ function fakeTrainingPlan(p) {
     { day: "Sunday", focus: "Rest day", rest: true, drills: [
       { name: "Full rest", detail: "Sleep well and eat good food" },
       { name: "Reflect", detail: "Write down one thing you improved this week" }
+    ] }
+  ].map(d => ({ ...d, minutes: d.rest ? "" : minutes }));
+}
+
+// All-round week: every training day gets a different main focus.
+function rotatingPlan(p, drills) {
+  const minutes = { "Under 10": "30–40 min", "10-13": "45 min", "14-17": "60 min", "18+": "60–75 min" }[p.ageGroup] || "45 min";
+  const young = p.ageGroup === "Under 10";
+  const warmUp = { name: "Warm-up", detail: young ? "Tag game + dynamic stretches, 8 min" : "Jog, dynamic stretches & rondo, 10 min" };
+  const coolDown = { name: "Cool-down", detail: "Light jog + stretching, 5 min" };
+  const picks = shuffle(ROTATION_FOCUSES).slice(0, 4);
+
+  const trainingDay = (day, i) => ({
+    day, focus: picks[i].focus, icon: picks[i].icon, rotating: true,
+    drills: [warmUp, ...picks[i].drills, drills[i], coolDown]
+  });
+
+  return [
+    trainingDay("Monday", 0),
+    trainingDay("Tuesday", 1),
+    { day: "Wednesday", focus: "Rest & recovery", rest: true, drills: [
+      { name: "Full rest", detail: "Let your body recover and grow stronger" },
+      { name: "Optional", detail: "Light walk or stretching, drink plenty of water" }
+    ] },
+    trainingDay("Thursday", 2),
+    trainingDay("Friday", 3),
+    { day: "Saturday", focus: "Match day – mix it all", icon: "🏟️", drills: [
+      warmUp,
+      { name: "Match or scrimmage", detail: "Try to use a skill from every focus day this week" },
+      drills[4],
+      coolDown
+    ] },
+    { day: "Sunday", focus: "Rest day", rest: true, drills: [
+      { name: "Full rest", detail: "Sleep well and eat good food" },
+      { name: "Reflect", detail: "Which focus day felt hardest? That could be next week's goal" }
     ] }
   ].map(d => ({ ...d, minutes: d.rest ? "" : minutes }));
 }
@@ -553,8 +643,8 @@ const QUESTIONS = [
   { key: "position", text: "First up – what position do you play? ⚽", options: ["Goalkeeper", "Defender", "Midfielder", "Winger", "Striker"] },
   { key: "ageGroup", text: "Nice! What is your age group?", options: ["Under 10", "10-13", "14-17", "18+"] },
   { key: "foot", text: "Which is your strong foot? 👟", options: ["Left", "Right", "Both"] },
-  { key: "weaknesses", text: "What are your weaknesses? Be honest – that's how we improve! 💪", placeholder: "e.g. my left foot, I get tired quickly..." },
-  { key: "goal", text: "Last one! What do you want to work on most? 🎯", placeholder: "e.g. scoring more goals, getting faster..." }
+  { key: "weaknesses", text: "What are your weaknesses? Be honest – that's how we improve! 💪", placeholder: "e.g. my left foot, I get tired quickly...", skipChip: "🤷 Nothing specific" },
+  { key: "goal", text: "Last one! What do you want to work on most? 🎯", placeholder: "e.g. scoring more goals, getting faster...", skipChip: "🔄 Mix it up for me" }
 ];
 
 const plannerMsgs = document.getElementById("planner-messages");
@@ -587,6 +677,7 @@ async function askQuestion() {
     plannerInput.placeholder = "Tap an option or type your answer...";
   } else {
     plannerInput.placeholder = q.placeholder;
+    if (q.skipChip) plannerOptions.appendChild(makeChip(q.skipChip, () => handleAnswer("Nothing specific")));
   }
   waitingForAnswer = true;
   plannerSend.disabled = false;
@@ -638,7 +729,10 @@ onSend(plannerInput, plannerSend, text => {
 async function buildPlan() {
   updateProgress();
   plannerInput.placeholder = "Your plan is ready!";
-  await botSay(plannerMsgs, "Brilliant! Give me a second to build your personal 7-day plan... 📝");
+  profile.focusMode = hasSpecificFocus(profile) ? "targeted" : "rotating";
+  await botSay(plannerMsgs, profile.focusMode === "rotating"
+    ? "No problem! I'll build you an all-round week where every training day has a different main focus. 🔄"
+    : "Brilliant! Give me a second to build your personal 7-day plan... 📝");
   const stop = showTyping(plannerMsgs);
   let plan;
   try {
@@ -654,16 +748,55 @@ async function buildPlan() {
   showRestart();
 }
 
+// Rotating plans only: pick a fresh set of focus days with the same answers.
+let shuffling = false;
+async function shufflePlan() {
+  if (shuffling) return;
+  shuffling = true;
+  addMessage(plannerMsgs, "user", "🔀 Shuffle my focus days");
+  const stop = showTyping(plannerMsgs);
+  try {
+    const plan = await getTrainingPlan(profile);
+    stop();
+    renderPlan(plan);
+  } catch (err) {
+    stop();
+    addMessage(plannerMsgs, "bot", "Sorry, I couldn't shuffle your plan. Please try again!");
+  }
+  shuffling = false;
+}
+
 function renderPlan(plan) {
   const wrap = document.createElement("div");
   wrap.className = "fc-plan";
   const tags = [profile.position, profile.ageGroup, profile.foot + " foot"].map(t => `<span class="fc-tag">${escapeHTML(t)}</span>`).join("");
+  const rotationDays = plan.filter(d => d.rotating);
+  const rotationSection = rotationDays.length ? `
+    <div class="fc-rotation">
+      <div class="fc-rotation-head">
+        <h4>🔄 Rotating Focus Week</h4>
+        <p>You didn't pick one thing to work on, so each training day switches to a different main focus. That way you improve all-round.</p>
+      </div>
+      <div class="fc-rotation-steps">
+        ${rotationDays.map(d => `
+          <div class="fc-rotation-step">
+            <span class="fc-rotation-day">${escapeHTML(d.day.slice(0, 3))}</span>
+            <span class="fc-rotation-icon">${escapeHTML(d.icon || "⚽")}</span>
+            <span class="fc-rotation-name">${escapeHTML(d.focus)}</span>
+          </div>`).join("")}
+      </div>
+    </div>` : "";
+  const note = rotationDays.length
+    ? `🔄 Mode: <strong>All-round – main focus changes every training day</strong><br>`
+    : `🎯 Main goal: <strong>${escapeHTML(profile.goal)}</strong><br>
+      💪 Working on: <strong>${escapeHTML(profile.weaknesses)}</strong><br>`;
 
   wrap.innerHTML = `
     <div class="fc-plan-head">
       <h3>🏆 Your 7-Day Training Plan</h3>
       <div class="fc-tags">${tags}</div>
     </div>
+    ${rotationSection}
     <div class="fc-days">
       ${plan.map(d => `
         <div class="fc-day ${d.rest ? "rest" : ""}">
@@ -671,15 +804,14 @@ function renderPlan(plan) {
             <span class="fc-day-name">${escapeHTML(d.day)}</span>
             <span class="fc-day-time">${d.rest ? "😴 Rest" : "⏱ " + escapeHTML(d.minutes || "")}</span>
           </div>
-          <span class="fc-day-focus">${escapeHTML(d.focus)}</span>
+          <span class="fc-day-focus">${d.icon ? escapeHTML(d.icon) + " " : ""}${escapeHTML(d.focus)}</span>
           <ul>
             ${d.drills.map(dr => `<li><strong>${escapeHTML(dr.name)}</strong><span>${escapeHTML(dr.detail)}</span></li>`).join("")}
           </ul>
         </div>`).join("")}
     </div>
     <div class="fc-plan-note">
-      🎯 Main goal: <strong>${escapeHTML(profile.goal)}</strong><br>
-      💪 Working on: <strong>${escapeHTML(profile.weaknesses)}</strong><br>
+      ${note}
       Always warm up, drink water and stop if anything hurts.
     </div>`;
   plannerMsgs.appendChild(wrap);
@@ -689,6 +821,7 @@ function renderPlan(plan) {
 function showRestart() {
   plannerOptions.innerHTML = "";
   plannerOptions.appendChild(makeChip("🔄 Make a new plan", startPlanner, true));
+  if (profile.focusMode === "rotating") plannerOptions.appendChild(makeChip("🔀 Shuffle focus days", shufflePlan));
 }
 
 async function startPlanner() {
