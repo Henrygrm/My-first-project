@@ -2,31 +2,39 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CoachAI – Football Coach</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CoachAI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
-  /* ============ THEME (matches the CoachAI site) ============ */
+  /* ============ THEME ============ */
   :root {
     --brand: #1fae52;
     --brand-dark: #178a41;
     --brand-soft: #eaf7ef;
     --lime: #7ed321;
+    --lime-soft: #f4fbe9;
     --bg: #f6f8f7;
     --card: #ffffff;
     --surface: #fafcfb;
+    --track: #eef2ef;
     --text: #0f1f17;
     --muted: #5f7068;
     --border: #e2ebe5;
+    --ink: #0f1f17;
+    --gold: #f2b233;
+    --gold-soft: #fff6e0;
+    --danger: #d64545;
     --radius-lg: 28px;
     --radius: 18px;
     --shadow: 0 1px 2px rgba(15, 31, 23, 0.04), 0 20px 50px -20px rgba(31, 174, 82, 0.25);
     --heading: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+    color-scheme: light;
   }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
 
   body {
     margin: 0;
@@ -35,49 +43,31 @@
     background: var(--bg);
     -webkit-font-smoothing: antialiased;
   }
-
-  .fc-section {
-    position: relative;
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 56px 16px;
-  }
-  .fc-section::before { /* soft green glow like the site hero */
-    content: "";
-    position: absolute; inset: 0;
-    background:
-      radial-gradient(600px 300px at 50% 10%, rgba(31, 174, 82, 0.12), transparent 70%),
-      radial-gradient(400px 300px at 90% 80%, rgba(126, 211, 33, 0.10), transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-  }
-  .fc-section > * { position: relative; z-index: 1; }
-
-  /* ============ SECTION HEADING ============ */
-  .fc-intro { text-align: center; margin-bottom: 32px; }
-  .fc-eyebrow {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 8px 16px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    font-size: 0.85rem; font-weight: 600; color: var(--muted);
-    box-shadow: 0 4px 14px rgba(15, 31, 23, 0.05);
-  }
-  .fc-intro h2 {
-    font-family: var(--heading);
-    font-weight: 800;
-    font-size: clamp(2rem, 5vw, 3.2rem);
-    letter-spacing: -0.035em;
-    line-height: 1.05;
-    margin: 18px 0 12px;
-  }
+  button { font-family: inherit; }
+  h1, h2, h3 { font-family: var(--heading); letter-spacing: -0.03em; margin: 0; }
   .fc-gradient {
     background: linear-gradient(90deg, var(--brand), var(--lime));
     -webkit-background-clip: text; background-clip: text;
     color: transparent;
   }
-  .fc-intro p { margin: 0 auto; max-width: 560px; color: var(--muted); font-size: 1.05rem; line-height: 1.6; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: 1px solid transparent; border-radius: 14px; cursor: pointer;
+    font: 700 0.98rem "Inter", sans-serif; padding: 13px 20px;
+    transition: background 0.2s, transform 0.15s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+  .btn:focus-visible, .fc-chip:focus-visible, .fc-tab:focus-visible, .auth-tab:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  .btn-primary { background: var(--brand); color: #fff; box-shadow: 0 10px 22px -12px rgba(31, 174, 82, 0.7); }
+  .btn-primary:hover { background: var(--brand-dark); }
+  .btn-ghost { background: var(--card); color: var(--text); border-color: var(--border); }
+  .btn-ghost:hover { border-color: var(--brand); }
+  .btn-dark { background: var(--ink); color: #fff; }
+  .btn-gold { background: var(--gold); color: var(--ink); }
+  .btn-sm { padding: 9px 14px; font-size: 0.88rem; border-radius: 12px; }
+  .btn-block { width: 100%; }
 
   /* ============ MAIN CARD ============ */
   .fc-card {
@@ -246,69 +236,626 @@
     .fc-rotation-steps { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .fc-rotation-step::after { display: none; }
   }
+
+  /* =====================================================================
+     SCREENS: login → plans → app
+     ===================================================================== */
+  .screen { min-height: 100vh; }
+
+  /* ---------- LOGIN / SIGN UP ---------- */
+  .auth-screen { display: grid; grid-template-columns: 1.05fr 1fr; }
+  .auth-hero {
+    position: relative; overflow: hidden;
+    background: repeating-linear-gradient(90deg, #13823a 0 72px, #16913f 72px 144px);
+    color: #fff; padding: 48px clamp(24px, 5vw, 64px);
+    display: flex; flex-direction: column; justify-content: space-between; gap: 32px;
+  }
+  .auth-hero::before, .auth-hero::after { content: ""; position: absolute; border: 3px solid rgba(255, 255, 255, 0.35); pointer-events: none; }
+  .auth-hero::before { width: 220px; height: 220px; border-radius: 50%; right: -70px; top: 50%; transform: translateY(-50%); }
+  .auth-hero::after { top: 0; bottom: 0; right: 40px; border-width: 0 0 0 3px; }
+  .auth-hero > * { position: relative; z-index: 1; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-logo {
+    width: 46px; height: 46px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--brand), #27c35f);
+    display: grid; place-items: center; font-size: 1.35rem;
+    box-shadow: 0 8px 20px -6px rgba(31, 174, 82, 0.55); flex-shrink: 0;
+  }
+  .auth-hero .brand-logo { background: #fff; box-shadow: none; }
+  .brand-name { font-family: var(--heading); font-weight: 800; font-size: 1.45rem; letter-spacing: -0.03em; }
+  .auth-hero h1 { font-weight: 800; font-size: clamp(2.2rem, 4.6vw, 3.8rem); line-height: 1.05; max-width: 14ch; text-wrap: balance; }
+  .auth-hero p { font-size: 1.1rem; line-height: 1.6; max-width: 440px; opacity: 0.92; margin: 16px 0 0; }
+  .auth-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .auth-points li { display: flex; gap: 12px; align-items: center; background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.22); padding: 12px 16px; border-radius: 14px; font-weight: 600; max-width: 420px; }
+
+  .auth-side { display: grid; place-items: center; padding: 40px 16px; }
+  .auth-card { width: min(420px, 100%); background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 32px 28px; }
+  .auth-card h2 { font-weight: 800; font-size: 1.7rem; }
+  .auth-sub { color: var(--muted); margin: 6px 0 20px; line-height: 1.5; }
+  .auth-tabs { display: flex; gap: 4px; padding: 4px; background: var(--track); border-radius: 999px; margin-bottom: 20px; }
+  .auth-tab { flex: 1; border: none; background: none; padding: 10px; border-radius: 999px; font: 600 0.95rem "Inter", sans-serif; color: var(--muted); cursor: pointer; }
+  .auth-tab.active { background: var(--card); color: var(--text); box-shadow: 0 2px 8px rgba(15, 31, 23, 0.08); }
+  .auth-form { display: grid; gap: 14px; }
+  .field { display: grid; gap: 6px; font-weight: 600; font-size: 0.9rem; }
+  .field input, .field select, .field textarea {
+    font: 400 1rem "Inter", sans-serif; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; width: 100%;
+  }
+  .field textarea { resize: vertical; min-height: 70px; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px rgba(31, 174, 82, 0.15); }
+  .field small { font-weight: 400; color: var(--muted); }
+  .form-error { margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 0.9rem; background: #fdecec; border: 1px solid #f4c4c4; }
+  .test-note { margin: 18px 0 0; font-size: 0.82rem; color: var(--muted); background: var(--surface); border: 1px dashed var(--border); padding: 10px 12px; border-radius: 12px; line-height: 1.45; }
+
+  /* ---------- PLANS PAGE ---------- */
+  .plans-screen { padding: 40px 16px 64px; }
+  .plans-top { max-width: 1100px; margin: 0 auto 8px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .plans-head { text-align: center; max-width: 640px; margin: 24px auto 40px; }
+  .plans-head .eyebrow { color: var(--brand); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.85rem; }
+  .plans-head h1 { font-weight: 800; font-size: clamp(2rem, 5vw, 3.2rem); margin: 10px 0 12px; text-wrap: balance; }
+  .plans-head p { color: var(--muted); font-size: 1.08rem; line-height: 1.6; margin: 0; }
+  .plan-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; align-items: center; }
+  .plan-card {
+    position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 26px; padding: 30px 26px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .plan-card.popular { border: 2px solid var(--brand); box-shadow: var(--shadow); padding-block: 40px; }
+  .plan-card.premium { background: linear-gradient(180deg, var(--gold-soft), var(--card) 40%); }
+  .popular-badge {
+    position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
+    background: var(--brand); color: #fff; font-weight: 800; font-size: 0.85rem;
+    padding: 6px 16px; border-radius: 999px; white-space: nowrap;
+  }
+  .plan-name { font-size: 1.35rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .plan-for { color: var(--muted); margin: -8px 0 0; }
+  .plan-price { margin: 0; color: var(--muted); }
+  .plan-price strong { font-family: var(--heading); font-size: 3rem; color: var(--text); letter-spacing: -0.04em; margin-right: 4px; }
+  .plan-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .plan-list li { position: relative; padding-left: 30px; line-height: 1.45; color: var(--text); }
+  .plan-list li::before {
+    content: "✓"; position: absolute; left: 0; top: 1px; width: 21px; height: 21px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 0.72rem; font-weight: 800;
+    background: var(--brand-soft); color: var(--brand-dark);
+  }
+  .plan-card.premium .plan-list li::before { background: var(--gold); color: var(--ink); }
+  .plan-card .btn { margin-top: auto; }
+  .current-tag { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; background: var(--track); color: var(--muted); padding: 4px 9px; border-radius: 999px; }
+  .plans-foot { text-align: center; color: var(--muted); font-size: 0.88rem; margin: 28px auto 0; max-width: 560px; line-height: 1.5; }
+
+  /* ---------- APP SHELL ---------- */
+  .app-header {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40;
+    background: rgba(246, 248, 247, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .app-header-inner { max-width: 960px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+  .app-header .brand-logo { width: 40px; height: 40px; border-radius: 12px; font-size: 1.15rem; }
+  .app-header .brand-name { font-size: 1.25rem; }
+  .user-area { margin-left: auto; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .user-hello { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .plan-badge {
+    font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 5px 10px; border-radius: 999px; border: none; cursor: pointer; white-space: nowrap;
+    background: var(--track); color: var(--muted);
+  }
+  .plan-badge[data-plan="pro"] { background: var(--brand-soft); color: var(--brand-dark); }
+  .plan-badge[data-plan="premium"] { background: var(--gold); color: var(--ink); }
+  .app-main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+  .usage-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .usage-pill { background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 7px 12px; font-size: 0.85rem; color: var(--muted); }
+  .usage-pill strong { color: var(--text); }
+  .usage-pill.out { border-color: #f4c4c4; background: #fdf3f3; }
+
+  .fc-tabs { overflow-x: auto; scrollbar-width: none; }
+  .fc-tabs::-webkit-scrollbar { display: none; }
+  .tab-short { display: none; }
+  .tab-lock { font-size: 0.75rem; margin-left: 2px; }
+  .fc-topbar .fc-tabs { max-width: 100%; }
+
+  /* ---------- LOCKS & UPSELLS ---------- */
+  .fc-bubble .fc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .fc-bubble .fc-actions .fc-chip { padding: 8px 14px; font-size: 0.85rem; }
+  .fc-msg.lock .fc-bubble { background: var(--gold-soft); border-color: #f3dca6; }
+  .upsell {
+    margin: 24px; padding: 28px; border-radius: 22px; text-align: center;
+    background: linear-gradient(180deg, var(--surface), var(--card)); border: 1px dashed var(--border);
+  }
+  .upsell-icon { font-size: 2.4rem; }
+  .upsell h3 { font-size: 1.35rem; font-weight: 800; margin: 8px 0; }
+  .upsell p { color: var(--muted); line-height: 1.6; max-width: 460px; margin: 0 auto 16px; }
+  .upsell ul { list-style: none; padding: 0; margin: 0 auto 20px; display: grid; gap: 8px; max-width: 380px; text-align: left; }
+  .upsell li::before { content: "✓ "; color: var(--brand-dark); font-weight: 800; }
+  .locked-line { font-size: 0.8rem; color: var(--muted); }
+  .plan-lock-note {
+    margin: 0 16px 16px; padding: 14px 16px; border-radius: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; justify-content: space-between;
+    background: var(--gold-soft); border: 1px solid #f3dca6; font-size: 0.9rem; line-height: 1.45;
+  }
+
+  /* drill steps (Pro+) */
+  .fc-day details { margin-top: 4px; }
+  .fc-day summary { cursor: pointer; font-size: 0.78rem; font-weight: 700; color: var(--brand-dark); list-style: none; }
+  .fc-day summary::-webkit-details-marker { display: none; }
+  .fc-day summary::before { content: "▸ "; }
+  .fc-day details[open] summary::before { content: "▾ "; }
+  .fc-day ol { margin: 6px 0 2px; padding-left: 18px; font-size: 0.8rem; color: var(--muted); display: grid; gap: 3px; }
+  .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; }
+
+  /* ---------- MY PLANS ---------- */
+  .panel-body { padding: 20px; display: grid; gap: 14px; }
+  .panel-body > h3 { font-size: 1.2rem; font-weight: 800; }
+  .panel-intro { color: var(--muted); margin: -6px 0 0; line-height: 1.5; }
+  .saved-list { display: grid; gap: 10px; }
+  .saved-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left;
+    width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; cursor: pointer;
+    font: inherit; color: inherit;
+  }
+  .saved-item:hover { border-color: var(--brand); }
+  .saved-item strong { display: block; }
+  .saved-item span { color: var(--muted); font-size: 0.85rem; }
+  .saved-item em { font-style: normal; font-size: 0.8rem; font-weight: 700; color: var(--brand-dark); white-space: nowrap; }
+  .empty-state { text-align: center; color: var(--muted); padding: 32px 16px; line-height: 1.6; }
+
+  /* ---------- PREMIUM ---------- */
+  .sub-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sub-tab { border: 1px solid var(--border); background: var(--card); border-radius: 999px; padding: 9px 14px; font: 600 0.88rem "Inter", sans-serif; cursor: pointer; color: var(--text); }
+  .sub-tab.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .premium-section { display: grid; gap: 14px; }
+  .checkin-form { display: grid; gap: 14px; }
+  .choice-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .choice-row label { position: relative; }
+  .choice-row input { position: absolute; opacity: 0; }
+  .choice-row span { display: inline-block; padding: 9px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+  .choice-row input:checked + span { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .choice-row input:focus-visible + span { outline: 3px solid var(--brand); outline-offset: 2px; }
+  .fieldset-label { font-weight: 600; font-size: 0.9rem; margin-bottom: 6px; display: block; }
+  .changes { margin: 0; padding: 14px 16px 14px 34px; background: var(--brand-soft); border-radius: 14px; line-height: 1.6; }
+  .tip-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .tip-list li { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; line-height: 1.5; }
+  .tip-list li strong { display: block; margin-bottom: 2px; }
+  .timeline { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+  .timeline li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: start; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+  .timeline time { font-weight: 800; color: var(--brand-dark); font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+  .timeline strong { display: block; }
+  .timeline span { color: var(--muted); font-size: 0.88rem; line-height: 1.45; }
+
+  /* ---------- MODAL & TOAST ---------- */
+  .modal { position: fixed; inset: 0; z-index: 100; background: rgba(8, 16, 12, 0.5); display: grid; place-items: center; padding: 16px; }
+  .modal-card { width: min(420px, 100%); background: var(--card); border-radius: 26px; padding: 30px 26px; text-align: center; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.5); }
+  .modal-card h2 { font-weight: 800; font-size: 1.5rem; margin: 12px 0 8px; }
+  .modal-card p { color: var(--muted); line-height: 1.55; margin: 0 0 20px; }
+  .spinner { width: 42px; height: 42px; margin: 0 auto; border-radius: 50%; border: 4px solid var(--brand-soft); border-top-color: var(--brand); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 120;
+    max-width: calc(100vw - 32px); background: var(--ink); color: #fff; padding: 13px 18px; border-radius: 14px; font-weight: 600;
+    box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ---------- PHONES ---------- */
+  @media (max-width: 860px) {
+    .auth-screen { grid-template-columns: 1fr; }
+    .auth-hero { padding: 28px 20px 32px; gap: 18px; }
+    .auth-hero::before { width: 140px; height: 140px; right: -60px; }
+    .auth-hero h1 { font-size: 2rem; }
+    .auth-hero p { font-size: 1rem; margin-top: 10px; }
+    .auth-points { display: none; }
+    .auth-side { padding: 24px 16px 40px; place-items: start center; }
+    .plan-grid { grid-template-columns: 1fr; max-width: 460px; gap: 28px; }
+  }
+  @media (max-width: 640px) {
+    .user-hello { display: none; }
+    .app-header .brand-name { display: none; }
+    .app-main { padding: 16px 12px 40px; }
+    .tab-full { display: none; }
+    .tab-short { display: inline; }
+    .fc-tab { flex: 1 0 auto; }
+    .upsell { margin: 14px; padding: 22px 16px; }
+    .panel-body { padding: 14px; }
+    .auth-card { padding: 26px 20px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
 
-<section class="fc-section">
-  <div class="fc-intro">
-    <span class="fc-eyebrow">⚽ Your Personal AI Football Coach</span>
-    <h2>Your coach, <span class="fc-gradient">on demand.</span></h2>
-    <p>Answer a few quick questions for a personalised weekly plan, or ask your coach anything about getting better.</p>
+<!-- =====================================================================
+     SCREEN 1: LOG IN / SIGN UP  (nothing else is visible until logged in)
+     ===================================================================== -->
+<main class="screen auth-screen" id="screen-auth" hidden>
+  <section class="auth-hero">
+    <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">CoachAI</span></div>
+    <div>
+      <h1>Train smarter. Play better.</h1>
+      <p>Your personal football coach: weekly training plans built around you, and answers whenever you're stuck.</p>
+    </div>
+    <ul class="auth-points">
+      <li>📅 Weekly plans for your position, age &amp; kit</li>
+      <li>💬 Ask a coach anything, any time</li>
+      <li>⭐ Check-ins that adapt your next week</li>
+    </ul>
+  </section>
+
+  <section class="auth-side">
+    <div class="auth-card">
+      <h2 id="auth-title">Welcome back</h2>
+      <p class="auth-sub" id="auth-sub">Log in to see your training plans.</p>
+      <div class="auth-tabs" role="tablist">
+        <button type="button" class="auth-tab active" data-auth-tab="login" role="tab">Log in</button>
+        <button type="button" class="auth-tab" data-auth-tab="signup" role="tab">Sign up</button>
+      </div>
+      <!-- Forms are handled in script (preventDefault), so nothing is sent anywhere. -->
+      <form class="auth-form" id="auth-form" novalidate>
+        <label class="field" id="name-field" hidden>
+          <span>Your name</span>
+          <input type="text" id="auth-name" autocomplete="name" placeholder="e.g. Jordan">
+        </label>
+        <label class="field">
+          <span>Email</span>
+          <input type="email" id="auth-email" autocomplete="email" placeholder="you@example.com">
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input type="password" id="auth-password" autocomplete="current-password" placeholder="At least 6 characters">
+        </label>
+        <p class="form-error" id="auth-error" role="alert" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block" id="auth-submit">Log in</button>
+      </form>
+      <p class="test-note">🧪 Test mode: accounts are saved only in this browser. Don't use a real password.</p>
+    </div>
+  </section>
+</main>
+
+<!-- =====================================================================
+     SCREEN 2: PLANS
+     ===================================================================== -->
+<main class="screen plans-screen" id="screen-plans" hidden>
+  <div class="plans-top">
+    <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">CoachAI</span></div>
+    <button type="button" class="btn btn-ghost btn-sm" id="plans-back" hidden>← Back to my coach</button>
+  </div>
+  <div class="plans-head">
+    <span class="eyebrow">Choose your plan</span>
+    <h1 id="plans-title">Pick how you want to train</h1>
+    <p>Start free and upgrade whenever you're ready. You can change plan at any time.</p>
   </div>
 
-  <div class="fc-card">
-    <div class="fc-topbar">
-      <div class="fc-coach">
-        <div class="fc-logo">⚽</div>
-        <div>
-          <div class="fc-coach-name">Coach AI</div>
-          <div class="fc-status">Online · replies instantly</div>
-        </div>
-      </div>
-      <nav class="fc-tabs" role="tablist">
-        <button type="button" class="fc-tab active" data-tab="planner">📅 Weekly Training Planner</button>
-        <button type="button" class="fc-tab" data-tab="coach">💬 Ask a Coach</button>
-      </nav>
-    </div>
+  <div class="plan-grid">
+    <article class="plan-card" data-plan="free">
+      <h2 class="plan-name">Free <span class="current-tag" hidden>Current</span></h2>
+      <p class="plan-for">Try it out</p>
+      <p class="plan-price"><strong>$0</strong>/month</p>
+      <ul class="plan-list">
+        <li>1 weekly training plan per month</li>
+        <li>3 "Ask a Coach" questions per day</li>
+        <li>Basic drill names only</li>
+      </ul>
+      <button type="button" class="btn btn-ghost btn-block" data-choose-plan="free">Start with Free</button>
+    </article>
 
-    <!-- TAB 1: WEEKLY TRAINING PLANNER -->
-    <div class="fc-panel active" id="panel-planner">
-      <div class="fc-progress">
-        <div class="fc-progress-row"><span id="progress-label">Question 1 of 5</span><span id="progress-pct">0%</span></div>
-        <div class="fc-progress-track"><div class="fc-progress-bar" id="progress-bar"></div></div>
-      </div>
-      <div class="fc-messages" id="planner-messages"></div>
-      <div class="fc-options" id="planner-options"></div>
-      <!-- No <form> on purpose: website builders often show pages in a
-           sandboxed frame that blocks form submits, which breaks Send. -->
-      <div class="fc-inputbar">
-        <div class="fc-inputwrap">
-          <input class="fc-input" id="planner-input" type="text" placeholder="Tap an option or type your answer..." autocomplete="off" enterkeyhint="send">
-          <button type="button" class="fc-send" id="planner-send" aria-label="Send">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
+    <article class="plan-card popular" data-plan="pro">
+      <span class="popular-badge">⭐ Most popular</span>
+      <h2 class="plan-name">Pro <span class="current-tag" hidden>Current</span></h2>
+      <p class="plan-for">For players who want to get better</p>
+      <p class="plan-price"><strong>$10</strong>/month</p>
+      <ul class="plan-list">
+        <li>A new weekly training plan every week</li>
+        <li>30 "Ask a Coach" questions per day</li>
+        <li>Step-by-step instructions for every drill</li>
+        <li>Save and view past plans</li>
+      </ul>
+      <button type="button" class="btn btn-primary btn-block" data-choose-plan="pro">Upgrade to Pro</button>
+    </article>
 
-    <!-- TAB 2: ASK A COACH -->
-    <div class="fc-panel" id="panel-coach">
-      <div class="fc-messages" id="coach-messages"></div>
-      <div class="fc-options" id="coach-suggestions"></div>
-      <div class="fc-inputbar">
-        <div class="fc-inputwrap">
-          <input class="fc-input" id="coach-input" type="text" placeholder="Ask any football question..." autocomplete="off" enterkeyhint="send">
-          <button type="button" class="fc-send" id="coach-send" aria-label="Send">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
+    <article class="plan-card premium" data-plan="premium">
+      <h2 class="plan-name">Premium <span class="current-tag" hidden>Current</span></h2>
+      <p class="plan-for">For rising stars</p>
+      <p class="plan-price"><strong>$22</strong>/month</p>
+      <ul class="plan-list">
+        <li>Everything in Pro</li>
+        <li>Unlimited "Ask a Coach" questions</li>
+        <li>Weekly check-ins that change next week's plan based on how training went</li>
+        <li>Match-day warm-up plans, fitness tips and food tips</li>
+        <li>Download the plan as a PDF</li>
+      </ul>
+      <button type="button" class="btn btn-dark btn-block" data-choose-plan="premium">Go Premium</button>
+    </article>
   </div>
-</section>
+  <p class="plans-foot">🧪 Test mode: upgrading is pretend – no payment is taken.</p>
+</main>
+
+<!-- =====================================================================
+     SCREEN 3: THE APP
+     ===================================================================== -->
+<div class="screen" id="screen-app" hidden>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">CoachAI</span></div>
+      <div class="user-area">
+        <span class="user-hello" id="user-hello"></span>
+        <button type="button" class="plan-badge" id="plan-badge" data-plan="free" title="Change plan">Free</button>
+        <button type="button" class="btn btn-primary btn-sm" id="upgrade-btn">Upgrade</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="logout-btn">Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="usage-strip" id="usage-strip"></div>
+
+    <div class="fc-card">
+      <div class="fc-topbar">
+        <div class="fc-coach">
+          <div class="fc-logo">⚽</div>
+          <div>
+            <div class="fc-coach-name">Coach AI</div>
+            <div class="fc-status">Online · replies instantly</div>
+          </div>
+        </div>
+        <nav class="fc-tabs" role="tablist">
+          <button type="button" class="fc-tab active" data-tab="planner"><span class="tab-full">📅 Weekly Training Planner</span><span class="tab-short">📅 Plan</span></button>
+          <button type="button" class="fc-tab" data-tab="coach"><span class="tab-full">💬 Ask a Coach</span><span class="tab-short">💬 Coach</span></button>
+          <button type="button" class="fc-tab" data-tab="saved">📂 <span class="tab-full">My Plans</span><span class="tab-short">Plans</span><span class="tab-lock" data-lock="savePlans">🔒</span></button>
+          <button type="button" class="fc-tab" data-tab="premium">⭐ Premium<span class="tab-lock" data-lock="premium">🔒</span></button>
+        </nav>
+      </div>
+
+      <!-- TAB 1: WEEKLY TRAINING PLANNER -->
+      <div class="fc-panel active" id="panel-planner">
+        <div class="fc-progress">
+          <div class="fc-progress-row"><span id="progress-label">Question 1 of 8</span><span id="progress-pct">0%</span></div>
+          <div class="fc-progress-track"><div class="fc-progress-bar" id="progress-bar"></div></div>
+        </div>
+        <div class="fc-messages" id="planner-messages"></div>
+        <div class="fc-options" id="planner-options"></div>
+        <!-- No <form> on purpose: website builders often show pages in a
+             sandboxed frame that blocks form submits, which breaks Send. -->
+        <div class="fc-inputbar">
+          <div class="fc-inputwrap">
+            <input class="fc-input" id="planner-input" type="text" placeholder="Tap an option or type your answer..." autocomplete="off" enterkeyhint="send">
+            <button type="button" class="fc-send" id="planner-send" aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: ASK A COACH -->
+      <div class="fc-panel" id="panel-coach">
+        <div class="fc-messages" id="coach-messages"></div>
+        <div class="fc-options" id="coach-suggestions"></div>
+        <div class="fc-inputbar">
+          <div class="fc-inputwrap">
+            <input class="fc-input" id="coach-input" type="text" placeholder="Ask any football question..." autocomplete="off" enterkeyhint="send">
+            <button type="button" class="fc-send" id="coach-send" aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: MY PLANS (Pro & Premium) -->
+      <div class="fc-panel" id="panel-saved"><div id="saved-content"></div></div>
+
+      <!-- TAB 4: PREMIUM -->
+      <div class="fc-panel" id="panel-premium"><div id="premium-content"></div></div>
+    </div>
+  </main>
+</div>
+
+<!-- Pretend payment "processing" -->
+<div class="modal" id="pay-modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pay-title">
+    <div class="spinner" id="pay-spinner"></div>
+    <h2 id="pay-title">Upgrading…</h2>
+    <p id="pay-text">Pretend payment in progress – no money is taken.</p>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
 
 <script>
+/* ==========================================================================
+   1. PLANS – what each subscription includes
+   --------------------------------------------------------------------------
+   Change prices, limits and features here. Infinity = no limit.
+   ========================================================================== */
+const PLANS = {
+  free: {
+    name: "Free", price: 0,
+    plansAllowed: 1, planPeriod: "month",   // 1 weekly training plan per month
+    questionsPerDay: 3,
+    features: { drillSteps: false, savePlans: false, premium: false }
+  },
+  pro: {
+    name: "Pro", price: 10,
+    plansAllowed: 1, planPeriod: "week",    // a new weekly plan every week
+    questionsPerDay: 30,
+    features: { drillSteps: true, savePlans: true, premium: false }
+  },
+  premium: {
+    name: "Premium", price: 22,
+    plansAllowed: Infinity, planPeriod: "week", // weekly plans + rebuilds after check-ins
+    questionsPerDay: Infinity,
+    features: { drillSteps: true, savePlans: true, premium: true }
+  }
+};
+const planOf = user => PLANS[user && user.plan] || PLANS.free;
+const hasFeature = (user, feature) => Boolean(planOf(user).features[feature]);
+
+/* ==========================================================================
+   2. STORAGE – the browser's localStorage, with a memory fallback
+   ========================================================================== */
+const Store = (() => {
+  const memory = {};
+  return {
+    get(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw == null ? fallback : JSON.parse(raw);
+      } catch (e) {
+        return key in memory ? memory[key] : fallback;
+      }
+    },
+    set(key, value) {
+      memory[key] = value;
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* private mode: memory only */ }
+    },
+    remove(key) {
+      delete memory[key];
+      try { localStorage.removeItem(key); } catch (e) {}
+    }
+  };
+})();
+
+/* ==========================================================================
+   3. 🔐 LOGIN – PRETEND VERSION (users are saved in this browser only)
+   --------------------------------------------------------------------------
+   To use a real login system (e.g. Supabase, Firebase or Auth0), replace the
+   inside of these five functions with calls to that service. Keep the same
+   names and return values and the rest of the app keeps working:
+     signUp({ name, email, password }) -> user   (throws Error with a message)
+     logIn({ email, password })        -> user   (throws Error with a message)
+     logOut()
+     currentUser()                     -> user or null
+     savePlan(userId, plan)            -> user   (real apps: done by the payment webhook)
+   A user looks like: { id, name, email, plan: "free" | "pro" | "premium", createdAt }
+   ========================================================================== */
+const AuthService = (() => {
+  const USERS_KEY = "coachai_users";
+  const SESSION_KEY = "coachai_session";
+
+  // Pretend security only: hashes the password so it isn't stored as plain text.
+  async function hash(text) {
+    try {
+      const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("coachai:" + text));
+      return Array.from(new Uint8Array(bytes)).map(b => b.toString(16).padStart(2, "0")).join("");
+    } catch (e) {
+      return "plain:" + text; // very old browsers
+    }
+  }
+  const users = () => Store.get(USERS_KEY, {});
+  const publicUser = u => u && { id: u.id, name: u.name, email: u.email, plan: u.plan, createdAt: u.createdAt };
+
+  return {
+    async signUp({ name, email, password }) {
+      email = String(email || "").trim().toLowerCase();
+      name = String(name || "").trim();
+      if (!name) throw new Error("Please enter your name.");
+      if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Please enter a valid email address.");
+      if (String(password || "").length < 6) throw new Error("Your password needs at least 6 characters.");
+      const all = users();
+      if (all[email]) throw new Error("There's already an account with that email. Try logging in.");
+      const user = { id: "u_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name, email,
+        passwordHash: await hash(password), plan: "free", createdAt: new Date().toISOString() };
+      all[email] = user;
+      Store.set(USERS_KEY, all);
+      Store.set(SESSION_KEY, email);
+      return publicUser(user);
+    },
+    async logIn({ email, password }) {
+      email = String(email || "").trim().toLowerCase();
+      if (!email || !password) throw new Error("Enter your email and password.");
+      const user = users()[email];
+      if (!user) throw new Error("We couldn't find an account with that email. Want to sign up?");
+      if (user.passwordHash !== await hash(password)) throw new Error("That password isn't right. Please try again.");
+      Store.set(SESSION_KEY, email);
+      return publicUser(user);
+    },
+    async logOut() {
+      Store.remove(SESSION_KEY);
+    },
+    async currentUser() {
+      const email = Store.get(SESSION_KEY, null);
+      return email ? publicUser(users()[email]) || null : null;
+    },
+    async savePlan(userId, plan) {
+      const all = users();
+      const user = Object.values(all).find(u => u.id === userId);
+      if (!user) throw new Error("Account not found.");
+      user.plan = plan;
+      Store.set(USERS_KEY, all);
+      return publicUser(user);
+    }
+  };
+})();
+
+/* ==========================================================================
+   4. 💳 PAYMENTS – PRETEND VERSION (no money is taken)
+   --------------------------------------------------------------------------
+   To take real payments (e.g. Stripe), replace upgrade() so it:
+     1. asks YOUR server to create a Stripe Checkout session for this plan,
+     2. sends the player to the returned checkout URL,
+     3. lets your server's Stripe webhook set user.plan after payment.
+   Never put a secret payment key in this file.
+   ========================================================================== */
+const BillingService = {
+  async upgrade(user, plan) {
+    await wait(1200); // pretend the payment is processing
+    return AuthService.savePlan(user.id, plan);
+  },
+  async downgradeToFree(user) {
+    return AuthService.savePlan(user.id, "free");
+  }
+};
+
+/* ==========================================================================
+   5. USAGE & PLAN LIMITS
+   --------------------------------------------------------------------------
+   Counted in this browser for testing. With a real backend, count and check
+   these on the server too – anything in the browser can be changed by users.
+   ========================================================================== */
+const UserData = (() => {
+  const key = id => "coachai_data_" + id;
+  const empty = () => ({ questions: { day: "", count: 0 }, planDates: [], planSince: null, savedPlans: [], latest: null, checkins: [] });
+  return {
+    load: id => Object.assign(empty(), Store.get(key(id), {})),
+    save: (id, data) => Store.set(key(id), data)
+  };
+})();
+
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; }; // local day
+
+// Start of the current calendar month or week (weeks start on Monday).
+function periodStart(period, now = new Date()) {
+  const d = new Date(now.getFullYear(), now.getMonth(), period === "month" ? 1 : now.getDate());
+  if (period === "week") d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
+}
+function nextPeriodStart(period, now = new Date()) {
+  const d = periodStart(period, now);
+  if (period === "month") d.setMonth(d.getMonth() + 1);
+  else d.setDate(d.getDate() + 7);
+  return d;
+}
+const niceDate = d => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+
+const Limits = {
+  plansLeft(user, data) {
+    const plan = planOf(user);
+    if (plan.plansAllowed === Infinity) return Infinity;
+    // Count from the start of this month/week – or from when the player changed plan, so upgrading gives a fresh allowance.
+    const since = Math.max(periodStart(plan.planPeriod).getTime(), data.planSince ? new Date(data.planSince).getTime() : 0);
+    const used = data.planDates.filter(t => new Date(t).getTime() >= since).length;
+    return Math.max(0, plan.plansAllowed - used);
+  },
+  questionsLeft(user, data) {
+    const plan = planOf(user);
+    if (plan.questionsPerDay === Infinity) return Infinity;
+    const used = data.questions.day === todayKey() ? data.questions.count : 0;
+    return Math.max(0, plan.questionsPerDay - used);
+  },
+  usePlan(data) { data.planDates.push(new Date().toISOString()); },
+  useQuestion(data) {
+    if (data.questions.day !== todayKey()) data.questions = { day: todayKey(), count: 0 };
+    data.questions.count++;
+  },
+  nextPlanDate: user => nextPeriodStart(planOf(user).planPeriod)
+};
+
+
 /* ==========================================================================
    🔌 AI CONNECTION POINT
    --------------------------------------------------------------------------
@@ -504,6 +1051,9 @@ const DRILLS = {
   ]
 };
 
+// Remember each drill's category (used for step-by-step coaching tips).
+for (const [cat, list] of Object.entries(DRILLS)) list.forEach(d => (d.cat = cat));
+
 const FOCUS_INFO = {
   ballMastery: { label: "Ball Mastery", icon: "⚽", type: "skill" },
   passing:     { label: "Passing", icon: "🎯", type: "skill" },
@@ -668,7 +1218,7 @@ function fakeTrainingPlan(p) {
         if (drills.some(x => x.name === d.name)) continue;
         const m = Math.min(d.min, remaining);
         if (m < 4) continue;
-        drills.push({ name: d.name, detail: d.detail.replace("{weak}", weak), minutes: m });
+        drills.push({ name: d.name, detail: d.detail.replace("{weak}", weak), minutes: m, cat: d.cat, needs: d.needs });
         used[d.name] = (used[d.name] || 0) + 1;
         remaining -= m;
       }
@@ -720,10 +1270,127 @@ function fakeCoachReply(question) {
   return "Good question! 🤔 Here's my general advice:\n\n• Practise a little every day – 20 minutes beats 2 hours once a week\n• Work on your weaker foot\n• Watch pros who play your position\n• Rest well and have fun!\n\nTry asking me about shooting, passing, speed, stamina, dribbling or confidence for more specific tips.";
 }
 
+
+/* ==========================================================================
+   STEP-BY-STEP DRILL INSTRUCTIONS (Pro & Premium)
+   ========================================================================== */
+const KIT_NAMES = { ball: "a ball", cones: "4–6 cones (or bottles)", goal: "a goal", wall: "a solid wall", partner: "your training partner", space: "a pitch or open park space" };
+
+const COACH_TIPS = {
+  ballMastery: "Stay on the balls of your feet and keep every touch small and soft.",
+  passing: "Point your standing foot at the target and strike through the middle of the ball.",
+  firstTouch: "Relax the part of your body that meets the ball – cushion it, don't stab at it.",
+  shooting: "Head over the ball, lock your ankle and follow through towards the target.",
+  dribbling: "Keep the ball within one step and look up between touches.",
+  speed: "Quality over quantity – rest fully so every rep is at top speed.",
+  fitness: "Work hard in the 'on' parts and recover properly in the 'off' parts.",
+  strength: "Slow and controlled – good form matters more than more reps.",
+  gameIQ: "Think about why, not just what – where is the space, and when should you move into it?",
+  weakFoot: "Slow it down at first; clean technique on your weaker foot beats power.",
+  heading: "Eyes open, mouth closed, and meet the ball with your forehead.",
+  defending: "Stay side-on and patient – let the attacker make the first move.",
+  crossing: "Look up before you cross and aim for an area, not a player.",
+  game: "Try today's skills when it matters – mistakes are part of learning.",
+  light: "Keep everything easy – this session is about recovery.",
+  Goalkeeper: "Get set before the shot – feet shoulder-width apart, weight forward.",
+  Defender: "Communicate loudly and keep your body between the attacker and goal.",
+  Midfielder: "Check your shoulder before the ball arrives so you know your next pass.",
+  Winger: "Attack the defender at speed and change pace to beat them.",
+  Striker: "Hit the target first – a shot on goal always has a chance."
+};
+
+// Some drills have their own fixed steps.
+const FIXED_STEPS = {
+  "Warm-up": [
+    "Jog easily for 2–3 minutes.",
+    "High knees, heel flicks and side-steps – about 20 m each.",
+    "Leg swings forwards and sideways – 10 each leg.",
+    "Finish with 3 short build-up runs to about 80% speed."
+  ],
+  "Cool-down": [
+    "Walk or jog very gently for 2 minutes to bring your heart rate down.",
+    "Stretch hamstrings, quads, calves and hips – hold each for 30 seconds.",
+    "Have a drink of water."
+  ],
+  "Free practice": [
+    "Pick the drill you enjoyed most today.",
+    "Repeat it, trying to be a bit quicker or more accurate each time.",
+    "Stop while your technique is still good."
+  ],
+  "Small-sided game": [
+    "Mark out a small pitch with two small goals (bottles or cones work).",
+    "Play first to 5 goals – 1v1 or 2v2.",
+    "Try to use at least one skill you practised today."
+  ]
+};
+
+function drillSteps(drill) {
+  if (FIXED_STEPS[drill.name]) return FIXED_STEPS[drill.name];
+  const kit = (drill.needs || []).map(k => KIT_NAMES[k]).filter(Boolean);
+  const steps = [
+    kit.length ? `Set up: you need ${kit.join(", ")}.` : "Set up: find a flat, safe space – no kit needed.",
+    `Do it: ${drill.detail}.`,
+    `Coach's tip: ${COACH_TIPS[drill.cat] || "Focus on doing each rep well."}`
+  ];
+  if (drill.minutes) steps.push(`Keep going for ${drill.minutes} min, resting 30–60 seconds between sets.`);
+  return steps;
+}
+
+/* ==========================================================================
+   PREMIUM CONTENT: match-day warm-up, fitness tips, food tips
+   ========================================================================== */
+function matchDayWarmup(profile) {
+  const gk = profile && profile.position === "Goalkeeper";
+  const young = profile && profile.ageGroup === "Under 10";
+  const steps = [
+    ["0:00", "Easy jog & mobility", "Jog around half the pitch, then open and close the gate (hip circles) – 10 each leg."],
+    ["0:04", "Dynamic stretches", "High knees, heel flicks, side-steps, carioca and walking lunges – about 15 m each."],
+    gk
+      ? ["0:09", "Handling", "Partner serves: 10 catches at chest height, 10 low, 10 high. Stay on your toes."]
+      : ["0:09", "Passing pairs", "Short passes with a teammate, one- and two-touch. Move after every pass."],
+    gk
+      ? ["0:14", "Diving & set position", "Low dives to each side (5 each), then react to 10 shots from the edge of the box."]
+      : ["0:14", "Rondo or 1v1s", young ? "Fun tag game with a ball – dribble away from the tagger." : "4v1 keep-ball in a small square – quick touches, lots of talking."],
+    ["0:19", "Sprints", "3–4 short sprints of 10–15 m, getting faster each time. Full rest between."],
+    gk
+      ? ["0:22", "Final shots", "Face 5–6 shots from teammates at match pace. Communicate like it's the game."]
+      : ["0:22", "Shooting / position work", "A few shots or position-specific moves at match speed."],
+    ["0:25", "Drink & team talk", "Sip water, listen to your coach and pick one thing you'll do well today."]
+  ];
+  return steps;
+}
+
+function fitnessTips(profile) {
+  const young = profile && ["Under 10", "10-13"].includes(profile.ageGroup);
+  return [
+    ["Build up slowly", "Add a little more each week – about 10% extra time or distance is plenty."],
+    ["Sprint fresh", "Do speed work at the start of a session when your legs are fresh, with full rest between sprints."],
+    young
+      ? ["Play lots of sports", "At your age, mixing football with other sports builds better all-round fitness than extra running."]
+      : ["Strength twice a week", "Two short bodyweight strength sessions a week help prevent injuries and make you stronger in duels."],
+    ["Sleep is training", young ? "Aim for 9–11 hours a night – it's when your body recovers and grows." : "Aim for 8–10 hours a night – it's when your body recovers."],
+    ["Listen to your body", "Some tiredness is normal; sharp pain isn't. Stop and tell a parent, coach or physio if something hurts."],
+    ["Recovery days count", "Light walks, stretching and rest days are when your body actually gets fitter."]
+  ];
+}
+
+function foodTips(profile) {
+  return [
+    ["2–3 hours before a match", "A normal meal with carbs for energy: pasta, rice, potatoes or a sandwich, plus some protein like chicken, eggs or beans."],
+    ["1 hour before", "Something small and easy if you're hungry: a banana, a cereal bar or toast."],
+    ["Drink throughout the day", "Water is best. Sip regularly rather than drinking lots just before kick-off."],
+    ["At half-time", "Water and, if you like, a few orange slices or half a banana."],
+    ["Within an hour after", "A snack or meal with carbs and protein – e.g. yoghurt and fruit, a milk drink, or a chicken wrap."],
+    ["Every day", "Eat a rainbow of fruit and veg, and don't skip breakfast on training days. No supplements needed – real food does the job."]
+  ];
+}
+
+
 /* ==========================================================================
    HELPERS
    ========================================================================== */
 const wait = ms => new Promise(r => setTimeout(r, ms));
+const $ = id => document.getElementById(id);
 
 function escapeHTML(str) {
   return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -736,9 +1403,21 @@ function scrollToBottom(container) {
 function addMessage(container, sender, text) {
   const msg = document.createElement("div");
   msg.className = "fc-msg " + sender;
-  msg.innerHTML = `<div class="fc-avatar">${sender === "bot" ? "⚽" : "You"}</div><div class="fc-bubble"></div>`;
+  msg.innerHTML = `<div class="fc-avatar">${sender === "user" ? "You" : "⚽"}</div><div class="fc-bubble"></div>`;
   msg.querySelector(".fc-bubble").textContent = text;
   container.appendChild(msg);
+  scrollToBottom(container);
+  return msg;
+}
+
+// A coach message with buttons (e.g. "Upgrade").
+function addActionMessage(container, text, actions, kind = "bot") {
+  const msg = addMessage(container, "bot", text);
+  if (kind === "lock") msg.classList.add("lock");
+  const row = document.createElement("div");
+  row.className = "fc-actions";
+  actions.forEach(a => row.appendChild(makeChip(a.label, a.onClick, a.primary)));
+  msg.querySelector(".fc-bubble").appendChild(row);
   scrollToBottom(container);
   return msg;
 }
@@ -784,15 +1463,175 @@ function makeChip(label, onClick, primary) {
   return chip;
 }
 
+let toastTimer;
+function toast(text) {
+  const el = $("toast");
+  el.textContent = text;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), 3500);
+}
+
 /* ==========================================================================
-   TABS
+   APP STATE & SCREENS
    ========================================================================== */
+let currentUser = null;
+let userData = null;
+const saveData = () => UserData.save(currentUser.id, userData);
+
+function showScreen(name) {
+  ["auth", "plans", "app"].forEach(s => ($("screen-" + s).hidden = s !== name));
+  window.scrollTo(0, 0);
+}
+
+const upgradeButton = (label = "⭐ Upgrade") => ({ label, primary: true, onClick: openPlans });
+function openPlans() {
+  renderPlansPage(true);
+  showScreen("plans");
+}
+
+/* ---------- log in / sign up ---------- */
+let authMode = "login";
+function setAuthMode(mode) {
+  authMode = mode;
+  document.querySelectorAll(".auth-tab").forEach(t => t.classList.toggle("active", t.dataset.authTab === mode));
+  $("name-field").hidden = mode !== "signup";
+  $("auth-title").textContent = mode === "signup" ? "Create your account" : "Welcome back";
+  $("auth-sub").textContent = mode === "signup" ? "It takes 20 seconds. Then pick a plan." : "Log in to see your training plans.";
+  $("auth-submit").textContent = mode === "signup" ? "Create account" : "Log in";
+  $("auth-password").autocomplete = mode === "signup" ? "new-password" : "current-password";
+  $("auth-error").hidden = true;
+}
+document.querySelectorAll(".auth-tab").forEach(t => t.addEventListener("click", () => setAuthMode(t.dataset.authTab)));
+
+$("auth-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const button = $("auth-submit");
+  button.disabled = true;
+  try {
+    const details = { name: $("auth-name").value, email: $("auth-email").value, password: $("auth-password").value };
+    const user = authMode === "signup" ? await AuthService.signUp(details) : await AuthService.logIn(details);
+    $("auth-password").value = "";
+    if (authMode === "signup") {
+      startSession(user, { showPlans: true });
+    } else {
+      startSession(user);
+      toast(`Welcome back, ${user.name}! ⚽`);
+    }
+  } catch (err) {
+    $("auth-error").textContent = err.message;
+    $("auth-error").hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("logout-btn").addEventListener("click", async () => {
+  await AuthService.logOut();
+  currentUser = null;
+  userData = null;
+  setAuthMode("login");
+  showScreen("auth");
+  toast("You're logged out.");
+});
+
+/* ---------- plans page ---------- */
+function renderPlansPage(fromApp) {
+  $("plans-back").hidden = !fromApp;
+  $("plans-title").textContent = fromApp ? "Change your plan" : `Welcome, ${currentUser.name}! Pick how you want to train`;
+  document.querySelectorAll(".plan-card").forEach(card => {
+    const key = card.dataset.plan;
+    const current = currentUser.plan === key;
+    card.querySelector(".current-tag").hidden = !current;
+    const button = card.querySelector("[data-choose-plan]");
+    const order = { free: 0, pro: 1, premium: 2 };
+    if (current) button.textContent = fromApp ? "Keep this plan" : "Continue with Free";
+    else if (key === "free") button.textContent = fromApp ? "Switch to Free" : "Start with Free";
+    else button.textContent = order[key] > order[currentUser.plan] ? (key === "pro" ? "Upgrade to Pro" : "Go Premium") : `Switch to ${PLANS[key].name}`;
+  });
+}
+
+document.querySelectorAll("[data-choose-plan]").forEach(button => {
+  button.addEventListener("click", async () => {
+    const plan = button.dataset.choosePlan;
+    if (plan === currentUser.plan) return enterApp();
+    userData.planSince = new Date().toISOString();
+    saveData();
+    if (plan === "free") {
+      currentUser = await BillingService.downgradeToFree(currentUser);
+      enterApp();
+      return toast("You're on the Free plan.");
+    }
+    $("pay-title").textContent = `Upgrading to ${PLANS[plan].name}…`;
+    $("pay-modal").hidden = false;
+    try {
+      currentUser = await BillingService.upgrade(currentUser, plan);
+      $("pay-modal").hidden = true;
+      enterApp();
+      if (!waitingForAnswer) startPlanner(); // refresh the planner with the new allowance
+      toast(`You're on ${PLANS[plan].name}! 🎉 New features unlocked.`);
+    } catch (err) {
+      $("pay-modal").hidden = true;
+      toast("The upgrade didn't go through. Please try again.");
+    }
+  });
+});
+$("plans-back").addEventListener("click", enterApp);
+
+/* ---------- the app ---------- */
+function startSession(user, { showPlans = false } = {}) {
+  currentUser = user;
+  userData = UserData.load(user.id);
+  resetPlanner();
+  resetCoach();
+  if (showPlans) {
+    renderPlansPage(false);
+    showScreen("plans");
+  } else {
+    enterApp();
+  }
+}
+
+function enterApp() {
+  renderHeader();
+  renderSaved();
+  renderPremium();
+  showScreen("app");
+  if (!plannerStarted) startPlanner();
+}
+
+function renderHeader() {
+  const plan = planOf(currentUser);
+  $("user-hello").textContent = `Hi, ${currentUser.name}`;
+  $("plan-badge").textContent = plan.name;
+  $("plan-badge").dataset.plan = currentUser.plan;
+  $("upgrade-btn").hidden = currentUser.plan === "premium";
+  $("upgrade-btn").textContent = currentUser.plan === "free" ? "Upgrade" : "Go Premium";
+  document.querySelectorAll("[data-lock]").forEach(el => (el.hidden = hasFeature(currentUser, el.dataset.lock)));
+  renderUsage();
+}
+
+function renderUsage() {
+  const plans = Limits.plansLeft(currentUser, userData);
+  const questions = Limits.questionsLeft(currentUser, userData);
+  const plan = planOf(currentUser);
+  const pill = (label, left, total, extra = "") =>
+    `<span class="usage-pill ${left === 0 ? "out" : ""}">${label}: <strong>${left === Infinity ? "Unlimited" : `${left} of ${total} left`}</strong>${extra}</span>`;
+  $("usage-strip").innerHTML =
+    pill("📅 Training plans", plans, plan.plansAllowed, plans === 0 ? ` · next on ${escapeHTML(niceDate(Limits.nextPlanDate(currentUser)))}` : ` ${plan.plansAllowed === Infinity ? "" : "this " + plan.planPeriod}`) +
+    pill("💬 Coach questions", questions, plan.questionsPerDay, questions === Infinity ? "" : " today");
+}
+
+$("plan-badge").addEventListener("click", openPlans);
+$("upgrade-btn").addEventListener("click", openPlans);
+
 document.querySelectorAll(".fc-tab").forEach(tab => {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".fc-tab").forEach(t => t.classList.toggle("active", t === tab));
     document.querySelectorAll(".fc-panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + tab.dataset.tab));
   });
 });
+const openTab = name => document.querySelector(`.fc-tab[data-tab="${name}"]`).click();
 
 /* ==========================================================================
    TAB 1: WEEKLY TRAINING PLANNER
@@ -946,6 +1785,8 @@ onSend(plannerInput, plannerSend, text => {
 async function buildPlan() {
   updateProgress();
   plannerInput.placeholder = "Your plan is ready!";
+  // Check the plan's limit again in case it changed while answering.
+  if (Limits.plansLeft(currentUser, userData) === 0) return showPlanLimit();
   profile.focusMode = hasSpecificFocus(profile) ? "targeted" : "rotating";
   await botSay(plannerMsgs, profile.focusMode === "rotating"
     ? "No problem! I'll build you an all-round week where every training day has a different main focus. 🔄"
@@ -961,26 +1802,21 @@ async function buildPlan() {
     return;
   }
   stop();
-  renderPlan(plan);
+  recordPlan(plan, profile);
+  renderPlan(plannerMsgs, plan, profile);
   showRestart();
 }
 
-// Rotating plans only: pick a fresh set of focus days with the same answers.
-let shuffling = false;
-async function shufflePlan() {
-  if (shuffling) return;
-  shuffling = true;
-  addMessage(plannerMsgs, "user", "🔀 Shuffle my focus days");
-  const stop = showTyping(plannerMsgs);
-  try {
-    const plan = await getTrainingPlan(profile);
-    stop();
-    renderPlan(plan);
-  } catch (err) {
-    stop();
-    addMessage(plannerMsgs, "bot", "Sorry, I couldn't shuffle your plan. Please try again!");
-  }
-  shuffling = false;
+// Counts the plan against the limit and stores it.
+function recordPlan(plan, answers, label) {
+  Limits.usePlan(userData);
+  const entry = { id: "p_" + Date.now().toString(36), createdAt: new Date().toISOString(), answers: { ...answers }, plan, label: label || "" };
+  userData.latest = entry;
+  if (hasFeature(currentUser, "savePlans")) userData.savedPlans = [entry, ...userData.savedPlans].slice(0, 30);
+  saveData();
+  renderUsage();
+  renderSaved();
+  return entry;
 }
 
 function formatMinutes(total) {
@@ -988,16 +1824,20 @@ function formatMinutes(total) {
   return h ? `${h} h${m ? " " + m + " min" : ""}` : `${m} min`;
 }
 
-function renderPlan(plan) {
+// Draws a plan into `container`. What's shown depends on the player's plan:
+// Free = drill names only, Pro = step-by-step instructions, Premium = + PDF download.
+function renderPlan(container, plan, answers, { scroll = true } = {}) {
+  const steps = hasFeature(currentUser, "drillSteps");
+  const premium = hasFeature(currentUser, "premium");
   const wrap = document.createElement("div");
   wrap.className = "fc-plan";
-  const tags = [profile.position, profile.ageGroup, profile.foot + " foot"].map(t => `<span class="fc-tag">${escapeHTML(t)}</span>`).join("");
+  const tags = [answers.position, answers.ageGroup, answers.foot + " foot"].map(t => `<span class="fc-tag">${escapeHTML(t)}</span>`).join("");
   const sessions = plan.filter(d => !d.rest);
   const totalMinutes = sessions.reduce((s, d) => s + (parseInt(d.minutes, 10) || 0), 0);
   const stats = [
     ["📅", "Sessions", sessions.length],
     ["⏱", "Total time", formatMinutes(totalMinutes)],
-    ["🧰", "Kit", equipmentLabel(profile.equipment || [])]
+    ["🧰", "Kit", equipmentLabel(answers.equipment || [])]
   ].map(([icon, label, value]) => `
     <div class="fc-stat"><span class="fc-stat-label">${icon} ${label}</span><strong>${escapeHTML(value)}</strong></div>`).join("");
 
@@ -1017,10 +1857,14 @@ function renderPlan(plan) {
           </div>`).join("")}
       </div>
     </div>` : "";
-  const note = rotationDays.length
-    ? `🔄 Mode: <strong>All-round – main focus changes every training day</strong><br>`
-    : `🎯 Main goal: <strong>${escapeHTML(profile.goal)}</strong><br>
-      💪 Working on: <strong>${escapeHTML(profile.weaknesses)}</strong><br>`;
+
+  const drillHTML = (dr, rest) => {
+    const top = `<div class="fc-drill-top"><strong>${escapeHTML(dr.name)}</strong>${dr.minutes ? `<em>${escapeHTML(dr.minutes)} min</em>` : ""}</div>`;
+    if (rest) return `<li>${top}<span>${escapeHTML(dr.detail)}</span></li>`;
+    if (!steps) return `<li>${top}</li>`;
+    return `<li>${top}<span>${escapeHTML(dr.detail)}</span>
+      <details><summary>How to do it</summary><ol>${drillSteps(dr).map(s => `<li>${escapeHTML(s)}</li>`).join("")}</ol></details></li>`;
+  };
 
   wrap.innerHTML = `
     <div class="fc-plan-head">
@@ -1037,34 +1881,99 @@ function renderPlan(plan) {
             <span class="fc-day-time">${d.rest ? "😴 Rest" : "⏱ " + escapeHTML(d.minutes) + " min"}</span>
           </div>
           <span class="fc-day-focus">${d.icon ? escapeHTML(d.icon) + " " : ""}${escapeHTML(d.focus)}</span>
-          ${d.why ? `<p class="fc-day-why">💡 ${escapeHTML(d.why)}</p>` : ""}
-          <ul>
-            ${d.drills.map(dr => `<li><div class="fc-drill-top"><strong>${escapeHTML(dr.name)}</strong>${dr.minutes ? `<em>${escapeHTML(dr.minutes)} min</em>` : ""}</div><span>${escapeHTML(dr.detail)}</span></li>`).join("")}
-          </ul>
+          ${d.why && steps ? `<p class="fc-day-why">💡 ${escapeHTML(d.why)}</p>` : ""}
+          <ul>${d.drills.map(dr => drillHTML(dr, d.rest)).join("")}</ul>
         </div>`).join("")}
     </div>
+    ${steps ? "" : `<div class="plan-lock-note"><span>🔒 <strong>Want to know how to do each drill?</strong> Pro shows step-by-step instructions for every drill.</span></div>`}
+    <div class="plan-actions"></div>
     <div class="fc-plan-note">
-      ${note}
+      ${rotationDays.length ? `🔄 Mode: <strong>All-round – main focus changes every training day</strong><br>`
+        : `🎯 Main goal: <strong>${escapeHTML(answers.goal)}</strong><br>💪 Working on: <strong>${escapeHTML(answers.weaknesses)}</strong><br>`}
       Rest days are part of the plan – that's when your body actually gets stronger. Always warm up, drink water and stop if anything hurts.
     </div>`;
-  plannerMsgs.appendChild(wrap);
-  plannerMsgs.scrollTop = wrap.offsetTop - plannerMsgs.offsetTop - 12;
+
+  if (!steps) wrap.querySelector(".plan-lock-note").appendChild(makeChip("⭐ Upgrade", openPlans, true));
+  const actions = wrap.querySelector(".plan-actions");
+  actions.appendChild(makeChip(premium ? "📄 Download PDF" : "🔒 Download PDF", () => {
+    if (!premium) return lockedMessage(container, "Downloading your plan as a PDF is part of Premium.");
+    downloadPlanPDF(plan, answers);
+  }, premium));
+
+  container.appendChild(wrap);
+  if (scroll) container.scrollTop = wrap.offsetTop - container.offsetTop - 12;
+  return wrap;
+}
+
+// Friendly "this is locked" message with an Upgrade button.
+function lockedMessage(container, text) {
+  addActionMessage(container, `🔒 ${text}`, [upgradeButton(), { label: "Not now", onClick: e => e.target.closest(".fc-msg").remove() }], "lock");
+}
+
+function showPlanLimit() {
+  plannerOptions.innerHTML = "";
+  plannerInput.placeholder = "New plan locked until " + niceDate(Limits.nextPlanDate(currentUser));
+  const plan = planOf(currentUser);
+  const text = currentUser.plan === "free"
+    ? `You've made your free training plan for this month. 🙌 Your next free plan unlocks on ${niceDate(Limits.nextPlanDate(currentUser))}. Upgrade to Pro for a brand-new plan every week.`
+    : `You've made this week's plan already. 🙌 Your next one unlocks on ${niceDate(Limits.nextPlanDate(currentUser))}. Premium lets you rebuild your plan any time, and changes it after each weekly check-in.`;
+  const actions = [upgradeButton()];
+  if (userData.latest) actions.push({ label: "📋 View my current plan", onClick: () => renderPlan(plannerMsgs, userData.latest.plan, userData.latest.answers) });
+  addActionMessage(plannerMsgs, text, actions, "lock");
+  updateProgress();
+}
+
+// Rotating plans: pick a fresh set of focus days (Premium – it's a new plan).
+let shuffling = false;
+async function shufflePlan() {
+  if (shuffling) return;
+  if (Limits.plansLeft(currentUser, userData) === 0) return showPlanLimit();
+  shuffling = true;
+  addMessage(plannerMsgs, "user", "🔀 Shuffle my focus days");
+  const stop = showTyping(plannerMsgs);
+  try {
+    const plan = await getTrainingPlan(profile);
+    stop();
+    recordPlan(plan, profile);
+    renderPlan(plannerMsgs, plan, profile);
+  } catch (err) {
+    stop();
+    addMessage(plannerMsgs, "bot", "Sorry, I couldn't shuffle your plan. Please try again!");
+  }
+  shuffling = false;
 }
 
 function showRestart() {
   plannerOptions.innerHTML = "";
   plannerOptions.appendChild(makeChip("🔄 Make a new plan", startPlanner, true));
-  if (profile.focusMode === "rotating") plannerOptions.appendChild(makeChip("🔀 Shuffle focus days", shufflePlan));
+  if (profile.focusMode === "rotating" && Limits.plansLeft(currentUser, userData) > 0) {
+    plannerOptions.appendChild(makeChip("🔀 Shuffle focus days", shufflePlan));
+  }
+}
+
+let plannerStarted = false;
+function resetPlanner() {
+  plannerStarted = false;
+  step = 0;
+  profile = {};
+  waitingForAnswer = false;
+  plannerMsgs.innerHTML = "";
+  plannerOptions.innerHTML = "";
 }
 
 async function startPlanner() {
+  plannerStarted = true;
   step = 0;
   profile = {};
   waitingForAnswer = false;
   plannerMsgs.innerHTML = "";
   plannerOptions.innerHTML = "";
   updateProgress();
-  await botSay(plannerMsgs, `Hi! 👋 I'm your football coach. Answer ${QUESTIONS.length} quick questions and I'll make you a training plan for the whole week!`);
+  if (Limits.plansLeft(currentUser, userData) === 0) {
+    await botSay(plannerMsgs, `Hi ${currentUser.name}! 👋`);
+    return showPlanLimit();
+  }
+  await botSay(plannerMsgs, `Hi ${currentUser.name}! 👋 Answer ${QUESTIONS.length} quick questions and I'll make you a training plan for the whole week!`);
   askQuestion();
 }
 
@@ -1075,18 +1984,29 @@ const coachMsgs = document.getElementById("coach-messages");
 const coachInput = document.getElementById("coach-input");
 const coachSend = document.getElementById("coach-send");
 const coachSuggestions = document.getElementById("coach-suggestions");
-const coachHistory = []; // [{ role: "user" | "assistant", content }] – ready to send to a real AI
+let coachHistory = []; // [{ role: "user" | "assistant", content }] – ready to send to a real AI
 
 async function askCoach(question) {
   coachSuggestions.innerHTML = "";
   addMessage(coachMsgs, "user", question);
+
+  if (Limits.questionsLeft(currentUser, userData) === 0) {
+    const text = currentUser.plan === "free"
+      ? `You've used your ${PLANS.free.questionsPerDay} free questions for today. They reset tomorrow – or upgrade to Pro for ${PLANS.pro.questionsPerDay} a day. ⚽`
+      : `You've used all ${PLANS.pro.questionsPerDay} of today's questions. They reset tomorrow – or go Premium for unlimited questions. ⚽`;
+    lockedMessage(coachMsgs, text);
+    return;
+  }
+
   coachHistory.push({ role: "user", content: question });
   coachSend.disabled = true;
-
   const stop = showTyping(coachMsgs);
   let reply;
   try {
     reply = await getCoachReply(question, coachHistory);
+    Limits.useQuestion(userData);
+    saveData();
+    renderUsage();
   } catch (err) {
     reply = "Sorry, I couldn't answer that right now. Please try again in a moment!";
   }
@@ -1094,16 +2014,245 @@ async function askCoach(question) {
   addMessage(coachMsgs, "bot", reply);
   coachHistory.push({ role: "assistant", content: reply });
   coachSend.disabled = false;
+
+  const left = Limits.questionsLeft(currentUser, userData);
+  if (left !== Infinity && left <= 1) {
+    addMessage(coachMsgs, "bot", left === 1 ? "Heads up: you've got 1 question left today." : "That was your last question for today – see you tomorrow! 👋");
+  }
 }
 
 onSend(coachInput, coachSend, askCoach);
 
-addMessage(coachMsgs, "bot", "Hey! 👋 Ask me anything about getting better at football – shooting, passing, speed, fitness, confidence and more.");
-["How do I get faster?", "How can I shoot better?", "How do I improve my weak foot?", "What should I eat before a game?"]
-  .forEach(q => coachSuggestions.appendChild(makeChip(q, () => askCoach(q))));
+function resetCoach() {
+  coachHistory = [];
+  coachMsgs.innerHTML = "";
+  coachSuggestions.innerHTML = "";
+  addMessage(coachMsgs, "bot", "Hey! 👋 Ask me anything about getting better at football – shooting, passing, speed, fitness, confidence and more.");
+  ["How do I get faster?", "How can I shoot better?", "How do I improve my weak foot?", "What should I eat before a game?"]
+    .forEach(q => coachSuggestions.appendChild(makeChip(q, () => askCoach(q))));
+}
 
-/* START */
-startPlanner();
+/* ==========================================================================
+   TAB 3: MY PLANS (Pro & Premium)
+   ========================================================================== */
+function upsellHTML(icon, title, text, points) {
+  return `<div class="upsell"><div class="upsell-icon">${icon}</div><h3>${title}</h3><p>${text}</p>
+    <ul>${points.map(p => `<li>${p}</li>`).join("")}</ul><div class="upsell-cta"></div></div>`;
+}
+function addUpsellButton(root, label) {
+  root.querySelector(".upsell-cta").appendChild(Object.assign(makeChip(label, openPlans, true), {}));
+}
+
+function renderSaved() {
+  const root = $("saved-content");
+  if (!currentUser) return;
+  if (!hasFeature(currentUser, "savePlans")) {
+    root.innerHTML = upsellHTML("📂", "Save and view past plans", "Keep every plan you make and look back at what you've done. Available on Pro and Premium.",
+      ["Every plan saved automatically", "Step-by-step instructions for every drill", "A new weekly plan every week"]);
+    addUpsellButton(root, "⭐ Upgrade to Pro");
+    return;
+  }
+  const list = userData.savedPlans;
+  root.innerHTML = `<div class="panel-body"><h3>📂 My plans</h3>
+    <p class="panel-intro">Every plan you make is saved here. Tap one to open it.</p>
+    ${list.length ? `<div class="saved-list"></div>` : `<div class="empty-state">No saved plans yet.<br>Make one in the Weekly Training Planner and it'll appear here.</div>`}
+    <div id="saved-view"></div></div>`;
+  const listEl = root.querySelector(".saved-list");
+  list.forEach(entry => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "saved-item";
+    const sessions = entry.plan.filter(d => !d.rest).length;
+    button.innerHTML = `<div><strong>${escapeHTML(niceDate(new Date(entry.createdAt)))}${entry.label ? " · " + escapeHTML(entry.label) : ""}</strong>
+      <span>${escapeHTML(entry.answers.position || "")} · ${sessions} sessions · ${escapeHTML(entry.answers.sessionTime || "")}</span></div><em>Open →</em>`;
+    button.addEventListener("click", () => {
+      const view = $("saved-view");
+      view.innerHTML = "";
+      renderPlan(view, entry.plan, entry.answers, { scroll: false });
+      view.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    listEl && listEl.appendChild(button);
+  });
+}
+
+/* ==========================================================================
+   TAB 4: PREMIUM – weekly check-in, match day, fitness, food
+   ========================================================================== */
+let premiumSection = "checkin";
+
+function renderPremium() {
+  const root = $("premium-content");
+  if (!currentUser) return;
+  if (!hasFeature(currentUser, "premium")) {
+    root.innerHTML = upsellHTML("⭐", "Premium tools for rising stars", "Get a coach that adapts to you week by week.",
+      ["Weekly check-ins that change next week's plan", "Match-day warm-up plans", "Fitness tips and food tips", "Unlimited Ask a Coach questions", "Download your plan as a PDF"]);
+    addUpsellButton(root, "⭐ Go Premium");
+    return;
+  }
+  const answers = (userData.latest && userData.latest.answers) || {};
+  root.innerHTML = `<div class="panel-body">
+    <div class="sub-tabs" role="tablist">
+      <button type="button" class="sub-tab" data-section="checkin">📝 Weekly check-in</button>
+      <button type="button" class="sub-tab" data-section="matchday">🏟️ Match-day warm-up</button>
+      <button type="button" class="sub-tab" data-section="fitness">💪 Fitness tips</button>
+      <button type="button" class="sub-tab" data-section="food">🍝 Food tips</button>
+    </div>
+    <div class="premium-section" id="premium-section"></div></div>`;
+  root.querySelectorAll(".sub-tab").forEach(b => {
+    b.classList.toggle("active", b.dataset.section === premiumSection);
+    b.addEventListener("click", () => { premiumSection = b.dataset.section; renderPremium(); });
+  });
+  const section = $("premium-section");
+  const tipList = items => `<ul class="tip-list">${items.map(([t, d]) => `<li><strong>${escapeHTML(t)}</strong>${escapeHTML(d)}</li>`).join("")}</ul>`;
+
+  if (premiumSection === "matchday") {
+    section.innerHTML = `<h3>🏟️ Match-day warm-up (25 min)</h3>
+      <p class="panel-intro">${answers.position === "Goalkeeper" ? "Goalkeeper version – " : ""}Start about 30 minutes before kick-off.</p>
+      <ol class="timeline">${matchDayWarmup(answers).map(([t, name, d]) => `<li><time>${t}</time><div><strong>${escapeHTML(name)}</strong><span>${escapeHTML(d)}</span></div></li>`).join("")}</ol>`;
+  } else if (premiumSection === "fitness") {
+    section.innerHTML = `<h3>💪 Fitness tips</h3>${tipList(fitnessTips(answers))}`;
+  } else if (premiumSection === "food") {
+    section.innerHTML = `<h3>🍝 Food tips for training & matches</h3>${tipList(foodTips(answers))}`;
+  } else {
+    renderCheckin(section);
+  }
+}
+
+function renderCheckin(section) {
+  const latest = userData.latest;
+  if (!latest) {
+    section.innerHTML = `<h3>📝 Weekly check-in</h3><div class="empty-state">Make your first plan in the Weekly Training Planner.<br>At the end of the week, check in here and I'll adapt next week's plan.</div>`;
+    return;
+  }
+  const planned = latest.plan.filter(d => !d.rest).length;
+  const radios = (name, options) => `<div class="choice-row">${options.map(([v, label], i) =>
+    `<label><input type="radio" name="${name}" value="${v}" ${i === 0 ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
+  section.innerHTML = `<h3>📝 Weekly check-in</h3>
+    <p class="panel-intro">Tell me how this week went and I'll build next week's plan around it.</p>
+    <form class="checkin-form" id="checkin-form" novalidate>
+      <div><span class="fieldset-label">How many of your ${planned} sessions did you do?</span>
+        ${radios("done", Array.from({ length: planned + 1 }, (_, i) => [planned - i, String(planned - i)]))}</div>
+      <div><span class="fieldset-label">How did the training feel?</span>
+        ${radios("feel", [["right", "Just right"], ["easy", "Too easy"], ["hard", "Too hard"]])}</div>
+      <div><span class="fieldset-label">Any pain or niggles?</span>
+        ${radios("pain", [["no", "No"], ["yes", "Yes"]])}</div>
+      <label class="field"><span>What do you want to work on next week? <small>(optional)</small></span>
+        <input type="text" id="checkin-focus" placeholder="e.g. my first touch, heading, stamina"></label>
+      <button type="submit" class="btn btn-primary">Build next week's plan</button>
+    </form>
+    <div id="checkin-result"></div>`;
+  $("checkin-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const form = e.target;
+    runCheckin({
+      done: Number(form.done.value), planned,
+      feel: form.feel.value, pain: form.pain.value === "yes",
+      focus: $("checkin-focus").value.trim()
+    });
+  });
+}
+
+// Adjusts the player's answers based on the check-in, then builds next week's plan.
+async function runCheckin(c) {
+  const latest = userData.latest;
+  const next = { ...latest.answers };
+  const changes = [];
+  const days = parseInt(next.daysPerWeek, 10) || 3;
+  const minutes = parseInt(next.sessionTime, 10) || 45;
+  const TIMES = [15, 30, 45, 60, 90];
+  const stepTime = dir => TIMES[Math.min(TIMES.length - 1, Math.max(0, TIMES.indexOf(minutes) + dir))] || minutes;
+  const setDays = n => { next.daysPerWeek = n + (n === 1 ? " day" : " days"); };
+
+  if (c.pain) {
+    if (days > 1) { setDays(days - 1); changes.push(`One fewer session (${days - 1} days) and more rest, because you mentioned pain.`); }
+    changes.push("If the pain doesn't go away, stop and tell a parent, coach or physio.");
+  } else if (c.done < Math.ceil(c.planned / 2)) {
+    if (days > 1) { setDays(days - 1); changes.push(`You managed ${c.done} of ${c.planned} sessions, so next week has ${days - 1} – easier to fit in.`); }
+  } else if (c.feel === "easy") {
+    if (c.done === c.planned && days < 6) { setDays(days + 1); changes.push(`You did every session and it felt easy – stepping up to ${days + 1} days.`); }
+    else if (stepTime(1) !== minutes) { next.sessionTime = stepTime(1) + " min"; changes.push(`Sessions go up to ${stepTime(1)} minutes to push you a bit more.`); }
+  }
+  if (!c.pain && c.feel === "hard" && stepTime(-1) !== minutes) {
+    next.sessionTime = stepTime(-1) + " min";
+    changes.push(`It felt too hard, so sessions drop to ${stepTime(-1)} minutes.`);
+  }
+  if (c.focus) {
+    next.weaknesses = c.focus;
+    next.goal = c.focus;
+    changes.push(`Next week focuses on: ${c.focus}.`);
+  }
+  if (!changes.length) changes.push("Training went well – keeping the same load, with fresh drills.");
+  next.focusMode = hasSpecificFocus(next) ? "targeted" : "rotating";
+
+  userData.checkins.push({ date: new Date().toISOString(), ...c });
+  const result = $("checkin-result");
+  result.innerHTML = `<div class="spinner"></div>`;
+  const plan = await getTrainingPlan(next);
+  recordPlan(plan, next, "After check-in");
+  result.innerHTML = `<h3>✅ Next week's plan is ready</h3><ul class="changes">${changes.map(t => `<li>${escapeHTML(t)}</li>`).join("")}</ul>`;
+  renderPlan(result, plan, next, { scroll: false });
+  result.scrollIntoView({ behavior: "smooth", block: "start" });
+  toast("Next week's plan is saved in My Plans. 📂");
+}
+
+/* ==========================================================================
+   PDF DOWNLOAD (Premium) – uses the jsPDF library, loaded only when needed
+   ========================================================================== */
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error("Couldn't load " + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function downloadPlanPDF(plan, answers) {
+  try {
+    if (!window.jspdf) await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const clean = s => String(s).replace(/[^\x20-\x7E -ÿ–—’‘“”•×]/g, "").replace(/\s+/g, " ").trim(); // PDF fonts can't draw emoji
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 48;
+    let y = M;
+    const line = (text, size = 10, style = "normal", color = [15, 31, 23], gap = 4) => {
+      doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(...color);
+      for (const part of doc.splitTextToSize(clean(text), W - M * 2)) {
+        if (y > H - M) { doc.addPage(); y = M; }
+        doc.text(part, M, y); y += size + gap;
+      }
+    };
+    line("CoachAI – 7-Day Training Plan", 20, "bold", [23, 138, 65], 8);
+    line(`${answers.position} · ${answers.ageGroup} · ${answers.foot} foot · ${answers.daysPerWeek} · ${answers.sessionTime} sessions`, 11, "normal", [95, 112, 104], 14);
+    for (const d of plan) {
+      y += 6;
+      line(`${d.day} – ${d.focus}${d.rest ? "" : ` (${d.minutes} min)`}`, 13, "bold", [15, 31, 23], 6);
+      if (d.why && !d.rest) line(d.why, 9, "italic", [95, 112, 104], 4);
+      for (const dr of d.drills) {
+        line(`• ${dr.name}${dr.minutes ? ` – ${dr.minutes} min` : ""}: ${dr.detail}`, 10, "normal");
+        if (!d.rest) drillSteps(dr).forEach((s, i) => line(`    ${i + 1}. ${s}`, 9, "normal", [95, 112, 104], 3));
+      }
+    }
+    y += 10;
+    line("Always warm up, drink water and stop if anything hurts.", 9, "italic", [95, 112, 104]);
+    doc.save(`coachai-plan-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast("Your plan PDF is downloading. 📄");
+  } catch (err) {
+    console.error(err);
+    toast("Couldn't create the PDF – check your internet connection and try again.");
+  }
+}
+
+/* ==========================================================================
+   START
+   ========================================================================== */
+(async () => {
+  setAuthMode("login");
+  const user = await AuthService.currentUser();
+  if (user) startSession(user);
+  else showScreen("auth");
+})();
 </script>
 </body>
 </html>
