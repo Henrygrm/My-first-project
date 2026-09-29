@@ -4,12 +4,15 @@
    🔌 AI CONNECTION
    The page talks to our own backend (/api/chat and /api/plan), which calls
    Claude with the secret API key kept safely on the server – never in here.
+   The server also checks the player's account and plan limits (account.js
+   adds the login token to each request).
    If the backend isn't set up yet (no API key, or the page is opened as a
    plain file), the site automatically falls back to the built-in demo coach.
    ========================================================================== */
 const API_TIMEOUT_MS = 65000;
 let aiMode = "checking";          // "live" (Claude) or "demo" (built-in answers)
 let lastPlanSource = "builtin";   // who made the most recent plan: "ai" or "builtin"
+let lastPlanElite = false;        // Premium "elite" plan
 
 async function postJSON(url, body) {
   const controller = new AbortController();
@@ -17,15 +20,14 @@ async function postJSON(url, body) {
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await Account.authHeaders()) },
       body: JSON.stringify(body),
       signal: controller.signal
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.error || "Request failed: " + res.status);
-      err.status = res.status;
-      err.demo = Boolean(data.demo);
+      Object.assign(err, { status: res.status, demo: Boolean(data.demo), needLogin: Boolean(data.needLogin), upgrade: Boolean(data.upgrade) });
       throw err;
     }
     return data;
@@ -34,39 +36,58 @@ async function postJSON(url, body) {
   }
 }
 
-// Asks the backend whether an API key is configured.
 async function detectAiMode() {
-  try {
-    const res = await fetch("/api/chat");
-    const data = await res.json();
-    aiMode = data.live ? "live" : "demo";
-  } catch (err) {
-    aiMode = "demo";
-  }
+  await Account.ready;
+  aiMode = Account.config.ai ? "live" : "demo";
   updateAiStatus();
 }
 
+// Status line under "Coach AI": live/demo, and what's left on the player's plan.
 function updateAiStatus() {
   const el = document.getElementById("coach-status");
   if (!el) return;
-  el.textContent = aiMode === "live" ? "Online · powered by Claude" : "Demo mode · example answers";
+  const me = Account.me;
+  let text;
+  if (aiMode !== "live") text = "Demo mode · example answers";
+  else if (Account.needsLogin()) text = "Online · sign up free to use your AI coach";
+  else if (me && me.limits) text = `${PRICING[me.plan].name} · ${me.left.question} questions left today · ${me.left.plan} plans left this week`;
+  else text = "Online · powered by Claude";
+  el.textContent = text;
   el.classList.toggle("demo", aiMode !== "live");
+  const saved = document.getElementById("saved-plans-btn");
+  if (saved) saved.hidden = !(me && me.features && me.features.savePlans && !me.demo && aiMode === "live");
+}
+Account.onChange(updateAiStatus);
+
+// A coach message with buttons, e.g. "Sign up free" or "See plans".
+function addActionMessage(container, text, actions) {
+  const msg = addMessage(container, "bot", text);
+  const row = document.createElement("div");
+  row.className = "fc-actions";
+  actions.forEach(a => row.appendChild(makeChip(a.label, a.onClick, a.primary)));
+  msg.querySelector(".fc-bubble").appendChild(row);
+  container.scrollTop = container.scrollHeight;
+  return msg;
 }
 
-function switchToDemo() {
-  aiMode = "demo";
-  updateAiStatus();
-}
+const seePlans = { label: "See plans", primary: true, onClick: () => document.getElementById("pricing").scrollIntoView({ behavior: "smooth" }) };
+const signUpActions = [
+  { label: "Sign up free", primary: true, onClick: () => Account.openAuth("signup") },
+  { label: "Log in", onClick: () => Account.openAuth("login") }
+];
 
 /** Tab 2: returns the coach's answer. `history` is [{ role, content }]. */
 async function getCoachReply(question, history) {
   if (aiMode === "checking") await detectAiMode();
   if (aiMode === "live") {
     try {
-      return (await postJSON("/api/chat", { messages: history })).reply;
+      const data = await postJSON("/api/chat", { messages: history });
+      Account.setLeft("question", data.left);
+      return data.reply;
     } catch (err) {
-      if (!err.demo) throw err; // real error: let the chat show a friendly message
-      switchToDemo();
+      if (!err.demo) throw err; // needLogin / upgrade / real errors are shown by the chat
+      aiMode = "demo";
+      updateAiStatus();
     }
   }
   await wait(700 + Math.random() * 600); // pretend the demo coach is "thinking"
@@ -76,25 +97,50 @@ async function getCoachReply(question, history) {
 /** Tab 1: returns a 7-day plan: [{ day, focus, icon, rest, rotating, minutes, why, drills: [{ name, detail, minutes }] }]. */
 async function getTrainingPlan(profile) {
   if (aiMode === "checking") await detectAiMode();
+  lastPlanElite = false;
   if (aiMode === "live") {
     try {
-      const { plan } = await postJSON("/api/plan", { profile });
-      if (Array.isArray(plan) && plan.length === 7) {
+      const data = await postJSON("/api/plan", { profile });
+      if (Array.isArray(data.plan) && data.plan.length === 7) {
+        Account.setLeft("plan", data.left);
         lastPlanSource = "ai";
-        return plan;
+        lastPlanElite = Boolean(data.elite);
+        return data.plan;
       }
     } catch (err) {
-      if (err.demo) switchToDemo();
-      else console.warn("AI plan failed, using the built-in planner:", err);
-    }
-    if (aiMode === "live") {
-      addMessage(plannerMsgs, "bot", "The AI coach is busy right now, so here's a plan from our built-in planner instead. 👇");
+      if (err.demo) {
+        aiMode = "demo";
+        updateAiStatus();
+      } else if (err.needLogin) {
+        addActionMessage(plannerMsgs, "Here's a plan from our built-in planner. Create a free account to get plans written by your AI coach. 👇", signUpActions);
+      } else if (err.upgrade) {
+        addActionMessage(plannerMsgs, `${err.message} Here's a plan from our built-in planner for now. 👇`, [seePlans]);
+      } else {
+        console.warn("AI plan failed, using the built-in planner:", err);
+        addMessage(plannerMsgs, "bot", "The AI coach is busy right now, so here's a plan from our built-in planner instead. 👇");
+      }
     }
   } else {
     await wait(1200);
   }
   lastPlanSource = "builtin";
   return fakeTrainingPlan(profile);
+}
+
+// Pro & Premium: list saved plans and open one.
+async function showSavedPlans() {
+  try {
+    const res = await fetch("/api/plans", { headers: await Account.authHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    if (!data.plans.length) return addMessage(plannerMsgs, "bot", "You haven't saved any plans yet. Every AI plan you make is saved here automatically.");
+    addActionMessage(plannerMsgs, "Your saved plans – tap one to open it:", data.plans.map(saved => ({
+      label: `${new Date(saved.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })} · ${saved.answers.position || "Plan"} · ${saved.answers.daysPerWeek || ""}`,
+      onClick: () => { lastPlanSource = "ai"; lastPlanElite = false; renderPlan(saved.plan, saved.answers); }
+    })));
+  } catch (err) {
+    addMessage(plannerMsgs, "bot", err.message || "Couldn't load your saved plans.");
+  }
 }
 
 /* ==========================================================================
@@ -720,11 +766,13 @@ function formatMinutes(total) {
   return h ? `${h} h${m ? " " + m + " min" : ""}` : `${m} min`;
 }
 
-function renderPlan(plan) {
+function renderPlan(plan, answers = profile) {
+  const profile = answers; // show the answers this plan was made from
   const wrap = document.createElement("div");
   wrap.className = "fc-plan";
   const tags = [profile.position, profile.ageGroup, profile.foot + " foot"].map(t => `<span class="fc-tag">${escapeHTML(t)}</span>`).join("") +
-    (lastPlanSource === "ai" ? `<span class="fc-tag ai">✨ Made by your AI coach</span>` : "");
+    (lastPlanSource === "ai" ? `<span class="fc-tag ai">✨ Made by your AI coach</span>` : "") +
+    (lastPlanElite ? `<span class="fc-tag elite">💎 Elite plan</span>` : "");
   const sessions = plan.filter(d => !d.rest);
   const totalMinutes = sessions.reduce((s, d) => s + (parseInt(d.minutes, 10) || 0), 0);
   const stats = [
@@ -821,7 +869,13 @@ async function askCoach(question) {
   try {
     reply = await getCoachReply(question, coachHistory);
   } catch (err) {
-    reply = "Sorry, I couldn't answer that right now. Please try again in a moment!";
+    stop();
+    coachHistory.pop(); // not answered, so don't send it again next time
+    if (err.needLogin) addActionMessage(coachMsgs, "Create a free account to chat with your AI coach – it takes 20 seconds. ⚽", signUpActions);
+    else if (err.upgrade) addActionMessage(coachMsgs, err.message, [seePlans]);
+    else addMessage(coachMsgs, "bot", "Sorry, I couldn't answer that right now. Please try again in a moment!");
+    coachSend.disabled = false;
+    return;
   }
   stop();
   addMessage(coachMsgs, "bot", reply);
@@ -855,5 +909,6 @@ document.querySelectorAll("[data-open-tab]").forEach(link => {
 });
 
 /* START */
+document.getElementById("saved-plans-btn").addEventListener("click", showSavedPlans);
 detectAiMode();
 startPlanner();

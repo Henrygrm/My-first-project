@@ -3,14 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "CoachAI – personal AI football coach website",
+  "description": "CoachAI \u2013 personal AI football coach website",
   "scripts": {
     "dev": "node --env-file-if-exists=.env server.js",
-    "start": "node --env-file-if-exists=.env server.js"
+    "start": "node --env-file-if-exists=.env server.js",
+    "test": "node --test tests/*.test.js",
+    "setup:stripe": "node --env-file-if-exists=.env scripts/setup-stripe.js"
   },
-  "engines": { "node": ">=22.9" },
+  "engines": {
+    "node": ">=22.9"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
+    "@supabase/supabase-js": "^2.117.2",
+    "stripe": "^22.6.2",
     "zod": "^4.0.0"
   }
 }
