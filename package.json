@@ -1,0 +1,16 @@
+{
+  "name": "coachai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CoachAI – personal AI football coach website",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env server.js",
+    "start": "node --env-file-if-exists=.env server.js"
+  },
+  "engines": { "node": ">=22.9" },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.129.0",
+    "zod": "^4.0.0"
+  }
+}

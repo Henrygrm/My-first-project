@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoachAI – Your Personal AI Football Coach</title>
+<meta name="description" content="Personalised weekly football training plans built around your position, age, kit and time – plus an AI coach you can ask anything.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<script>
+  // Apply the saved theme before first paint so there's no flash.
+  try { const t = localStorage.getItem("coachai-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-logo">⚽</span>
+      <span class="brand-name">CoachAI</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#get-started">Get Started</a>
+    </nav>
+    <div class="nav-actions">
+      <button type="button" class="icon-btn" id="theme-toggle" aria-label="Switch dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <a href="#coach" class="btn btn-primary btn-sm" data-open-tab="planner">Start free</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="container">
+      <span class="pill">⚽ Your Personal AI Football Coach</span>
+      <h1 class="hero-title">Train smarter. <span class="gradient-text">Play better.</span><br>Improve every week.</h1>
+      <p class="hero-sub">Your AI Football Coach gives you personalised training plans based on your position, age, skill level, goals, and available equipment.</p>
+      <div class="hero-actions">
+        <a href="#coach" class="btn btn-primary btn-lg" data-open-tab="planner">Start training free
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a href="#features" class="btn btn-ghost btn-lg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M10 8l6 4-6 4z"/></svg>
+          See what you get
+        </a>
+      </div>
+      <div class="hero-proof">
+        <div class="proof-avatars"><span>GK</span><span>DF</span><span>MF</span><span>ST</span></div>
+        <p><strong>Built for every position</strong><br>Goalkeepers, defenders, midfielders, wingers &amp; strikers</p>
+      </div>
+
+      <!-- Hero visual: a pitch with a live-looking plan preview -->
+      <div class="hero-visual" aria-hidden="true">
+        <div class="pitch">
+          <span class="pitch-line pitch-half"></span>
+          <span class="pitch-line pitch-circle"></span>
+          <span class="pitch-line pitch-box pitch-box-left"></span>
+          <span class="pitch-line pitch-box pitch-box-right"></span>
+        </div>
+        <div class="preview-card">
+          <div class="preview-head">
+            <span class="brand-logo sm">⚽</span>
+            <div><strong>Your week</strong><small>Winger · 14-17 · 4 sessions</small></div>
+          </div>
+          <ul class="preview-days">
+            <li><b>Mon</b><span>🌀 Dribbling &amp; 1v1</span><em>60 min</em></li>
+            <li class="rest"><b>Tue</b><span>😴 Rest</span><em></em></li>
+            <li><b>Wed</b><span>🥅 Shooting</span><em>60 min</em></li>
+            <li><b>Thu</b><span>⚡ Speed &amp; Agility</span><em>30 min</em></li>
+            <li class="rest"><b>Fri</b><span>😴 Rest</span><em></em></li>
+            <li><b>Sat</b><span>📐 Crossing</span><em>60 min</em></li>
+          </ul>
+        </div>
+        <div class="float-badge badge-top">⚡ Speed day<br><strong>25 min</strong><small>short &amp; sharp</small></div>
+        <div class="float-badge badge-bottom">🔄 Rotating focus<small>new skill every day</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Features</span>
+        <h2>Everything a coach would ask – <span class="gradient-text">built into one plan.</span></h2>
+        <p>Answer 8 quick questions and CoachAI builds a week of training that actually fits your life.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature">
+          <span class="feature-icon">📅</span>
+          <h3>Personalised weekly plans</h3>
+          <p>A full Monday–Sunday plan built around your position, age, strong foot, weaknesses and goals.</p>
+        </article>
+        <article class="feature">
+          <span class="feature-icon">🧰</span>
+          <h3>Uses the kit you have</h3>
+          <p>Just a ball? A wall and a mate? A full pitch? You only get drills you can actually do.</p>
+        </article>
+        <article class="feature">
+          <span class="feature-icon">⏱</span>
+          <h3>Smart session lengths</h3>
+          <p>Speed work stays short and sharp, skill days use your full time, and younger players get shorter sessions.</p>
+        </article>
+        <article class="feature">
+          <span class="feature-icon">🔄</span>
+          <h3>Rotating focus weeks</h3>
+          <p>Nothing specific to fix? Every training day switches focus so you improve all-round.</p>
+        </article>
+        <article class="feature">
+          <span class="feature-icon">💬</span>
+          <h3>Ask a coach anytime</h3>
+          <p>Stuck on your weak foot, nerves before a match or what to eat? Ask the AI coach and get practical tips.</p>
+        </article>
+        <article class="feature">
+          <span class="feature-icon">😴</span>
+          <h3>Rest built in</h3>
+          <p>Training days are spread out with proper rest, because that's when your body gets stronger.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section class="section section-tint">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">How it works</span>
+        <h2>From kick-off to plan in under a minute</h2>
+      </div>
+      <ol class="steps">
+        <li><span class="step-num">1</span><h3>Tell us about you</h3><p>Position, age, strong foot, kit, how often and how long you can train.</p></li>
+        <li><span class="step-num">2</span><h3>Get your week</h3><p>Your AI coach builds 7 days of drills, session lengths and rest days.</p></li>
+        <li><span class="step-num">3</span><h3>Train &amp; ask</h3><p>Follow the plan and ask the coach anything along the way.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ COACH (the app) ============ -->
+  <section class="section" id="coach">
+    <div class="container container-narrow">
+      <div class="section-head">
+        <span class="eyebrow">Your AI coach</span>
+        <h2>Your coach, <span class="gradient-text">on demand.</span></h2>
+        <p>Build your weekly plan, or ask your coach anything about getting better.</p>
+      </div>
+
+      <div class="fc-card">
+        <div class="fc-topbar">
+          <div class="fc-coach">
+            <div class="fc-logo">⚽</div>
+            <div>
+              <div class="fc-coach-name">Coach AI</div>
+              <div class="fc-status" id="coach-status">Connecting…</div>
+            </div>
+          </div>
+          <nav class="fc-tabs" role="tablist">
+            <button type="button" class="fc-tab active" data-tab="planner">📅 Weekly Training Planner</button>
+            <button type="button" class="fc-tab" data-tab="coach">💬 Ask a Coach</button>
+          </nav>
+        </div>
+
+        <!-- TAB 1: WEEKLY TRAINING PLANNER -->
+        <div class="fc-panel active" id="panel-planner">
+          <div class="fc-progress">
+            <div class="fc-progress-row"><span id="progress-label">Question 1 of 8</span><span id="progress-pct">0%</span></div>
+            <div class="fc-progress-track"><div class="fc-progress-bar" id="progress-bar"></div></div>
+          </div>
+          <div class="fc-messages" id="planner-messages"></div>
+          <div class="fc-options" id="planner-options"></div>
+          <!-- No <form> on purpose: website builders often show pages in a
+               sandboxed frame that blocks form submits, which breaks Send. -->
+          <div class="fc-inputbar">
+            <div class="fc-inputwrap">
+              <input class="fc-input" id="planner-input" type="text" placeholder="Tap an option or type your answer..." autocomplete="off" enterkeyhint="send">
+              <button type="button" class="fc-send" id="planner-send" aria-label="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: ASK A COACH -->
+        <div class="fc-panel" id="panel-coach">
+          <div class="fc-messages" id="coach-messages"></div>
+          <div class="fc-options" id="coach-suggestions"></div>
+          <div class="fc-inputbar">
+            <div class="fc-inputwrap">
+              <input class="fc-input" id="coach-input" type="text" placeholder="Ask any football question..." autocomplete="off" enterkeyhint="send">
+              <button type="button" class="fc-send" id="coach-send" aria-label="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRICING ============ -->
+  <section class="section section-tint" id="pricing">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Choose your plan</span>
+        <h2>Pick the plan that fits your game</h2>
+        <p>Start free, upgrade when you're ready. Cancel anytime.</p>
+      </div>
+      <div class="pricing-grid">
+        <article class="price-card">
+          <h3>Free</h3>
+          <p class="price-desc">Get started with AI coaching basics.</p>
+          <p class="price"><span>$0</span>/month</p>
+          <a href="#coach" class="btn btn-ghost btn-block" data-open-tab="planner">Start free</a>
+          <ul class="price-list">
+            <li>Basic AI coaching</li>
+            <li>Sample training sessions</li>
+            <li>General football tips</li>
+          </ul>
+        </article>
+        <article class="price-card popular">
+          <span class="popular-badge">✨ Most popular</span>
+          <h3>Pro</h3>
+          <p class="price-desc">Your full personal coach, every week.</p>
+          <p class="price"><span>$9</span>/month</p>
+          <a href="#coach" class="btn btn-primary btn-block" data-open-tab="planner">Go Pro</a>
+          <ul class="price-list">
+            <li>Unlimited weekly plans</li>
+            <li>Unlimited Ask a Coach</li>
+            <li>Position-specific drills</li>
+            <li>Rotating focus weeks</li>
+          </ul>
+        </article>
+        <article class="price-card">
+          <h3>Team</h3>
+          <p class="price-desc">For coaches running a squad.</p>
+          <p class="price"><span>$29</span>/month</p>
+          <a href="#coach" class="btn btn-ghost btn-block" data-open-tab="coach">Talk to the coach</a>
+          <ul class="price-list">
+            <li>Everything in Pro</li>
+            <li>Plans for up to 25 players</li>
+            <li>Session ideas for team training</li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GET STARTED ============ -->
+  <section class="section" id="get-started">
+    <div class="container">
+      <div class="cta-card">
+        <span class="cta-ball">⚽</span>
+        <h2>Ready to level up?</h2>
+        <p>Tell your AI coach your position, current level, goals, and how many days you can train, and we'll build your training plan.</p>
+        <a href="#coach" class="btn btn-primary btn-lg" data-open-tab="planner">Build my training plan
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <p class="cta-small">Train with purpose. Improve with consistency. Play your best football.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <a href="#top" class="brand"><span class="brand-logo sm">⚽</span><span class="brand-name">CoachAI</span></a>
+    <nav class="footer-links">
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#coach">AI Coach</a>
+    </nav>
+    <p class="footer-note">AI coaching tips are general guidance, not medical advice. Always warm up and stop if anything hurts.</p>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
