@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Pitchside Coaching AI</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
@@ -322,6 +323,15 @@
   }
   .plan-card.premium .plan-list li::before { background: var(--gold); color: var(--ink); }
   .plan-card .btn { margin-top: auto; }
+  .billing-toggle { display: flex; width: fit-content; margin: -12px auto 36px; gap: 4px; padding: 5px; background: var(--card); border: 1px solid var(--border); border-radius: 999px; }
+  .billing-option { border: none; background: transparent; color: var(--muted); cursor: pointer; font: 700 0.95rem "Inter", sans-serif; padding: 10px 20px; border-radius: 999px; display: flex; align-items: center; gap: 8px; }
+  .billing-option[aria-pressed="true"] { background: var(--brand); color: #fff; }
+  .billing-option:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  .save-tag { font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: var(--lime-soft); color: var(--brand-dark); }
+  .billing-option[aria-pressed="true"] .save-tag { background: rgba(255, 255, 255, 0.25); color: #fff; }
+  .price-note { margin: -8px 0 0; color: var(--muted); font-size: 0.88rem; min-height: 1.3em; }
+  .price-note strong { color: var(--brand-dark); }
+  .form-error.info { background: var(--brand-soft); border-color: #bfe5cc; }
   .current-tag { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; background: var(--track); color: var(--muted); padding: 4px 9px; border-radius: 999px; }
   .plans-foot { text-align: center; color: var(--muted); font-size: 0.88rem; margin: 28px auto 0; max-width: 560px; line-height: 1.5; }
 
@@ -536,7 +546,7 @@
         <p class="form-error" id="auth-error" role="alert" hidden></p>
         <button type="submit" class="btn btn-primary btn-block" id="auth-submit">Log in</button>
       </form>
-      <p class="test-note">🧪 Test mode: accounts are saved only in this browser. Don't use a real password.</p>
+      <p class="test-note" id="auth-test-note">🧪 Test mode: accounts are saved only in this browser. Don't use a real password.</p>
     </div>
   </section>
 </main>
@@ -555,11 +565,17 @@
     <p>Start free and upgrade whenever you're ready. You can change plan at any time.</p>
   </div>
 
+  <div class="billing-toggle" role="group" aria-label="Billing period">
+    <button type="button" class="billing-option" data-interval="month" aria-pressed="true">Monthly</button>
+    <button type="button" class="billing-option" data-interval="year" aria-pressed="false">Yearly <span class="save-tag">Save 15%</span></button>
+  </div>
+
   <div class="plan-grid">
     <article class="plan-card" data-plan="free">
       <h2 class="plan-name">Free <span class="current-tag" hidden>Current</span></h2>
       <p class="plan-for">Try it out</p>
-      <p class="plan-price"><strong>$0</strong>/month</p>
+      <p class="plan-price"><strong class="price-amount">$0</strong><span class="price-period">/month</span></p>
+      <p class="price-note"></p>
       <ul class="plan-list">
         <li>1 weekly training plan per month</li>
         <li>3 "Ask a Coach" questions per day</li>
@@ -572,7 +588,8 @@
       <span class="popular-badge">⭐ Most popular</span>
       <h2 class="plan-name">Pro <span class="current-tag" hidden>Current</span></h2>
       <p class="plan-for">For players who want to get better</p>
-      <p class="plan-price"><strong>$10</strong>/month</p>
+      <p class="plan-price"><strong class="price-amount">$10</strong><span class="price-period">/month</span></p>
+      <p class="price-note"></p>
       <ul class="plan-list">
         <li>A new weekly training plan every week</li>
         <li>30 "Ask a Coach" questions per day</li>
@@ -585,7 +602,8 @@
     <article class="plan-card premium" data-plan="premium">
       <h2 class="plan-name">Premium <span class="current-tag" hidden>Current</span></h2>
       <p class="plan-for">For rising stars</p>
-      <p class="plan-price"><strong>$22</strong>/month</p>
+      <p class="plan-price"><strong class="price-amount">$22</strong><span class="price-period">/month</span></p>
+      <p class="price-note"></p>
       <ul class="plan-list">
         <li>Everything in Pro</li>
         <li>Unlimited "Ask a Coach" questions</li>
@@ -597,7 +615,7 @@
       <button type="button" class="btn btn-dark btn-block" data-choose-plan="premium">Go Premium</button>
     </article>
   </div>
-  <p class="plans-foot">🧪 Test mode: upgrading is pretend – no payment is taken.</p>
+  <p class="plans-foot" id="plans-test-note">🧪 Test mode: upgrading is pretend – no payment is taken.</p>
 </main>
 
 <!-- =====================================================================
@@ -695,22 +713,25 @@
    1. PLANS – what each subscription includes
    --------------------------------------------------------------------------
    Change prices, limits and features here. Infinity = no limit.
+   The server has the same limits in lib/plans.js – keep them in step.
    ========================================================================== */
+const YEARLY_DISCOUNT = 0.15; // 15% off when paying yearly
+const yearlyPrice = monthly => Math.round(monthly * 12 * (1 - YEARLY_DISCOUNT) * 100) / 100;
 const PLANS = {
   free: {
-    name: "Free", price: 0,
+    name: "Free", prices: { month: 0, year: 0 },
     plansAllowed: 1, planPeriod: "month",   // 1 weekly training plan per month
     questionsPerDay: 3,
     features: { drillSteps: false, savePlans: false, premium: false }
   },
   pro: {
-    name: "Pro", price: 10,
+    name: "Pro", prices: { month: 10, year: yearlyPrice(10) },       // $102/year
     plansAllowed: 1, planPeriod: "week",    // a new weekly plan every week
     questionsPerDay: 30,
     features: { drillSteps: true, savePlans: true, premium: false }
   },
   premium: {
-    name: "Premium", price: 22,
+    name: "Premium", prices: { month: 22, year: yearlyPrice(22) },   // $224.40/year
     plansAllowed: Infinity, planPeriod: "week", // weekly plans + rebuilds after check-ins
     questionsPerDay: Infinity,
     features: { drillSteps: true, savePlans: true, premium: true }
@@ -718,65 +739,94 @@ const PLANS = {
 };
 const planOf = user => PLANS[user && user.plan] || PLANS.free;
 const hasFeature = (user, feature) => Boolean(planOf(user).features[feature]);
+const money = n => "$" + (Number.isInteger(n) ? n : n.toFixed(2));
 
 /* ==========================================================================
    2. STORAGE – the browser's localStorage, with a memory fallback
    ========================================================================== */
-const Store = (() => {
+const makeStore = area => {
   const memory = {};
   return {
     get(key, fallback) {
-      try {
-        const raw = localStorage.getItem(key);
-        return raw == null ? fallback : JSON.parse(raw);
-      } catch (e) {
-        return key in memory ? memory[key] : fallback;
-      }
-    },
-    set(key, value) {
-      memory[key] = value;
-      try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* private mode: memory only */ }
-    },
-    remove(key) {
-      delete memory[key];
-      try { localStorage.removeItem(key); } catch (e) {}
-    }
-  };
-})();
-
-// Like Store, but forgotten when the browser tab is closed (sessionStorage).
-const SessionStore = (() => {
-  const memory = {};
-  return {
-    get(key, fallback) {
-      try { const raw = sessionStorage.getItem(key); return raw == null ? fallback : JSON.parse(raw); }
+      try { const raw = window[area].getItem(key); return raw == null ? fallback : JSON.parse(raw); }
       catch (e) { return key in memory ? memory[key] : fallback; }
     },
     set(key, value) {
       memory[key] = value;
-      try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+      try { window[area].setItem(key, JSON.stringify(value)); } catch (e) { /* private mode: memory only */ }
     },
     remove(key) {
       delete memory[key];
-      try { sessionStorage.removeItem(key); } catch (e) {}
+      try { window[area].removeItem(key); } catch (e) {}
     }
   };
-})();
+};
+const Store = makeStore("localStorage");          // stays on this device
+const SessionStore = makeStore("sessionStorage");  // forgotten when the tab is closed
 
 /* ==========================================================================
-   3. 🔐 LOGIN – PRETEND VERSION (users are saved in this browser only)
+   3. 🔌 BACKEND DETECTION
    --------------------------------------------------------------------------
-   To use a real login system (e.g. Supabase, Firebase or Auth0), replace the
-   inside of these five functions with calls to that service. Keep the same
-   names and return values and the rest of the app keeps working:
-     signUp({ name, email, password, remember }) -> user   (throws Error with a message)
-     logIn({ email, password, remember })        -> user   (throws Error with a message)
-     logOut()
-     currentUser()                     -> user or null
-     savePlan(userId, plan)            -> user   (real apps: done by the payment webhook)
-   A user looks like: { id, name, email, plan: "free" | "pro" | "premium", createdAt }
+   On the Pitchside website (with the /api server running) this page uses the
+   REAL login (Supabase), REAL payments (Stripe) and the REAL AI coach (Claude).
+   Anywhere else – Bolt, a preview, or opening this file directly – it runs in
+   TEST MODE: pretend accounts, pretend payments and example AI answers.
    ========================================================================== */
-const AuthService = (() => {
+const API_BASE = ""; // same website. Only change this if the page is hosted somewhere else.
+
+const Backend = {
+  config: { ai: false, auth: null, payments: false },
+  async init() {
+    if (location.protocol === "file:") return;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(API_BASE + "/api/config", { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok && (res.headers.get("content-type") || "").includes("application/json")) this.config = await res.json();
+    } catch (e) { /* no server here: test mode */ }
+  },
+  get ai() { return Boolean(this.config.ai); },
+  get auth() { return Boolean(this.config.auth); },
+  get payments() { return Boolean(this.config.payments && this.config.auth); }
+};
+
+// Calls our own server. Errors carry flags the app shows as friendly messages.
+async function api(path, body, method = "POST") {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 65000);
+  try {
+    const res = await fetch(API_BASE + path, {
+      method,
+      headers: { "Content-Type": "application/json", ...(await AuthService.authHeaders()) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || "Something went wrong. Please try again.");
+      Object.assign(err, { status: res.status, upgrade: Boolean(data.upgrade), needLogin: Boolean(data.needLogin), demo: Boolean(data.demo) });
+      throw err;
+    }
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/* ==========================================================================
+   4. 🔐 LOGIN
+   --------------------------------------------------------------------------
+   Two versions with the same functions:
+     signUp({ name, email, password, remember }) -> user   (throws Error with a message)
+     logIn({ email, password, remember })        -> user
+     logOut(), currentUser() -> user or null, authHeaders()
+   A user looks like: { id, name, email, plan: "free"|"pro"|"premium", interval: "month"|"year"|null }
+   ========================================================================== */
+const REMEMBER_KEY = "pitchside_remember";
+
+// TEST MODE: users are saved in this browser only.
+const PretendAuth = (() => {
   const USERS_KEY = "pitchside_users";
   const SESSION_KEY = "pitchside_session";
 
@@ -790,7 +840,7 @@ const AuthService = (() => {
     }
   }
   const users = () => Store.get(USERS_KEY, {});
-  const publicUser = u => u && { id: u.id, name: u.name, email: u.email, plan: u.plan, createdAt: u.createdAt };
+  const publicUser = u => u && { id: u.id, name: u.name, email: u.email, plan: u.plan, interval: u.interval || null, createdAt: u.createdAt };
   // Logged-in state lasts until the tab is closed, or stays on this device if "Keep me logged in" was ticked.
   function startSession(email, remember) {
     Store.remove(SESSION_KEY);
@@ -799,6 +849,7 @@ const AuthService = (() => {
   }
 
   return {
+    async init() {},
     async signUp({ name, email, password, remember }) {
       email = String(email || "").trim().toLowerCase();
       name = String(name || "").trim();
@@ -808,7 +859,7 @@ const AuthService = (() => {
       const all = users();
       if (all[email]) throw new Error("There's already an account with that email. Try logging in.");
       const user = { id: "u_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name, email,
-        passwordHash: await hash(password), plan: "free", createdAt: new Date().toISOString() };
+        passwordHash: await hash(password), plan: "free", interval: null, createdAt: new Date().toISOString() };
       all[email] = user;
       Store.set(USERS_KEY, all);
       startSession(email, remember);
@@ -831,41 +882,139 @@ const AuthService = (() => {
       const email = SessionStore.get(SESSION_KEY, null) || Store.get(SESSION_KEY, null);
       return email ? publicUser(users()[email]) || null : null;
     },
-    async savePlan(userId, plan) {
+    async authHeaders() { return {}; },
+    // Test mode only – on the real site the Stripe webhook changes the plan.
+    async savePlan(userId, plan, interval) {
       const all = users();
       const user = Object.values(all).find(u => u.id === userId);
       if (!user) throw new Error("Account not found.");
       user.plan = plan;
+      user.interval = plan === "free" ? null : interval || "month";
       Store.set(USERS_KEY, all);
       return publicUser(user);
     }
   };
 })();
 
+// REAL LOGIN: Supabase accounts (set up in the README). The page loads the
+// Supabase library only when the website's server says accounts are on.
+const LiveAuth = (() => {
+  let sb = null;
+  let clientRemembers = null;
+
+  function makeClient(remember) {
+    clientRemembers = remember;
+    let storage;
+    try { storage = remember ? window.localStorage : window.sessionStorage; } catch (e) { storage = undefined; }
+    sb = window.supabase.createClient(Backend.config.auth.url, Backend.config.auth.anonKey,
+      { auth: { storage, persistSession: true, detectSessionInUrl: true } });
+  }
+  function useRemember(remember) {
+    Store.set(REMEMBER_KEY, Boolean(remember));
+    if (clientRemembers !== Boolean(remember)) makeClient(Boolean(remember));
+  }
+  function friendly(err) {
+    const msg = (err && err.message) || "";
+    if (/invalid login credentials/i.test(msg)) return "That email and password don't match. Please try again.";
+    if (/already registered|already exists/i.test(msg)) return "There's already an account with that email. Try logging in.";
+    if (/email not confirmed/i.test(msg)) return "Please confirm your email first – check your inbox for the link.";
+    if (/rate limit|too many/i.test(msg)) return "Too many attempts. Wait a minute and try again.";
+    return msg || "Something went wrong. Please try again.";
+  }
+  // Account details (plan, usage left) come from our server.
+  async function me() {
+    const data = await api("/api/me", undefined, "GET");
+    return { id: data.id, name: data.name, email: data.email, plan: data.plan, interval: data.interval,
+      left: data.left, resets: data.resets, hasBilling: data.hasBilling };
+  }
+
+  return {
+    async init() {
+      if (!window.supabase) await loadScript(API_BASE + "/vendor/supabase.js");
+      makeClient(Boolean(Store.get(REMEMBER_KEY, false)));
+    },
+    async signUp({ name, email, password, remember }) {
+      name = String(name || "").trim();
+      if (!name) throw new Error("Please enter your name.");
+      if (!/^\S+@\S+\.\S+$/.test(String(email || "").trim())) throw new Error("Please enter a valid email address.");
+      if (String(password || "").length < 6) throw new Error("Your password needs at least 6 characters.");
+      useRemember(remember);
+      const { data, error } = await sb.auth.signUp({ email: email.trim(), password, options: { data: { name }, emailRedirectTo: location.origin } });
+      if (error) throw new Error(friendly(error));
+      if (!data.session) {
+        const note = new Error(`Nearly there! Check ${email.trim()} for a link to confirm your account, then log in.`);
+        note.info = true;
+        throw note;
+      }
+      return me();
+    },
+    async logIn({ email, password, remember }) {
+      if (!email || !password) throw new Error("Enter your email and password.");
+      useRemember(remember);
+      const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) throw new Error(friendly(error));
+      return me();
+    },
+    async logOut() { await sb.auth.signOut(); },
+    async currentUser() {
+      const { data } = await sb.auth.getSession();
+      if (!data.session) return null;
+      try { return await me(); } catch (e) { return null; }
+    },
+    async authHeaders() {
+      if (!sb) return {};
+      const { data } = await sb.auth.getSession();
+      return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {};
+    }
+  };
+})();
+
+const AuthService = {
+  get impl() { return Backend.auth ? LiveAuth : PretendAuth; },
+  init() { return this.impl.init(); },
+  signUp(d) { return this.impl.signUp(d); },
+  logIn(d) { return this.impl.logIn(d); },
+  logOut() { return this.impl.logOut(); },
+  currentUser() { return this.impl.currentUser(); },
+  authHeaders() { return this.impl.authHeaders(); }
+};
+
 /* ==========================================================================
-   4. 💳 PAYMENTS – PRETEND VERSION (no money is taken)
+   5. 💳 PAYMENTS
    --------------------------------------------------------------------------
-   To take real payments (e.g. Stripe), replace upgrade() so it:
-     1. asks YOUR server to create a Stripe Checkout session for this plan,
-     2. sends the player to the returned checkout URL,
-     3. lets your server's Stripe webhook set user.plan after payment.
+   Real site: Stripe Checkout (the server creates the checkout page, and the
+   Stripe webhook updates the plan after payment). Test mode: pretend.
    Never put a secret payment key in this file.
    ========================================================================== */
 const BillingService = {
-  async upgrade(user, plan) {
+  // Returns the updated user (test mode), or leaves the page for Stripe (real site).
+  async upgrade(user, plan, interval) {
+    if (Backend.payments) {
+      const { url } = await api("/api/checkout", { plan, interval });
+      location.href = url;
+      return new Promise(() => {}); // the page is navigating to Stripe
+    }
+    if (Backend.auth) throw new Error("Payments aren't set up on this site yet. Please try again later.");
     await wait(1200); // pretend the payment is processing
-    return AuthService.savePlan(user.id, plan);
+    return PretendAuth.savePlan(user.id, plan, interval);
   },
-  async downgradeToFree(user) {
-    return AuthService.savePlan(user.id, "free");
+  // Downgrading, switching or cancelling a paid plan (real site: Stripe's billing page).
+  async manage(user, plan = "free") {
+    if (Backend.payments) {
+      const { url } = await api("/api/portal", {});
+      location.href = url;
+      return new Promise(() => {});
+    }
+    if (Backend.auth) throw new Error("Payments aren't set up on this site yet. Please try again later.");
+    return PretendAuth.savePlan(user.id, plan, null);
   }
 };
 
 /* ==========================================================================
-   5. USAGE & PLAN LIMITS
+   6. USAGE & PLAN LIMITS
    --------------------------------------------------------------------------
-   Counted in this browser for testing. With a real backend, count and check
-   these on the server too – anything in the browser can be changed by users.
+   Test mode counts in this browser. On the real site the server counts and
+   enforces the limits, and this page shows the numbers it sends back.
    ========================================================================== */
 const UserData = (() => {
   const key = id => "pitchside_data_" + id;
@@ -892,8 +1041,13 @@ function nextPeriodStart(period, now = new Date()) {
 }
 const niceDate = d => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 
+// True when the server is counting (real AI + real accounts).
+const serverCounts = user => Backend.ai && Backend.auth && user && user.left;
+const fromServer = n => (n === null || n === undefined ? Infinity : n);
+
 const Limits = {
   plansLeft(user, data) {
+    if (serverCounts(user)) return fromServer(user.left.plan);
     const plan = planOf(user);
     if (plan.plansAllowed === Infinity) return Infinity;
     // Count from the start of this month/week – or from when the player changed plan, so upgrading gives a fresh allowance.
@@ -902,110 +1056,66 @@ const Limits = {
     return Math.max(0, plan.plansAllowed - used);
   },
   questionsLeft(user, data) {
+    if (serverCounts(user)) return fromServer(user.left.question);
     const plan = planOf(user);
     if (plan.questionsPerDay === Infinity) return Infinity;
     const used = data.questions.day === todayKey() ? data.questions.count : 0;
     return Math.max(0, plan.questionsPerDay - used);
   },
-  usePlan(data) { data.planDates.push(new Date().toISOString()); },
-  useQuestion(data) {
+  usePlan(data, serverLeft) {
+    data.planDates.push(new Date().toISOString());
+    if (serverCounts(currentUser) && serverLeft !== undefined) currentUser.left.plan = serverLeft;
+  },
+  useQuestion(data, serverLeft) {
     if (data.questions.day !== todayKey()) data.questions = { day: todayKey(), count: 0 };
     data.questions.count++;
+    if (serverCounts(currentUser) && serverLeft !== undefined) currentUser.left.question = serverLeft;
   },
-  nextPlanDate: user => nextPeriodStart(planOf(user).planPeriod)
+  nextPlanDate: user => (serverCounts(user) && user.resets && user.resets.plan ? new Date(user.resets.plan) : nextPeriodStart(planOf(user).planPeriod))
 };
 
-
 /* ==========================================================================
-   🔌 AI CONNECTION POINT
+   7. 🤖 AI COACH
    --------------------------------------------------------------------------
-   Right now the chatbot uses PRETEND answers (USE_REAL_AI = false).
-   To connect a real AI later:
-     1. Set USE_REAL_AI = true
-     2. Set AI_ENDPOINT to YOUR OWN backend / serverless function URL.
-        (Never put a secret API key directly in this file — anyone can see it.)
-     3. Your backend should accept:  { system, messages: [{role, content}] }
-        and return JSON:              { reply: "text answer" }
-   Only the two functions below talk to the "AI", so that's all you change.
+   Real site: our server asks Claude (the API key stays on the server).
+   Test mode: example answers from the built-in library further down.
+   Each function returns { ..., left } where left = uses left (real site only).
    ========================================================================== */
-const USE_REAL_AI = false;
-const AI_ENDPOINT = "https://your-backend.example.com/api/coach";
-
-async function callAI(systemPrompt, messages) {
-  const res = await fetch(AI_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ system: systemPrompt, messages })
-  });
-  if (!res.ok) throw new Error("AI request failed: " + res.status);
-  const data = await res.json();
-  return data.reply;
-}
-
-/** Tab 2: returns the coach's answer to a question. */
 async function getCoachReply(question, history) {
-  if (USE_REAL_AI) {
-    return callAI(
-      "You are a friendly, encouraging football (soccer) coach. Give short, practical tips for young players.",
-      history
-    );
+  if (Backend.ai) {
+    const data = await api("/api/chat", { messages: history });
+    return { reply: data.reply, left: data.left };
   }
   await wait(700 + Math.random() * 600); // pretend the AI is "thinking"
-  return fakeCoachReply(question);
+  return { reply: fakeCoachReply(question) };
 }
 
-/** Tab 1: returns a 7-day plan as an array of { day, focus, rest, rotating, icon, drills: [{name, detail}] }. */
+/** Returns a 7-day plan: [{ day, focus, icon, rest, rotating, minutes, why, drills: [{ name, detail, minutes }] }]. */
 async function getTrainingPlan(profile) {
-  if (USE_REAL_AI) {
-    const reply = await callAI(
-      "You are a football coach. Reply ONLY with a JSON array of 7 objects (Monday to Sunday) " +
-      'shaped like {"day":"Monday","focus":"...","icon":"⚽","rest":false,"minutes":35,"why":"why this session is this long",' +
-      '"drills":[{"name":"...","detail":"...","minutes":8}]}. ' +
-      "Train exactly daysPerWeek days with rest days between, keep every session within sessionTime (shorter for speed, " +
-      "conditioning and recovery days, and shorter for young players), only use drills that need the equipment listed, " +
-      "and suit the player's age. " +
-      'If focusMode is "rotating", give every training day a DIFFERENT main focus and add "rotating":true and an "icon" emoji to those days.',
-      [{ role: "user", content: JSON.stringify(profile) }]
-    );
-    return JSON.parse(reply);
+  if (Backend.ai) {
+    const data = await api("/api/plan", { profile });
+    return { plan: data.plan, left: data.left, ai: true };
   }
   await wait(1200);
-  return fakeTrainingPlan(profile);
+  return { plan: fakeTrainingPlan(profile) };
 }
 
-/** Premium diet tracker: returns a fuel plan { waterTarget, notes: [..], days: { training|rest|match: [{ slot, time, food }] } }. */
+/** Premium diet tracker: { waterTarget, notes: [..], days: { training|rest|match: [{ slot, time, food }] } }. */
 async function getDietPlan(input) {
-  if (USE_REAL_AI) {
-    const reply = await callAI(
-      "You are a sports nutrition coach for young footballers. Reply ONLY with JSON shaped like " +
-      '{"waterTarget":8,"notes":["..."],"days":{"training":[{"slot":"Breakfast","time":"7:30","food":"..."}],"rest":[...],"match":[...]}}. ' +
-      "Use normal family foods and food groups – never calorie targets, weight-loss advice or supplements, especially for under-18s. " +
-      "Respect the diet type and every food to avoid. Training days include a pre-training snack and a recovery snack; " +
-      "match days include a pre-match meal about 3 hours before kick-off and a half-time top-up.",
-      [{ role: "user", content: JSON.stringify(input) }]
-    );
-    return JSON.parse(reply);
-  }
+  if (Backend.ai) return (await api("/api/diet", { action: "plan", input })).plan;
   await wait(1100);
   return fakeDietPlan(input);
 }
 
-/** Premium diet tracker: returns a list of short feedback lines about the last 7 days of logs. */
+/** Premium diet tracker: 3–5 short feedback lines about the last 7 days of logs. */
 async function getDietFeedback(input) {
-  if (USE_REAL_AI) {
-    const reply = await callAI(
-      "You are a friendly sports nutrition coach for young footballers. Look at the player's last 7 days of food tracking " +
-      "and reply with 3–5 short, encouraging, practical tips as a JSON array of strings. No calorie or weight talk.",
-      [{ role: "user", content: JSON.stringify(input) }]
-    );
-    return JSON.parse(reply);
-  }
+  if (Backend.ai) return (await api("/api/diet", { action: "feedback", input })).tips;
   await wait(900);
   return fakeDietFeedback(input);
 }
 
 /* ==========================================================================
-   PRETEND DATA (delete or ignore once a real AI is connected)
+   BUILT-IN COACH (test mode) – drill library, plan builder and example answers
    ========================================================================== */
 // Equipment keys used by the questions and the drill library.
 const EQUIPMENT = [
@@ -1611,63 +1721,107 @@ $("auth-form").addEventListener("submit", async e => {
     }
   } catch (err) {
     $("auth-error").textContent = err.message;
+    $("auth-error").classList.toggle("info", Boolean(err.info));
     $("auth-error").hidden = false;
   } finally {
     button.disabled = false;
   }
 });
 
-$("logout-btn").addEventListener("click", async () => {
-  await AuthService.logOut();
+async function logOutNow() {
+  await AuthService.logOut().catch(() => {});
   currentUser = null;
   userData = null;
   setAuthMode("login");
   showScreen("auth");
   toast("You're logged out.");
-});
+}
+$("logout-btn").addEventListener("click", logOutNow);
 
 /* ---------- plans page ---------- */
+let billingInterval = "month";
+const isCurrentPlan = key => currentUser.plan === key && (key === "free" || (currentUser.interval || "month") === billingInterval);
+
 function renderPlansPage(fromApp) {
   $("plans-back").hidden = !fromApp;
   $("plans-title").textContent = fromApp ? "Change your plan" : `Welcome, ${currentUser.name}! Pick how you want to train`;
+  document.querySelectorAll(".billing-option").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.interval === billingInterval)));
+  const order = { free: 0, pro: 1, premium: 2 };
   document.querySelectorAll(".plan-card").forEach(card => {
     const key = card.dataset.plan;
-    const current = currentUser.plan === key;
-    card.querySelector(".current-tag").hidden = !current;
+    const plan = PLANS[key];
+    // prices
+    const yearly = billingInterval === "year" && key !== "free";
+    card.querySelector(".price-amount").textContent = money(plan.prices[yearly ? "year" : "month"]);
+    card.querySelector(".price-period").textContent = yearly ? "/year" : "/month";
+    const saving = Math.round((plan.prices.month * 12 - plan.prices.year) * 100) / 100;
+    card.querySelector(".price-note").innerHTML = key === "free" ? "Free forever"
+      : yearly ? `Just ${money(Math.round(plan.prices.year / 12 * 100) / 100)}/month · <strong>save ${money(saving)} a year</strong>`
+      : `Billed monthly · cancel anytime`;
+    // current plan & button
+    const current = isCurrentPlan(key);
+    card.querySelector(".current-tag").hidden = currentUser.plan !== key;
     const button = card.querySelector("[data-choose-plan]");
-    const order = { free: 0, pro: 1, premium: 2 };
     if (current) button.textContent = fromApp ? "Keep this plan" : "Continue with Free";
     else if (key === "free") button.textContent = fromApp ? "Switch to Free" : "Start with Free";
-    else button.textContent = order[key] > order[currentUser.plan] ? (key === "pro" ? "Upgrade to Pro" : "Go Premium") : `Switch to ${PLANS[key].name}`;
+    else if (currentUser.plan === key) button.textContent = billingInterval === "year" ? "Switch to yearly" : "Switch to monthly";
+    else button.textContent = order[key] > order[currentUser.plan] ? (key === "pro" ? "Upgrade to Pro" : "Go Premium") : `Switch to ${plan.name}`;
   });
 }
+
+document.querySelectorAll(".billing-option").forEach(b => b.addEventListener("click", () => {
+  billingInterval = b.dataset.interval;
+  renderPlansPage(!$("plans-back").hidden);
+}));
 
 document.querySelectorAll("[data-choose-plan]").forEach(button => {
   button.addEventListener("click", async () => {
     const plan = button.dataset.choosePlan;
-    if (plan === currentUser.plan) return enterApp();
-    userData.planSince = new Date().toISOString();
-    saveData();
-    if (plan === "free") {
-      currentUser = await BillingService.downgradeToFree(currentUser);
-      enterApp();
-      return toast("You're on the Free plan.");
-    }
-    $("pay-title").textContent = `Upgrading to ${PLANS[plan].name}…`;
+    if (isCurrentPlan(plan)) return enterApp();
+    const payTitle = plan === "free" ? "Opening billing…" : `Upgrading to ${PLANS[plan].name}…`;
+    $("pay-title").textContent = Backend.payments ? (plan === "free" ? "Opening billing…" : "Taking you to secure checkout…") : payTitle;
+    $("pay-text").textContent = Backend.payments ? "Payments are handled safely by Stripe." : "Test mode – no money is taken.";
     $("pay-modal").hidden = false;
     try {
-      currentUser = await BillingService.upgrade(currentUser, plan);
+      const updated = plan === "free"
+        ? await BillingService.manage(currentUser)
+        : await BillingService.upgrade(currentUser, plan, billingInterval);
+      // Test mode only from here (the real site has moved on to Stripe).
+      currentUser = updated;
+      userData.planSince = new Date().toISOString(); // a plan change gives a fresh allowance
+      saveData();
       $("pay-modal").hidden = true;
       enterApp();
       if (!waitingForAnswer) startPlanner(); // refresh the planner with the new allowance
-      toast(`You're on ${PLANS[plan].name}! 🎉 New features unlocked.`);
+      toast(plan === "free" ? "You're on the Free plan." : `You're on ${PLANS[plan].name}${billingInterval === "year" ? " (yearly)" : ""}! 🎉 New features unlocked.`);
     } catch (err) {
       $("pay-modal").hidden = true;
-      toast("The upgrade didn't go through. Please try again.");
+      toast(err.message || "That didn't go through. Please try again.");
     }
   });
 });
 $("plans-back").addEventListener("click", enterApp);
+
+// Coming back from Stripe: ?checkout=success or ?checkout=cancelled
+async function handleCheckoutReturn() {
+  const result = new URLSearchParams(location.search).get("checkout");
+  if (!result) return;
+  history.replaceState(null, "", location.pathname);
+  if (result === "cancelled") return toast("Checkout cancelled – you haven't been charged.");
+  toast("Payment complete – activating your plan…");
+  // Stripe tells our server by webhook; check a few times until the new plan shows up.
+  for (let i = 0; i < 8; i++) {
+    await wait(2000);
+    const fresh = await AuthService.currentUser().catch(() => null);
+    if (fresh && fresh.plan !== "free") {
+      currentUser = fresh;
+      enterApp();
+      if (!waitingForAnswer) startPlanner();
+      return toast(`You're on ${PLANS[fresh.plan].name}! 🎉 New features unlocked.`);
+    }
+  }
+  toast("Payment received – your plan will update in a moment. Refresh if it doesn't.");
+}
 
 /* ---------- the app ---------- */
 function startSession(user, { showPlans = false } = {}) {
@@ -1883,24 +2037,24 @@ async function buildPlan() {
     ? "No problem! I'll build you an all-round week where every training day has a different main focus. 🔄"
     : "Brilliant! Give me a second to build your personal 7-day plan... 📝");
   const stop = showTyping(plannerMsgs);
-  let plan;
+  let result;
   try {
-    plan = await getTrainingPlan(profile);
+    result = await getTrainingPlan(profile);
   } catch (err) {
     stop();
-    addMessage(plannerMsgs, "bot", "Sorry, something went wrong making your plan. Please try again!");
+    if (!showAiError(plannerMsgs, err)) addMessage(plannerMsgs, "bot", "Sorry, something went wrong making your plan. Please try again!");
     showRestart();
     return;
   }
   stop();
-  recordPlan(plan, profile);
-  renderPlan(plannerMsgs, plan, profile);
+  recordPlan(result.plan, profile, "", result.left);
+  renderPlan(plannerMsgs, result.plan, profile);
   showRestart();
 }
 
 // Counts the plan against the limit and stores it.
-function recordPlan(plan, answers, label) {
-  Limits.usePlan(userData);
+function recordPlan(plan, answers, label, serverLeft) {
+  Limits.usePlan(userData, serverLeft);
   const entry = { id: "p_" + Date.now().toString(36), createdAt: new Date().toISOString(), answers: { ...answers }, plan, label: label || "" };
   userData.latest = entry;
   if (hasFeature(currentUser, "savePlans")) userData.savedPlans = [entry, ...userData.savedPlans].slice(0, 30);
@@ -2001,6 +2155,27 @@ function lockedMessage(container, text) {
   addActionMessage(container, `🔒 ${text}`, [upgradeButton(), { label: "Not now", onClick: e => e.target.closest(".fc-msg").remove() }], "lock");
 }
 
+// Shows a server message such as "limit reached" as a friendly locked message. Returns true if handled.
+function showAiError(container, err) {
+  if (err && err.upgrade) {
+    lockedMessage(container, err.message);
+    refreshUser();
+    return true;
+  }
+  if (err && err.needLogin) {
+    addActionMessage(container, "Your login has expired – please log in again.", [{ label: "Log in", primary: true, onClick: logOutNow }]);
+    return true;
+  }
+  return false;
+}
+
+// Re-reads the account (plan and usage left) from the server.
+async function refreshUser() {
+  if (!Backend.auth || !currentUser) return;
+  const fresh = await AuthService.currentUser().catch(() => null);
+  if (fresh) { currentUser = fresh; renderHeader(); }
+}
+
 function showPlanLimit() {
   plannerOptions.innerHTML = "";
   plannerInput.placeholder = "New plan locked until " + niceDate(Limits.nextPlanDate(currentUser));
@@ -2023,13 +2198,13 @@ async function shufflePlan() {
   addMessage(plannerMsgs, "user", "🔀 Shuffle my focus days");
   const stop = showTyping(plannerMsgs);
   try {
-    const plan = await getTrainingPlan(profile);
+    const result = await getTrainingPlan(profile);
     stop();
-    recordPlan(plan, profile);
-    renderPlan(plannerMsgs, plan, profile);
+    recordPlan(result.plan, profile, "", result.left);
+    renderPlan(plannerMsgs, result.plan, profile);
   } catch (err) {
     stop();
-    addMessage(plannerMsgs, "bot", "Sorry, I couldn't shuffle your plan. Please try again!");
+    if (!showAiError(plannerMsgs, err)) addMessage(plannerMsgs, "bot", "Sorry, I couldn't shuffle your plan. Please try again!");
   }
   shuffling = false;
 }
@@ -2094,12 +2269,17 @@ async function askCoach(question) {
   const stop = showTyping(coachMsgs);
   let reply;
   try {
-    reply = await getCoachReply(question, coachHistory);
-    Limits.useQuestion(userData);
+    const result = await getCoachReply(question, coachHistory);
+    reply = result.reply;
+    Limits.useQuestion(userData, result.left);
     saveData();
     renderUsage();
   } catch (err) {
-    reply = "Sorry, I couldn't answer that right now. Please try again in a moment!";
+    stop();
+    coachHistory.pop(); // not answered, so don't send it again
+    coachSend.disabled = false;
+    if (!showAiError(coachMsgs, err)) addMessage(coachMsgs, "bot", "Sorry, I couldn't answer that right now. Please try again in a moment!");
+    return;
   }
   stop();
   addMessage(coachMsgs, "bot", reply);
@@ -2495,9 +2675,13 @@ function renderDiet(section) {
   $("diet-rebuild").addEventListener("click", async () => {
     data.seed = (data.seed || 0) + 1;
     section.innerHTML = `<div class="spinner"></div>`;
-    data.plan = await getDietPlan({ ...data.prefs, seed: data.seed });
+    try {
+      data.plan = await getDietPlan({ ...data.prefs, seed: data.seed });
+      toast("New meal ideas ready. 🥗");
+    } catch (err) {
+      toast(err.message || "Couldn't get new meal ideas. Please try again.");
+    }
     persist();
-    toast("New meal ideas ready. 🥗");
   });
   $("diet-prefs").addEventListener("click", () => renderDietSetup(section, data.prefs));
 }
@@ -2611,8 +2795,16 @@ async function runCheckin(c) {
   userData.checkins.push({ date: new Date().toISOString(), ...c });
   const result = $("checkin-result");
   result.innerHTML = `<div class="spinner"></div>`;
-  const plan = await getTrainingPlan(next);
-  recordPlan(plan, next, "After check-in");
+  let plan;
+  try {
+    const built = await getTrainingPlan(next);
+    plan = built.plan;
+    recordPlan(plan, next, "After check-in", built.left);
+  } catch (err) {
+    result.innerHTML = "";
+    if (!showAiError(result, err)) result.innerHTML = `<p class="muted">Couldn't build next week's plan right now. Please try again.</p>`;
+    return;
+  }
   result.innerHTML = `<h3>✅ Next week's plan is ready</h3><ul class="changes">${changes.map(t => `<li>${escapeHTML(t)}</li>`).join("")}</ul>`;
   renderPlan(result, plan, next, { scroll: false });
   result.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2673,9 +2865,23 @@ async function downloadPlanPDF(plan, answers) {
    ========================================================================== */
 (async () => {
   setAuthMode("login");
-  const user = await AuthService.currentUser();
+  await Backend.init();
+  // "Test mode" notes only when not connected to the real services.
+  $("auth-test-note").hidden = Backend.auth;
+  $("plans-test-note").hidden = Backend.payments;
+  try {
+    await AuthService.init();
+  } catch (err) {
+    console.error(err);
+    showScreen("auth");
+    $("auth-error").textContent = "Couldn't connect to the login service. Please refresh the page.";
+    $("auth-error").hidden = false;
+    return;
+  }
+  const user = await AuthService.currentUser().catch(() => null);
   if (user) startSession(user);
   else showScreen("auth");
+  if (user) handleCheckoutReturn();
 })();
 </script>
 </body>

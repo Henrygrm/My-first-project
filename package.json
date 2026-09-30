@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Pitchside Coaching AI \u2013 personal AI football coach website",
+  "description": "Pitchside Coaching AI \u2013 personal AI football coach (website + one-file app)",
   "scripts": {
     "dev": "node --env-file-if-exists=.env server.js",
     "start": "node --env-file-if-exists=.env server.js",
     "test": "node --test tests/*.test.js",
-    "setup:stripe": "node --env-file-if-exists=.env scripts/setup-stripe.js"
+    "setup:stripe": "node --env-file-if-exists=.env scripts/setup-stripe.js",
+    "sync:bolt": "node -e \"require('fs').copyFileSync('public/index.html','football-coach-chatbot.html')\""
   },
   "engines": {
     "node": ">=22.9"

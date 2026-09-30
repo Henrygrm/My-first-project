@@ -1,17 +1,18 @@
 import { json } from "../lib/http.js";
 import { authEnabled, getSignedInUser } from "../lib/supabase.js";
 import { remaining } from "../lib/usage.js";
-import { planFor } from "../lib/plans.js";
 
-// GET /api/me -> the signed-in player's plan, billing state and what's left this day/week.
+// GET /api/me -> the signed-in player's name, plan and what's left (null = unlimited).
 export async function GET(request) {
   if (!authEnabled()) return json({ error: "Accounts aren't set up" }, 503);
   try {
     const session = await getSignedInUser(request);
-    if (!session) return json({ error: "Not signed in" }, 401);
+    if (!session) return json({ error: "Not signed in", needLogin: true }, 401);
     const { user, profile } = session;
-    const plan = planFor(profile.plan);
+    const { left, resets } = await remaining(profile);
     return json({
+      id: user.id,
+      name: user.user_metadata?.name || (user.email || "").split("@")[0],
       email: user.email,
       plan: profile.plan || "free",
       interval: profile.billing_interval,
@@ -19,9 +20,8 @@ export async function GET(request) {
       periodEnd: profile.current_period_end,
       cancelAtPeriodEnd: Boolean(profile.cancel_at_period_end),
       hasBilling: Boolean(profile.stripe_customer_id),
-      limits: { question: plan.questionsPerDay, plan: plan.plansPerWeek },
-      left: await remaining(user.id, profile.plan),
-      features: { savePlans: plan.savePlans, rememberProfile: plan.rememberProfile, elitePlans: plan.elitePlans }
+      left,
+      resets
     });
   } catch (err) {
     console.error(err);

@@ -12,9 +12,12 @@ create table if not exists public.profiles (
   cancel_at_period_end boolean not null default false,
   stripe_customer_id text unique,
   stripe_subscription_id text,
-  player_profile jsonb,           -- latest planner answers (Premium's coach remembers them)
+  player_profile jsonb,           -- (not used any more; kept so older databases still match)
+  plan_changed_at timestamptz,    -- a plan change starts a fresh usage allowance
   created_at timestamptz not null default now()
 );
+-- Databases created before plan_changed_at existed:
+alter table public.profiles add column if not exists plan_changed_at timestamptz;
 
 -- Every AI question / plan, for the daily and weekly limits.
 create table if not exists public.usage_events (

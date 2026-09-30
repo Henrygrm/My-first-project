@@ -15,8 +15,11 @@ const aiServer = http.createServer((req, res) => {
     aiRequests.push(body);
     const day = (d, rest) => ({ day: d, focus: rest ? "Rest" : "Shooting", icon: "🥅", rest, rotating: false,
       minutes: rest ? 0 : 30, why: rest ? "" : "Test", drills: [{ name: "Drill", detail: "Do it", minutes: rest ? 0 : 30 }] });
-    const text = body.output_config?.format
-      ? JSON.stringify({ days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((d, i) => day(d, i % 2 === 1)) })
+    const props = body.output_config?.format?.schema?.properties || {};
+    const meal = slot => ({ slot, time: "7:30", food: "Porridge" });
+    const text = props.tips ? JSON.stringify({ tips: ["Drink more water", "Great breakfasts"] })
+      : props.waterTarget ? JSON.stringify({ waterTarget: 8, notes: ["Portion guide"], days: { training: [meal("Breakfast")], rest: [meal("Breakfast")], match: [meal("Breakfast")] } })
+      : body.output_config?.format ? JSON.stringify({ days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((d, i) => day(d, i % 2 === 1)) })
       : "Test reply";
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify({ id: "msg_1", type: "message", role: "assistant", model: body.model, content: [{ type: "text", text }],
@@ -113,6 +116,7 @@ const webhook = async (event) => {
   return res.status;
 };
 const ask = token => call("chat", "POST", { token, body: { messages: [{ role: "user", content: "How do I shoot?" }] } });
+const askDiet = (token, action = "plan") => call("diet", "POST", { token, body: { action, input: { diet: "vegan", avoid: "nuts", goal: "energy", ageGroup: "14-17", logs: { a: { water: 3 }, b: { water: 5 } } } } });
 const askPlan = token => call("plan", "POST", { token, body: { profile: { position: "Striker", ageGroup: "14-17", foot: "Right", equipment: ["ball"], daysPerWeek: "3 days", sessionTime: "45 min", weaknesses: "left foot", goal: "goals" } } });
 
 before(async () => {
@@ -127,7 +131,7 @@ before(async () => {
   db = fakeSupabase(); supa._setAdminForTests(db);
   stripe = fakeStripe(); billing._setStripeForTests(stripe);
   api = {};
-  for (const name of ["config", "me", "chat", "plan", "plans", "checkout", "portal", "stripe-webhook"]) api[name] = await import(`../api/${name}.js`);
+  for (const name of ["config", "me", "chat", "plan", "plans", "diet", "checkout", "portal", "stripe-webhook"]) api[name] = await import(`../api/${name}.js`);
 });
 after(() => aiServer.close());
 
@@ -143,36 +147,46 @@ test("AI needs an account", async () => {
   assert.equal((await askPlan(null)).status, 401);
 });
 
-test("Free plan: 5 questions a day, 1 plan a week, no saved plans", async () => {
-  for (let i = 0; i < 5; i++) {
+test("Free plan: 3 questions a day, 1 plan a month with drill names only, no saved plans or diet", async () => {
+  for (let i = 0; i < 3; i++) {
     const r = await ask("token-ana");
     assert.equal(r.status, 200);
-    assert.equal(r.body.left, 4 - i);
+    assert.equal(r.body.left, 2 - i);
   }
   const blocked = await ask("token-ana");
   assert.equal(blocked.status, 429);
   assert.equal(blocked.body.upgrade, true);
-  assert.match(blocked.body.error, /5 coach questions today.*Pro or Premium/);
+  assert.match(blocked.body.error, /3 free questions for today.*Pro for 30 a day/);
 
-  assert.equal((await askPlan("token-ana")).status, 200);
-  assert.equal((await askPlan("token-ana")).status, 429);
+  const plan = await askPlan("token-ana");
+  assert.equal(plan.status, 200);
+  assert.equal(plan.body.left, 0);
+  const training = plan.body.plan.find(d => !d.rest);
+  assert.equal(training.drills[0].detail, "");  // names only on Free
+  const second = await askPlan("token-ana");
+  assert.equal(second.status, 429);
+  assert.match(second.body.error, /free training plan for this month/);
   assert.equal(db.tables.saved_plans.length, 0);
   assert.equal((await call("plans", "GET", { token: "token-ana" })).status, 403);
 
+  const diet = await askDiet("token-ana");
+  assert.equal(diet.status, 403);
+  assert.equal(diet.body.upgrade, true);
+
   const me = await call("me", "GET", { token: "token-ana" });
   assert.equal(me.body.plan, "free");
+  assert.equal(me.body.name, "ana");
   assert.deepEqual(me.body.left, { question: 0, plan: 0 });
-  // The last planner answers are remembered on the profile.
-  assert.equal(db.tables.profiles[0].player_profile.position, "Striker");
+  assert.ok(new Date(me.body.resets.plan) > new Date());
 });
 
-test("Checkout: yearly Pro gets a 7-day trial and links the account", async () => {
+test("Checkout: yearly Pro, no trial, linked to the account", async () => {
   const r = await call("checkout", "POST", { token: "token-ana", body: { plan: "pro", interval: "year" } });
   assert.equal(r.status, 200);
   assert.equal(r.body.url, "https://checkout.stripe.test/s1");
   const [, params] = stripe.calls.find(c => c[0] === "checkout");
   assert.equal(params.line_items[0].price, "price_pitchside_pro_year");
-  assert.equal(params.subscription_data.trial_period_days, 7);
+  assert.equal(params.subscription_data.trial_period_days, undefined);
   assert.equal(params.client_reference_id, "u-ana");
   assert.equal(params.success_url, "https://pitchside.test/?checkout=success#pricing");
   assert.equal(db.tables.profiles[0].stripe_customer_id, "cus_1");
@@ -181,15 +195,13 @@ test("Checkout: yearly Pro gets a 7-day trial and links the account", async () =
   assert.equal(bad.status, 400);
 });
 
-test("Monthly checkout has no trial", async () => {
-  stripe.calls.length = 0;
-  await call("checkout", "POST", { token: "token-ana", body: { plan: "premium", interval: "month" } });
-  const [, params] = stripe.calls.find(c => c[0] === "checkout");
-  assert.equal(params.line_items[0].price, "price_pitchside_premium_month");
-  assert.equal(params.subscription_data.trial_period_days, undefined);
+test("Yearly prices are 15% off", async () => {
+  const { PLANS } = await import("../lib/plans.js");
+  assert.deepEqual(PLANS.pro.prices, { month: 10, year: 102 });
+  assert.deepEqual(PLANS.premium.prices, { month: 22, year: 224.4 });
 });
 
-test("Webhook: rejects bad signatures, upgrades on checkout", async () => {
+test("Webhook: rejects bad signatures, upgrades on checkout and starts a fresh allowance", async () => {
   const res = await api["stripe-webhook"].POST(req("/api/stripe-webhook", { method: "POST", body: "{}", headers: { "stripe-signature": "t=1,v1=bad" } }));
   assert.equal(res.status, 400);
   assert.equal(db.tables.profiles[0].plan, "free");
@@ -200,39 +212,50 @@ test("Webhook: rejects bad signatures, upgrades on checkout", async () => {
   const p = db.tables.profiles[0];
   assert.equal(p.plan, "pro");
   assert.equal(p.billing_interval, "year");
-  assert.equal(p.subscription_status, "trialing");
+  assert.ok(p.plan_changed_at);
   assert.equal(p.current_period_end, new Date(1893456000 * 1000).toISOString());
 });
 
-test("Pro: higher limits and saved plans; already-subscribed checkout goes to the portal", async () => {
+test("Pro: 30 questions a day, 1 plan a week with full details, saved plans; already subscribed goes to the portal", async () => {
+  await new Promise(r => setTimeout(r, 5)); // make sure new uses come after the plan change
   const me = await call("me", "GET", { token: "token-ana" });
   assert.equal(me.body.plan, "pro");
-  assert.deepEqual(me.body.left, { question: 45, plan: 6 }); // 5 questions + 1 plan already used
-  assert.equal((await ask("token-ana")).status, 200);
+  assert.deepEqual(me.body.left, { question: 30, plan: 1 }); // fresh allowance after upgrading
+  assert.equal((await ask("token-ana")).body.left, 29);
   const plan = await askPlan("token-ana");
   assert.equal(plan.status, 200);
+  assert.equal(plan.body.plan.find(d => !d.rest).drills[0].detail, "Do it");
   assert.ok(plan.body.savedId);
-  assert.equal(plan.body.elite, false);
+  assert.equal((await askPlan("token-ana")).status, 429);
   const saved = await call("plans", "GET", { token: "token-ana" });
   assert.equal(saved.body.plans.length, 1);
+  assert.equal((await askDiet("token-ana")).status, 403);
 
   const again = await call("checkout", "POST", { token: "token-ana", body: { plan: "premium", interval: "month" } });
   assert.equal(again.body.url, "https://billing.stripe.test/p1");
   assert.equal((await call("portal", "POST", { token: "token-ana" })).body.url, "https://billing.stripe.test/p1");
 });
 
-test("Premium: elite plans and the coach remembers the player", async () => {
+test("Premium: unlimited questions and plans, and the AI diet tracker", async () => {
   await webhook({ id: "evt_2", object: "event", type: "customer.subscription.updated", data: { object: subscription("sub_1", "pitchside_premium_month", "active") } });
   assert.equal(db.tables.profiles[0].plan, "premium");
+  const me = await call("me", "GET", { token: "token-ana" });
+  assert.deepEqual(me.body.left, { question: null, plan: null });
 
   aiRequests.length = 0;
-  await ask("token-ana");
-  assert.match(aiRequests[0].system, /position: Striker/);
-  const plan = await askPlan("token-ana");
-  assert.equal(plan.body.elite, true);
-  assert.match(aiRequests[1].system, /Elite plan/);
-  assert.equal(aiRequests[1].model, "claude-opus-5-5");
-  assert.equal(aiRequests[1].fallbacks, "default");
+  assert.equal((await ask("token-ana")).body.left, null);
+  assert.equal((await askPlan("token-ana")).status, 200);
+  assert.equal((await askPlan("token-ana")).status, 200); // no weekly limit
+  const diet = await askDiet("token-ana");
+  assert.equal(diet.status, 200);
+  assert.equal(diet.body.plan.waterTarget, 8);
+  const dietRequest = aiRequests.find(r => r.output_config?.format?.schema?.properties?.waterTarget);
+  assert.match(dietRequest.messages[0].content, /Diet: vegan/);
+  assert.match(dietRequest.system, /Never give calorie targets/);
+  const feedback = await askDiet("token-ana", "feedback");
+  assert.deepEqual(feedback.body.tips, ["Drink more water", "Great breakfasts"]);
+  assert.equal(aiRequests[0].model, "claude-opus-5-5");
+  assert.equal(aiRequests[0].fallbacks, "default");
 });
 
 test("Cancelled subscription drops back to Free", async () => {
@@ -243,17 +266,21 @@ test("Cancelled subscription drops back to Free", async () => {
 });
 
 test("A failed AI call gives the use back", async () => {
-  const before = db.tables.usage_events.length;
   const saved = process.env.ANTHROPIC_BASE_URL;
   process.env.ANTHROPIC_BASE_URL = "http://localhost:1"; // nothing listening
   const { _resetClientForTests } = await import("../lib/coach-ai.js");
   _resetClientForTests();
-  // A new Free day: make room by clearing old questions.
-  db.tables.usage_events = db.tables.usage_events.filter(e => e.kind !== "question");
+  const before = db.tables.usage_events.filter(e => e.kind === "question").length;
   const r = await ask("token-ana");
   assert.equal(r.status, 502);
-  assert.equal(db.tables.usage_events.filter(e => e.kind === "question").length, 0);
+  assert.equal(db.tables.usage_events.filter(e => e.kind === "question").length, before);
   process.env.ANTHROPIC_BASE_URL = saved;
   _resetClientForTests();
-  assert.ok(before >= 0);
+});
+
+test("The website page and the one-file app are the same", async () => {
+  const fs = await import("node:fs");
+  const site = fs.readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+  const bolt = fs.readFileSync(new URL("../football-coach-chatbot.html", import.meta.url), "utf8");
+  assert.ok(site === bolt, "Run `npm run sync:bolt` after editing public/index.html");
 });

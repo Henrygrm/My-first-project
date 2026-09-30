@@ -11,7 +11,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const DESCRIPTIONS = {
-  pro: "For players looking to get better",
+  pro: "For players who want to get better",
   premium: "For rising stars"
 };
 
@@ -34,7 +34,7 @@ for (const plan of ["pro", "premium"]) {
     await stripe.prices.create({
       product: typeof productId === "string" ? productId : productId.id,
       currency: "usd",
-      unit_amount: amount * 100,
+      unit_amount: Math.round(amount * 100), // cents, e.g. $224.40 -> 22440
       recurring: { interval },
       lookup_key: key,
       nickname: `${PLANS[plan].name} ${interval === "month" ? "monthly" : "yearly"}`
