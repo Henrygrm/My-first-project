@@ -56,27 +56,28 @@ Create an API key at <https://platform.claude.com/settings/keys> and set a month
 
 ### 3. Stripe – payments
 1. Create an account at <https://stripe.com> and stay in **Test mode**.
-2. **Developers → API keys**: copy the secret key (`sk_test_...`).
-3. Create the prices (run on your computer):
+2. **Developers → API keys**: copy the secret key (`sk_test_...`). Keep it out of the code – it only goes in `.env` / Vercel's environment variables.
+3. Set up (or update) everything in Stripe with one command:
    ```bash
    npm install
    STRIPE_SECRET_KEY=sk_test_... npm run setup:stripe
    ```
-4. **Developers → Webhooks → Add endpoint**:
-   - URL: `https://YOUR-SITE/api/stripe-webhook`
-   - Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
-   - Copy the **Signing secret** (`whsec_...`).
-5. **Settings → Billing → Customer portal**: turn it on and allow customers to switch between the Pro and Premium prices and to cancel.
+   This creates the Pro and Premium products with all four prices (monthly and yearly, 15% off), and the customer billing page (switch plan, update card, invoices, cancel). It's safe to run again: if you change prices in `lib/plans.js`, it makes the new prices and archives the old ones.
+4. When the site is online, run it once more with your address to create the webhook:
+   ```bash
+   SITE_URL=https://your-site.vercel.app STRIPE_SECRET_KEY=sk_test_... npm run setup:stripe
+   ```
+   It prints `STRIPE_WEBHOOK_SECRET=whsec_...` – add that to Vercel's environment variables.
 
 ### 4. Put it online (Vercel)
 1. Import this repository at <https://vercel.com/new> (framework preset: **Other**).
 2. Add the environment variables from `.env.example` (all of them).
-3. Deploy. Then update the Stripe webhook URL and Supabase Site URL if your address changed.
+3. Deploy. Then run step 3.4 above to create the Stripe webhook, add `STRIPE_WEBHOOK_SECRET`, and redeploy. Update the Supabase Site URL if your address changed.
 
 Test a purchase with Stripe's test card `4242 4242 4242 4242` (any future date, any CVC).
 
 ### Going live
-In Stripe, switch to **Live mode**, run `npm run setup:stripe` again with your `sk_live_` key, add a live webhook endpoint, and replace `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` in Vercel.
+In Stripe, switch to **Live mode** and run `SITE_URL=... STRIPE_SECRET_KEY=sk_live_... npm run setup:stripe`, then replace `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` in Vercel with the live values.
 
 ## Run it on your computer
 

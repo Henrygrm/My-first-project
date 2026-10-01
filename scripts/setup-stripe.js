@@ -1,45 +1,30 @@
-// Creates the Pitchside Coaching AI products and prices in your Stripe account (run once per account/mode).
-//   STRIPE_SECRET_KEY=sk_test_... node scripts/setup-stripe.js
-// Safe to re-run: prices that already exist (by lookup key) are left alone.
+// Sets up (or updates) Stripe for Pitchside Coaching AI so it matches the website's prices in lib/plans.js.
+//   STRIPE_SECRET_KEY=sk_test_... npm run setup:stripe
+//   SITE_URL=https://your-site.vercel.app STRIPE_SECRET_KEY=... npm run setup:stripe   (also creates the webhook)
+// Safe to run again any time – e.g. after changing prices.
 import Stripe from "stripe";
-import { PLANS, lookupKey } from "../lib/plans.js";
+import { setupStripe } from "../lib/stripe-setup.js";
+import { PLANS } from "../lib/plans.js";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  console.error("Set STRIPE_SECRET_KEY first (use your sk_test_ key while testing).");
+const key = process.env.STRIPE_SECRET_KEY;
+if (!key) {
+  console.error("Set STRIPE_SECRET_KEY first (your sk_test_ key while testing). Never commit it to the code.");
   process.exit(1);
 }
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+console.log(`Setting up Stripe in ${key.startsWith("sk_live_") ? "LIVE" : "TEST"} mode…\n`);
 
-const DESCRIPTIONS = {
-  pro: "For players who want to get better",
-  premium: "For rising stars"
-};
-
-for (const plan of ["pro", "premium"]) {
-  const keys = ["month", "year"].map(i => lookupKey(plan, i));
-  const { data: existing } = await stripe.prices.list({ lookup_keys: keys, limit: 10 });
-  let productId = existing[0]?.product;
-  if (!productId) {
-    const product = await stripe.products.create({ name: `Pitchside Coaching AI ${PLANS[plan].name}`, description: DESCRIPTIONS[plan] });
-    productId = product.id;
-    console.log(`Created product Pitchside Coaching AI ${PLANS[plan].name}`);
+try {
+  const summary = await setupStripe(new Stripe(key), { siteUrl: process.env.SITE_URL });
+  console.log("\nPrices now in Stripe:");
+  for (const plan of ["pro", "premium"]) {
+    console.log(`  ${PLANS[plan].name}: $${PLANS[plan].prices.month}/month or $${PLANS[plan].prices.year}/year`);
   }
-  for (const interval of ["month", "year"]) {
-    const key = lookupKey(plan, interval);
-    if (existing.some(p => p.lookup_key === key)) {
-      console.log(`Price ${key} already exists`);
-      continue;
-    }
-    const amount = PLANS[plan].prices[interval];
-    await stripe.prices.create({
-      product: typeof productId === "string" ? productId : productId.id,
-      currency: "usd",
-      unit_amount: Math.round(amount * 100), // cents, e.g. $224.40 -> 22440
-      recurring: { interval },
-      lookup_key: key,
-      nickname: `${PLANS[plan].name} ${interval === "month" ? "monthly" : "yearly"}`
-    });
-    console.log(`Created price ${key}: $${amount}/${interval}`);
+  if (summary.webhook?.secret) {
+    console.log(`\nAdd this to your site's environment variables (keep it secret):\n  STRIPE_WEBHOOK_SECRET=${summary.webhook.secret}`);
+  } else if (!summary.webhook) {
+    console.log("\nNext: once your site is online, run this again with SITE_URL set to create the webhook.");
   }
+} catch (err) {
+  console.error("\nStripe setup failed:", err.message);
+  process.exit(1);
 }
-console.log("\nDone. Next: add the webhook endpoint in Stripe (see README).");
