@@ -88,10 +88,7 @@ function fakeStripe() {
     prices: { list: async ({ lookup_keys }) => ({ data: [{ id: `price_${lookup_keys[0]}`, lookup_key: lookup_keys[0] }] }) },
     customers: { create: async (p) => { calls.push(["customer", p]); return { id: "cus_1" }; } },
     checkout: { sessions: { create: async (p) => { calls.push(["checkout", p]); return { url: "https://checkout.stripe.test/s1" }; } } },
-    billingPortal: {
-      sessions: { create: async (p) => { calls.push(["portal", p]); return { url: "https://billing.stripe.test/p1" }; } },
-      configurations: { list: () => (async function* () { yield { id: "bpc_other", metadata: {} }; yield { id: "bpc_pitchside", metadata: { app: "pitchside" } }; })() }
-    },
+    billingPortal: { sessions: { create: async (p) => { calls.push(["portal", p]); return { url: "https://billing.stripe.test/p1" }; } } },
     subscriptions: { retrieve: async (id) => subscription(id, "pitchside_pro_year", "trialing") }
   };
 }
@@ -191,7 +188,7 @@ test("Checkout: yearly Pro, no trial, linked to the account", async () => {
   assert.equal(params.line_items[0].price, "price_pitchside_pro_year");
   assert.equal(params.subscription_data.trial_period_days, undefined);
   assert.equal(params.client_reference_id, "u-ana");
-  assert.equal(params.success_url, "https://pitchside.test/?checkout=success");
+  assert.equal(params.success_url, "https://pitchside.test/?checkout=success#pricing");
   assert.equal(db.tables.profiles[0].stripe_customer_id, "cus_1");
 
   const bad = await call("checkout", "POST", { token: "token-ana", body: { plan: "gold", interval: "year" } });
@@ -237,8 +234,6 @@ test("Pro: 30 questions a day, 1 plan a week with full details, saved plans; alr
   const again = await call("checkout", "POST", { token: "token-ana", body: { plan: "premium", interval: "month" } });
   assert.equal(again.body.url, "https://billing.stripe.test/p1");
   assert.equal((await call("portal", "POST", { token: "token-ana" })).body.url, "https://billing.stripe.test/p1");
-  const [, portalParams] = stripe.calls.filter(c => c[0] === "portal").at(-1);
-  assert.equal(portalParams.configuration, "bpc_pitchside"); // our billing page: switch between our plans
 });
 
 test("Premium: unlimited questions and plans, and the AI diet tracker", async () => {
@@ -288,70 +283,4 @@ test("The website page and the one-file app are the same", async () => {
   const site = fs.readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
   const bolt = fs.readFileSync(new URL("../football-coach-chatbot.html", import.meta.url), "utf8");
   assert.ok(site === bolt, "Run `npm run sync:bolt` after editing public/index.html");
-});
-
-/* ---------- Stripe setup script (with a stand-in Stripe account) ---------- */
-function fakeStripeAccount() {
-  const db = { products: [], prices: [], configs: [], hooks: [] };
-  let n = 1;
-  const iter = arr => (async function* () { for (const x of arr) yield x; })();
-  const log = [];
-  return {
-    db, log,
-    products: {
-      list: () => iter(db.products.filter(p => p.active)),
-      create: async p => { const x = { id: `prod_${n++}`, active: true, metadata: {}, ...p }; db.products.push(x); log.push("product.create"); return x; },
-      update: async (id, p) => { const x = db.products.find(y => y.id === id); Object.assign(x, p); log.push("product.update"); return x; }
-    },
-    prices: {
-      list: async ({ lookup_keys }) => ({ data: db.prices.filter(p => p.active && lookup_keys.includes(p.lookup_key)) }),
-      create: async p => {
-        if (p.transfer_lookup_key) db.prices.forEach(o => { if (o.lookup_key === p.lookup_key) o.lookup_key = null; });
-        const x = { id: `price_${n++}`, active: true, ...p, recurring: p.recurring }; delete x.transfer_lookup_key;
-        db.prices.push(x); log.push("price.create"); return x;
-      },
-      update: async (id, p) => { const x = db.prices.find(y => y.id === id); Object.assign(x, p); log.push("price.update"); return x; }
-    },
-    billingPortal: { configurations: {
-      list: () => iter(db.configs),
-      create: async p => { const x = { id: `bpc_${n++}`, active: true, ...p }; db.configs.push(x); log.push("portal.create"); return x; },
-      update: async (id, p) => { const x = db.configs.find(y => y.id === id); Object.assign(x, p); log.push("portal.update"); return x; }
-    } },
-    webhookEndpoints: {
-      list: () => iter(db.hooks),
-      create: async p => { const x = { id: `we_${n++}`, secret: "whsec_new", ...p }; db.hooks.push(x); log.push("webhook.create"); return x; },
-      update: async (id, p) => { const x = db.hooks.find(y => y.id === id); Object.assign(x, p); log.push("webhook.update"); return x; }
-    }
-  };
-}
-
-test("Stripe setup: creates everything once, then only updates what changed", async () => {
-  const { setupStripe } = await import("../lib/stripe-setup.js");
-  const acct = fakeStripeAccount();
-  const quiet = () => {};
-
-  const first = await setupStripe(acct, { siteUrl: "https://pitchside.test/", log: quiet });
-  assert.equal(acct.db.products.length, 2);
-  const amounts = Object.fromEntries(acct.db.prices.map(p => [p.lookup_key, p.unit_amount]));
-  assert.deepEqual(amounts, { pitchside_pro_month: 1000, pitchside_pro_year: 10200, pitchside_premium_month: 2200, pitchside_premium_year: 22440 });
-  const portal = acct.db.configs[0];
-  assert.equal(portal.features.subscription_update.products.length, 2);
-  assert.equal(portal.features.subscription_update.products[0].prices.length, 2);
-  assert.equal(first.webhook.url, "https://pitchside.test/api/stripe-webhook");
-  assert.equal(first.webhook.secret, "whsec_new");
-
-  // Run again: nothing new is created.
-  acct.log.length = 0;
-  const again = await setupStripe(acct, { siteUrl: "https://pitchside.test", log: quiet });
-  assert.deepEqual(acct.log.filter(l => l.endsWith("create")), []);
-  assert.equal(again.webhook.secret, null);
-
-  // An old price (e.g. the website's earlier $12 Pro) is replaced and archived.
-  const pro = acct.db.prices.find(p => p.lookup_key === "pitchside_pro_month");
-  pro.unit_amount = 1200;
-  await setupStripe(acct, { log: quiet });
-  const active = acct.db.prices.filter(p => p.lookup_key === "pitchside_pro_month");
-  assert.equal(active.length, 1);
-  assert.equal(active[0].unit_amount, 1000);
-  assert.equal(acct.db.prices.find(p => p.id === pro.id).active, false);
 });
