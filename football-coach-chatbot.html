@@ -224,6 +224,10 @@
   .fc-day li span { display: block; color: var(--muted); font-size: 0.8rem; }
   .fc-drill-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
   .fc-drill-top em { font-style: normal; font-size: 0.75rem; font-weight: 700; color: var(--brand-dark); white-space: nowrap; }
+  .fuel-link { display: block; width: 100%; margin-top: 10px; padding: 9px 11px; text-align: left; font: inherit; font-size: 0.8rem; line-height: 1.45; color: var(--brand-dark); background: var(--brand-soft); border: 1px solid #bfe5cc; border-radius: 12px; cursor: pointer; }
+  .fuel-link strong { display: block; margin-top: 2px; text-decoration: underline; text-underline-offset: 3px; }
+  .fuel-link:hover { border-color: var(--brand); }
+  .fuel-link.match { color: #8a5a00; background: #fdeec4; border-color: #f1d58a; }
   .fc-day-why { margin: -2px 0 10px; font-size: 0.78rem; line-height: 1.45; color: var(--muted); background: #f7faf8; border-left: 3px solid var(--lime); padding: 6px 8px; border-radius: 0 8px 8px 0; }
   .fc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-top: 14px; }
   .fc-stat { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; }
@@ -2412,6 +2416,8 @@ function renderPlan(container, plan, answers, { scroll = true } = {}) {
           <span class="fc-day-focus">${d.icon ? escapeHTML(d.icon) + " " : ""}${escapeHTML(d.focus)}</span>
           ${d.why && (steps || d.club || d.match) ? `<p class="fc-day-why">💡 ${escapeHTML(d.why)}</p>` : ""}
           <ul>${d.drills.map(dr => drillHTML(dr, !isSoloSession(d))).join("")}</ul>
+          ${premium && !d.rest ? `<button type="button" class="fuel-link ${d.match ? "match" : ""}" data-fuel-day="${escapeHTML(d.day)}">
+            <span class="fuel-text">${escapeHTML(fuelLinkText(d))}</span> <strong>Click here for ${d.day === todayName() ? "today's" : escapeHTML(d.day) + "'s"} meals →</strong></button>` : ""}
         </div>`).join("")}
     </div>
     ${steps ? "" : `<div class="plan-lock-note"><span>🔒 <strong>Want to know how to do each drill?</strong> Pro shows step-by-step instructions for every drill.</span></div>`}
@@ -2425,6 +2431,7 @@ function renderPlan(container, plan, answers, { scroll = true } = {}) {
     </div>`;
 
   if (!steps) wrap.querySelector(".plan-lock-note").appendChild(makeChip("⭐ Upgrade", openPlans, true));
+  wrap.querySelectorAll("[data-fuel-day]").forEach(b => b.addEventListener("click", () => openMealsFor(b.dataset.fuelDay)));
   const actions = wrap.querySelector(".plan-actions");
   actions.appendChild(makeChip(premium ? "📄 Download PDF" : "🔒 Download PDF", () => {
     if (!premium) return lockedMessage(container, "Downloading your plan as a PDF is part of Premium.");
@@ -2642,6 +2649,30 @@ function renderSaved() {
    TAB 4: PREMIUM – weekly check-in, match day, fitness, food
    ========================================================================== */
 let premiumSection = "checkin";
+
+// The training plan's "go to meals" link speaks to the player's diet goal.
+const FUEL_LINK_TEXT = {
+  energy: "⚡ Your goal is energy for training – fuel up with carbs before you play.",
+  recover: "🔁 Your goal is recovering faster – refuel within an hour of finishing.",
+  strength: "💪 Your goal is building strength – get protein in at every meal.",
+  allround: "🌈 Your goal is healthy all-round – a rainbow of fruit and veg keeps you going."
+};
+function fuelLinkText(day) {
+  const goal = userData.diet && userData.diet.prefs && userData.diet.prefs.goal;
+  const text = FUEL_LINK_TEXT[goal] || "🍽️ On training and match days we must fuel our bodies.";
+  return day.match ? "🏟️ Game day needs maximum energy! " + text.replace(/^\S+ /, "") : text;
+}
+
+// Premium: jump from a day in the training plan to that day's meals in the diet tracker.
+function openMealsFor(day) {
+  if (!hasFeature(currentUser, "premium")) return;
+  premiumSection = "diet";
+  dietShownDay = day;
+  openTab("premium");
+  renderPremium();
+  const menu = document.querySelector("#premium-section .diet-day-menu") || $("premium-section");
+  if (menu) menu.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 function renderPremium() {
   const root = $("premium-content");
@@ -2941,6 +2972,11 @@ async function buildDietPlan(section, message) {
   section.innerHTML = `<div class="spinner"></div><p class="muted" style="text-align:center">${escapeHTML(message)}</p>`;
   data.plan = await getDietPlan({ ...data.prefs, seed: data.seed || 0, week: dietWeekTypes(data.prefs.gameDay) });
   saveData();
+  // Plans already on screen pick up the new goal in their "meals" links.
+  document.querySelectorAll("[data-fuel-day]").forEach(b => {
+    const day = { day: b.dataset.fuelDay, match: b.classList.contains("match") };
+    b.querySelector(".fuel-text").textContent = fuelLinkText(day);
+  });
 }
 
 let dietShownDay = null; // which day of "This week's menu" is open
