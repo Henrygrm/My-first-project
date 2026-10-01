@@ -102,7 +102,14 @@ To test Stripe webhooks locally, use the Stripe CLI: `stripe listen --forward-to
 - Diet-tracker logs, weekly check-ins and the **My Plans** list are saved in the player's browser for now, so they don't follow the player to another device. (AI plans are also saved on the server for Pro and Premium.)
 - If Supabase's **Confirm email** setting is on, new players get a "check your email" message and log in after confirming.
 
-## Before you launch
+## Launch checklist
 
-- Add a **Terms of Service**, **Privacy Policy** and **refund policy** – Stripe and app stores expect them, and many players will be under 18 (parents should sign up for younger players).
-- Set a spend limit on your Claude account.
+1. **Fill in your business details** at the top of the script in `public/index.html` (`BUSINESS`: contact email and country), then run `npm run sync:bolt`. They appear in the Terms of Service and Privacy Policy and the footer's Contact link.
+2. **Have the Terms and Privacy Policy checked** for your country (they're a plain-English starting point, written for this app: accounts and ages, subscriptions and cancelling, AI coaching safety, and which services handle data).
+3. Set up **Claude**, **Supabase** and **Stripe** as above, and add every key to Vercel's environment variables.
+4. In Supabase → Authentication → URL Configuration, set the **Site URL** to your live address (sign-up confirmation and password-reset emails link back to it).
+5. Make a test purchase with Stripe's test card `4242 4242 4242 4242`, check the plan upgrades, then try **Manage billing** and cancel.
+6. Set a monthly **spend limit** on your Claude account.
+7. Switch Stripe to **Live mode** when you're ready to take real payments.
+
+What's already built in: log-in first (with "Forgot password?"), sign-up agreement to the Terms and Privacy Policy with an age check (13+, or a parent/guardian sets the account up), Terms and Privacy pages, a Manage billing / cancel button for paying players, plan limits enforced on the server, security headers (`vercel.json`), and page info for search and link previews.

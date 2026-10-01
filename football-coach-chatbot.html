@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Pitchside Coaching AI</title>
+<meta name="description" content="Pitchside Coaching AI – personalised weekly football training plans, an AI coach you can ask anything, and Premium tools for rising stars.">
+<meta name="theme-color" content="#1fae52">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Pitchside Coaching AI">
+<meta property="og:description" content="Train smarter. Play better. Weekly training plans built around you, and an AI football coach whenever you're stuck.">
+<meta name="twitter:card" content="summary">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -460,6 +466,28 @@
   .week-bar span { width: 100%; max-width: 34px; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, var(--lime), var(--brand)); }
   .week-bar em { font-style: normal; font-size: 0.75rem; color: var(--muted); font-weight: 700; }
 
+  /* ---------- BOOT, LINKS, CONSENT, FOOTER, LEGAL ---------- */
+  .boot-screen { display: grid; place-content: center; justify-items: center; gap: 24px; }
+  .boot-screen[hidden] { display: none; }
+  .noscript { max-width: 520px; margin: 40px auto; padding: 16px; text-align: center; background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
+  .link-btn { background: none; border: none; padding: 0; font: inherit; font-weight: 700; color: var(--brand-dark); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .link-btn:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+  #forgot-link { justify-self: start; font-size: 0.88rem; margin-top: -6px; }
+  .back-link { justify-self: center; font-size: 0.9rem; }
+  .consent { display: flex; gap: 10px; align-items: flex-start; font-size: 0.86rem; line-height: 1.45; color: var(--muted); cursor: pointer; }
+  .consent input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--brand); flex-shrink: 0; }
+  .legal-links { text-align: center; font-size: 0.85rem; color: var(--muted); margin: 14px 0 0; line-height: 1.6; }
+  .app-footer { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; align-items: center; margin-top: 24px; font-size: 0.85rem; color: var(--muted); }
+  .legal-card { width: min(720px, 100%); max-height: calc(100vh - 32px); text-align: left; padding: 22px 22px 0; position: relative; display: flex; flex-direction: column; }
+  .legal-tabs { display: flex; gap: 8px; flex-wrap: wrap; padding-right: 44px; }
+  .legal-close { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--surface); color: var(--muted); font-size: 1.4rem; cursor: pointer; }
+  .legal-body { overflow-y: auto; padding: 8px 2px 22px; line-height: 1.6; font-size: 0.93rem; }
+  .legal-body h2 { font-size: 1.5rem; font-weight: 800; margin: 12px 0 4px; }
+  .legal-body h3 { font-size: 1.02rem; font-weight: 800; margin: 18px 0 4px; letter-spacing: -0.01em; }
+  .legal-body p, .legal-body ul { margin: 0 0 8px; }
+  .legal-body ul { padding-left: 20px; }
+  .legal-body a { color: var(--brand-dark); font-weight: 700; }
+
   /* ---------- MODAL & TOAST ---------- */
   .modal { position: fixed; inset: 0; z-index: 100; background: rgba(8, 16, 12, 0.5); display: grid; place-items: center; padding: 16px; }
   .modal-card { width: min(420px, 100%); background: var(--card); border-radius: 26px; padding: 30px 26px; text-align: center; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.5); }
@@ -502,6 +530,14 @@
 </head>
 <body>
 
+<noscript><p class="noscript">Pitchside Coaching AI needs JavaScript. Please turn it on in your browser settings and reload the page.</p></noscript>
+
+<!-- Shown for a moment while the page checks whether you're logged in -->
+<div class="screen boot-screen" id="screen-boot">
+  <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
+  <div class="spinner" aria-label="Loading"></div>
+</div>
+
 <!-- =====================================================================
      SCREEN 1: LOG IN / SIGN UP  (nothing else is visible until logged in)
      ===================================================================== -->
@@ -528,25 +564,31 @@
         <button type="button" class="auth-tab active" data-auth-tab="login" role="tab">Log in</button>
         <button type="button" class="auth-tab" data-auth-tab="signup" role="tab">Sign up</button>
       </div>
-      <!-- Forms are handled in script (preventDefault), so nothing is sent anywhere. -->
-      <form class="auth-form" id="auth-form" novalidate>
+      <!-- No <form> on purpose: website builders often show pages in a sandboxed
+           frame that blocks form submits. The button and Enter key are handled in script. -->
+      <div class="auth-form" id="auth-form" role="form" aria-labelledby="auth-title">
         <label class="field" id="name-field" hidden>
           <span>Your name</span>
           <input type="text" id="auth-name" autocomplete="name" placeholder="e.g. Jordan">
         </label>
-        <label class="field">
+        <label class="field" id="email-field">
           <span>Email</span>
           <input type="email" id="auth-email" autocomplete="email" placeholder="you@example.com">
         </label>
-        <label class="field">
-          <span>Password</span>
+        <label class="field" id="password-field">
+          <span id="password-label">Password</span>
           <input type="password" id="auth-password" autocomplete="current-password" placeholder="At least 6 characters">
         </label>
-        <label class="remember"><input type="checkbox" id="auth-remember"> Keep me logged in on this device</label>
+        <button type="button" class="link-btn" id="forgot-link">Forgot password?</button>
+        <label class="remember" id="remember-row"><input type="checkbox" id="auth-remember"> Keep me logged in on this device</label>
+        <label class="consent" id="consent-row" hidden><input type="checkbox" id="auth-consent">
+          <span>I agree to the <button type="button" class="link-btn" data-legal="terms">Terms</button> and <button type="button" class="link-btn" data-legal="privacy">Privacy Policy</button>, and I'm 13 or older – or my parent or guardian is setting up this account for me.</span></label>
         <p class="form-error" id="auth-error" role="alert" hidden></p>
-        <button type="submit" class="btn btn-primary btn-block" id="auth-submit">Log in</button>
-      </form>
+        <button type="button" class="btn btn-primary btn-block" id="auth-submit">Log in</button>
+        <button type="button" class="link-btn back-link" id="auth-back" hidden>← Back to log in</button>
+      </div>
       <p class="test-note" id="auth-test-note">🧪 Test mode: accounts are saved only in this browser. Don't use a real password.</p>
+      <p class="legal-links"><button type="button" class="link-btn" data-legal="terms">Terms</button> · <button type="button" class="link-btn" data-legal="privacy">Privacy</button></p>
     </div>
   </section>
 </main>
@@ -615,7 +657,10 @@
       <button type="button" class="btn btn-dark btn-block" data-choose-plan="premium">Go Premium</button>
     </article>
   </div>
+  <p class="plans-foot"><button type="button" class="btn btn-ghost btn-sm" id="manage-billing" hidden>Manage billing, invoices or cancel</button></p>
   <p class="plans-foot" id="plans-test-note">🧪 Test mode: upgrading is pretend – no payment is taken.</p>
+  <p class="plans-foot legal-links">Subscriptions renew automatically until you cancel. Cancelling stops the next payment; you keep your plan until the end of the period you've paid for.<br>
+    <button type="button" class="link-btn" data-legal="terms">Terms</button> · <button type="button" class="link-btn" data-legal="privacy">Privacy</button></p>
 </main>
 
 <!-- =====================================================================
@@ -694,7 +739,25 @@
       <!-- TAB 4: PREMIUM -->
       <div class="fc-panel" id="panel-premium"><div id="premium-content"></div></div>
     </div>
+    <footer class="app-footer">
+      <span>© <span id="footer-year"></span> Pitchside Coaching AI</span>
+      <button type="button" class="link-btn" data-legal="terms">Terms</button>
+      <button type="button" class="link-btn" data-legal="privacy">Privacy</button>
+      <a class="link-btn" id="footer-contact" hidden>Contact</a>
+    </footer>
   </main>
+</div>
+
+<!-- Terms & Privacy -->
+<div class="modal" id="legal-modal" hidden>
+  <div class="modal-card legal-card" role="dialog" aria-modal="true" aria-labelledby="legal-title">
+    <button type="button" class="legal-close" id="legal-close" aria-label="Close">×</button>
+    <div class="legal-tabs" role="tablist">
+      <button type="button" class="sub-tab" data-legal-tab="terms">Terms of Service</button>
+      <button type="button" class="sub-tab" data-legal-tab="privacy">Privacy Policy</button>
+    </div>
+    <div class="legal-body" id="legal-body"></div>
+  </div>
 </div>
 
 <!-- Pretend payment "processing" -->
@@ -709,6 +772,18 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
+/* ==========================================================================
+   0. YOUR BUSINESS DETAILS – fill these in before you publish
+   --------------------------------------------------------------------------
+   Shown in the Terms of Service and Privacy Policy.
+   ========================================================================== */
+const BUSINESS = {
+  name: "Pitchside Coaching AI",
+  contactEmail: "",            // e.g. "hello@pitchsidecoaching.com" – where players and parents can reach you
+  country: "",                 // e.g. "England and Wales" – the law that applies to your Terms
+  legalUpdated: "1 October 2026"
+};
+
 /* ==========================================================================
    1. PLANS – what each subscription includes
    --------------------------------------------------------------------------
@@ -859,7 +934,7 @@ const PretendAuth = (() => {
       const all = users();
       if (all[email]) throw new Error("There's already an account with that email. Try logging in.");
       const user = { id: "u_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name, email,
-        passwordHash: await hash(password), plan: "free", interval: null, createdAt: new Date().toISOString() };
+        passwordHash: await hash(password), plan: "free", interval: null, createdAt: new Date().toISOString(), agreedTermsAt: new Date().toISOString() };
       all[email] = user;
       Store.set(USERS_KEY, all);
       startSession(email, remember);
@@ -883,6 +958,12 @@ const PretendAuth = (() => {
       return email ? publicUser(users()[email]) || null : null;
     },
     async authHeaders() { return {}; },
+    async resetPassword() {
+      const note = new Error("Test mode can't send emails. Sign up with a new email, or use the password you chose before.");
+      note.info = true;
+      throw note;
+    },
+    async updatePassword() { throw new Error("Password reset only works on the live site."); },
     // Test mode only – on the real site the Stripe webhook changes the plan.
     async savePlan(userId, plan, interval) {
       const all = users();
@@ -908,6 +989,10 @@ const LiveAuth = (() => {
     try { storage = remember ? window.localStorage : window.sessionStorage; } catch (e) { storage = undefined; }
     sb = window.supabase.createClient(Backend.config.auth.url, Backend.config.auth.anonKey,
       { auth: { storage, persistSession: true, detectSessionInUrl: true } });
+    // Clicking the link in a password-reset email opens the page in "choose a new password" mode.
+    sb.auth.onAuthStateChange(event => {
+      if (event === "PASSWORD_RECOVERY") window.dispatchEvent(new Event("pitchside:password-recovery"));
+    });
   }
   function useRemember(remember) {
     Store.set(REMEMBER_KEY, Boolean(remember));
@@ -939,7 +1024,8 @@ const LiveAuth = (() => {
       if (!/^\S+@\S+\.\S+$/.test(String(email || "").trim())) throw new Error("Please enter a valid email address.");
       if (String(password || "").length < 6) throw new Error("Your password needs at least 6 characters.");
       useRemember(remember);
-      const { data, error } = await sb.auth.signUp({ email: email.trim(), password, options: { data: { name }, emailRedirectTo: location.origin } });
+      const { data, error } = await sb.auth.signUp({ email: email.trim(), password,
+        options: { data: { name, agreed_terms_at: new Date().toISOString() }, emailRedirectTo: location.origin } });
       if (error) throw new Error(friendly(error));
       if (!data.session) {
         const note = new Error(`Nearly there! Check ${email.trim()} for a link to confirm your account, then log in.`);
@@ -956,6 +1042,17 @@ const LiveAuth = (() => {
       return me();
     },
     async logOut() { await sb.auth.signOut(); },
+    async resetPassword(email) {
+      if (!/^\S+@\S+\.\S+$/.test(String(email || "").trim())) throw new Error("Enter the email you signed up with.");
+      const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: location.origin });
+      if (error) throw new Error(friendly(error));
+    },
+    async updatePassword(password) {
+      if (String(password || "").length < 6) throw new Error("Your new password needs at least 6 characters.");
+      const { error } = await sb.auth.updateUser({ password });
+      if (error) throw new Error(friendly(error));
+      return me();
+    },
     async currentUser() {
       const { data } = await sb.auth.getSession();
       if (!data.session) return null;
@@ -976,7 +1073,9 @@ const AuthService = {
   logIn(d) { return this.impl.logIn(d); },
   logOut() { return this.impl.logOut(); },
   currentUser() { return this.impl.currentUser(); },
-  authHeaders() { return this.impl.authHeaders(); }
+  authHeaders() { return this.impl.authHeaders(); },
+  resetPassword(email) { return this.impl.resetPassword(email); },
+  updatePassword(password) { return this.impl.updatePassword(password); }
 };
 
 /* ==========================================================================
@@ -1681,7 +1780,7 @@ let userData = null;
 const saveData = () => UserData.save(currentUser.id, userData);
 
 function showScreen(name) {
-  ["auth", "plans", "app"].forEach(s => ($("screen-" + s).hidden = s !== name));
+  ["boot", "auth", "plans", "app"].forEach(s => ($("screen-" + s).hidden = s !== name));
   window.scrollTo(0, 0);
 }
 
@@ -1692,25 +1791,62 @@ function openPlans() {
 }
 
 /* ---------- log in / sign up ---------- */
+// Modes: "login", "signup", "forgot" (send a reset email) and "reset" (choose a new password).
 let authMode = "login";
+const AUTH_COPY = {
+  login:  ["Welcome back", "Log in to see your training plans.", "Log in"],
+  signup: ["Create your account", "It takes 20 seconds. Then pick a plan.", "Create account"],
+  forgot: ["Reset your password", "Enter your email and we'll send you a link to choose a new password.", "Send reset link"],
+  reset:  ["Choose a new password", "Pick a new password for your account.", "Save new password"]
+};
 function setAuthMode(mode) {
   authMode = mode;
+  const [title, sub, button] = AUTH_COPY[mode];
   document.querySelectorAll(".auth-tab").forEach(t => t.classList.toggle("active", t.dataset.authTab === mode));
+  document.querySelector(".auth-tabs").hidden = mode === "forgot" || mode === "reset";
   $("name-field").hidden = mode !== "signup";
-  $("auth-title").textContent = mode === "signup" ? "Create your account" : "Welcome back";
-  $("auth-sub").textContent = mode === "signup" ? "It takes 20 seconds. Then pick a plan." : "Log in to see your training plans.";
-  $("auth-submit").textContent = mode === "signup" ? "Create account" : "Log in";
-  $("auth-password").autocomplete = mode === "signup" ? "new-password" : "current-password";
+  $("email-field").hidden = mode === "reset";
+  $("password-field").hidden = mode === "forgot";
+  $("password-label").textContent = mode === "reset" ? "New password" : "Password";
+  $("forgot-link").hidden = mode !== "login";
+  $("remember-row").hidden = mode === "forgot" || mode === "reset";
+  $("consent-row").hidden = mode !== "signup";
+  $("auth-back").hidden = mode !== "forgot";
+  $("auth-title").textContent = title;
+  $("auth-sub").textContent = sub;
+  $("auth-submit").textContent = button;
+  $("auth-password").autocomplete = mode === "login" ? "current-password" : "new-password";
   $("auth-error").hidden = true;
 }
 document.querySelectorAll(".auth-tab").forEach(t => t.addEventListener("click", () => setAuthMode(t.dataset.authTab)));
+$("forgot-link").addEventListener("click", () => setAuthMode("forgot"));
+$("auth-back").addEventListener("click", () => setAuthMode("login"));
 
-$("auth-form").addEventListener("submit", async e => {
-  e.preventDefault();
+function showAuthMessage(text, info = false) {
+  $("auth-error").textContent = text;
+  $("auth-error").classList.toggle("info", info);
+  $("auth-error").hidden = false;
+}
+
+async function submitAuth() {
   const button = $("auth-submit");
+  if (button.disabled) return;
+  if (authMode === "signup" && !$("auth-consent").checked) {
+    return showAuthMessage("Please tick the box to agree to the Terms and Privacy Policy.");
+  }
   button.disabled = true;
   try {
     const details = { name: $("auth-name").value, email: $("auth-email").value, password: $("auth-password").value, remember: $("auth-remember").checked };
+    if (authMode === "forgot") {
+      await AuthService.resetPassword(details.email);
+      return showAuthMessage(`If ${details.email.trim()} has an account, a reset link is on its way. Check your inbox (and spam folder).`, true);
+    }
+    if (authMode === "reset") {
+      const user = await AuthService.updatePassword(details.password);
+      $("auth-password").value = "";
+      startSession(user);
+      return toast("Password updated – you're logged in. ✅");
+    }
     const user = authMode === "signup" ? await AuthService.signUp(details) : await AuthService.logIn(details);
     $("auth-password").value = "";
     if (authMode === "signup") {
@@ -1720,13 +1856,23 @@ $("auth-form").addEventListener("submit", async e => {
       toast(`Welcome back, ${user.name}! ⚽`);
     }
   } catch (err) {
-    $("auth-error").textContent = err.message;
-    $("auth-error").classList.toggle("info", Boolean(err.info));
-    $("auth-error").hidden = false;
+    showAuthMessage(err.message, Boolean(err.info));
   } finally {
     button.disabled = false;
   }
-});
+}
+// Plain button + Enter key (no <form>, so it works inside sandboxed frames too).
+function onSubmit(container, handler) {
+  container.querySelectorAll("[data-submit], #auth-submit").forEach(b => b.addEventListener("click", handler));
+  container.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.isComposing && e.target.matches("input:not([type=checkbox]):not([type=radio]), select")) {
+      e.preventDefault();
+      handler();
+    }
+  });
+}
+onSubmit($("auth-form"), submitAuth);
+window.addEventListener("pitchside:password-recovery", () => { showScreen("auth"); setAuthMode("reset"); });
 
 async function logOutNow() {
   await AuthService.logOut().catch(() => {});
@@ -1746,6 +1892,7 @@ function renderPlansPage(fromApp) {
   $("plans-back").hidden = !fromApp;
   $("plans-title").textContent = fromApp ? "Change your plan" : `Welcome, ${currentUser.name}! Pick how you want to train`;
   document.querySelectorAll(".billing-option").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.interval === billingInterval)));
+  $("manage-billing").hidden = !(Backend.payments && currentUser.hasBilling);
   const order = { free: 0, pro: 1, premium: 2 };
   document.querySelectorAll(".plan-card").forEach(card => {
     const key = card.dataset.plan;
@@ -1801,6 +1948,10 @@ document.querySelectorAll("[data-choose-plan]").forEach(button => {
   });
 });
 $("plans-back").addEventListener("click", enterApp);
+$("manage-billing").addEventListener("click", async () => {
+  try { await BillingService.manage(currentUser); }
+  catch (err) { toast(err.message || "Couldn't open billing. Please try again."); }
+});
 
 // Coming back from Stripe: ?checkout=success or ?checkout=cancelled
 async function handleCheckoutReturn() {
@@ -1936,11 +2087,13 @@ function updateProgress() {
 }
 
 async function askQuestion() {
+  const run = plannerRun;
   const q = QUESTIONS[step];
   plannerOptions.innerHTML = "";
   waitingForAnswer = false;
   updateProgress();
   await botSay(plannerMsgs, q.text);
+  if (run !== plannerRun) return; // the planner was restarted meanwhile
 
   if (q.multi) {
     const selected = new Set();
@@ -2219,6 +2372,7 @@ function showRestart() {
 
 let plannerStarted = false;
 function resetPlanner() {
+  plannerRun++; // stop any start that's still "typing"
   plannerStarted = false;
   step = 0;
   profile = {};
@@ -2227,7 +2381,10 @@ function resetPlanner() {
   plannerOptions.innerHTML = "";
 }
 
+// Each start gets a number; if a newer start begins while this one is "typing", this one stops.
+let plannerRun = 0;
 async function startPlanner() {
+  const run = ++plannerRun;
   plannerStarted = true;
   step = 0;
   profile = {};
@@ -2237,9 +2394,11 @@ async function startPlanner() {
   updateProgress();
   if (Limits.plansLeft(currentUser, userData) === 0) {
     await botSay(plannerMsgs, `Hi ${currentUser.name}! 👋`);
+    if (run !== plannerRun) return;
     return showPlanLimit();
   }
   await botSay(plannerMsgs, `Hi ${currentUser.name}! 👋 Answer ${QUESTIONS.length} quick questions and I'll make you a training plan for the whole week!`);
+  if (run !== plannerRun) return;
   askQuestion();
 }
 
@@ -2695,7 +2854,7 @@ function renderDietSetup(section, prefs = {}) {
   section.innerHTML = `
     <div class="diet-head"><h3>🥗 AI Diet Plan &amp; Tracker</h3><span class="premium-chip">⭐ Premium</span></div>
     <p class="panel-intro">Answer a few questions and your AI coach builds a fuel plan for training days, rest days and match days. Then track your meals, water and energy every day.</p>
-    <form class="checkin-form" id="diet-form" novalidate>
+    <div class="checkin-form" id="diet-form" role="form">
       <div><span class="fieldset-label">How do you eat?</span>
         ${radios("diet", [["any", "Everything"], ["vegetarian", "Vegetarian"], ["vegan", "Vegan"], ["pescatarian", "Pescatarian"]], prefs.diet)}</div>
       <label class="field"><span>Foods to avoid or allergies <small>(optional)</small></span>
@@ -2704,15 +2863,15 @@ function renderDietSetup(section, prefs = {}) {
         ${radios("goal", [["energy", "⚡ Energy for training"], ["recover", "🔁 Recover faster"], ["strength", "💪 Build strength"], ["allround", "🌈 Healthy all-round"]], prefs.goal)}</div>
       <label class="field"><span>Age group</span>
         <select id="diet-age">${["Under 10", "10-13", "14-17", "18+"].map(a => `<option ${(prefs.ageGroup || answers.ageGroup || "14-17") === a ? "selected" : ""}>${a}</option>`).join("")}</select></label>
-      <button type="submit" class="btn btn-primary">${prefs.diet ? "Update my diet plan" : "Create my diet plan"}</button>
+      <button type="button" class="btn btn-primary" data-submit>${prefs.diet ? "Update my diet plan" : "Create my diet plan"}</button>
       <p class="muted small">General healthy-eating guidance, not medical advice. With allergies or a medical condition, check with a parent, doctor or dietitian.</p>
-    </form>`;
-  $("diet-form").addEventListener("submit", async e => {
-    e.preventDefault();
+    </div>`;
+  const form = $("diet-form");
+  const picked = name => form.querySelector(`input[name="${name}"]:checked`).value;
+  onSubmit(form, async () => {
     if (!hasFeature(currentUser, "premium")) return;
-    const form = e.target;
     const data = dietData();
-    data.prefs = { diet: form.diet.value, avoid: $("diet-avoid").value.trim().slice(0, 120), goal: form.goal.value, ageGroup: $("diet-age").value };
+    data.prefs = { diet: picked("diet"), avoid: $("diet-avoid").value.trim().slice(0, 120), goal: picked("goal"), ageGroup: $("diet-age").value };
     section.innerHTML = `<div class="spinner"></div><p class="muted" style="text-align:center">Your AI coach is building your fuel plan…</p>`;
     try {
       data.plan = await getDietPlan({ ...data.prefs, seed: data.seed || 0 });
@@ -2737,7 +2896,7 @@ function renderCheckin(section) {
     `<label><input type="radio" name="${name}" value="${v}" ${i === 0 ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
   section.innerHTML = `<h3>📝 Weekly check-in</h3>
     <p class="panel-intro">Tell me how this week went and I'll build next week's plan around it.</p>
-    <form class="checkin-form" id="checkin-form" novalidate>
+    <div class="checkin-form" id="checkin-form" role="form">
       <div><span class="fieldset-label">How many of your ${planned} sessions did you do?</span>
         ${radios("done", Array.from({ length: planned + 1 }, (_, i) => [planned - i, String(planned - i)]))}</div>
       <div><span class="fieldset-label">How did the training feel?</span>
@@ -2746,18 +2905,16 @@ function renderCheckin(section) {
         ${radios("pain", [["no", "No"], ["yes", "Yes"]])}</div>
       <label class="field"><span>What do you want to work on next week? <small>(optional)</small></span>
         <input type="text" id="checkin-focus" placeholder="e.g. my first touch, heading, stamina"></label>
-      <button type="submit" class="btn btn-primary">Build next week's plan</button>
-    </form>
+      <button type="button" class="btn btn-primary" data-submit>Build next week's plan</button>
+    </div>
     <div id="checkin-result"></div>`;
-  $("checkin-form").addEventListener("submit", e => {
-    e.preventDefault();
-    const form = e.target;
-    runCheckin({
-      done: Number(form.done.value), planned,
-      feel: form.feel.value, pain: form.pain.value === "yes",
-      focus: $("checkin-focus").value.trim()
-    });
-  });
+  const form = $("checkin-form");
+  const picked = name => form.querySelector(`input[name="${name}"]:checked`).value;
+  onSubmit(form, () => runCheckin({
+    done: Number(picked("done")), planned,
+    feel: picked("feel"), pain: picked("pain") === "yes",
+    focus: $("checkin-focus").value.trim()
+  }));
 }
 
 // Adjusts the player's answers based on the check-in, then builds next week's plan.
@@ -2858,6 +3015,111 @@ async function downloadPlanPDF(plan, answers) {
     console.error(err);
     toast("Couldn't create the PDF – check your internet connection and try again.");
   }
+}
+
+/* ==========================================================================
+   TERMS OF SERVICE & PRIVACY POLICY
+   --------------------------------------------------------------------------
+   Plain-English starting point. Fill in BUSINESS (top of the script) and have
+   them checked for your country before you launch.
+   ========================================================================== */
+function legalContact() {
+  return BUSINESS.contactEmail
+    ? `email us at <a href="mailto:${escapeHTML(BUSINESS.contactEmail)}">${escapeHTML(BUSINESS.contactEmail)}</a>`
+    : "contact us using the details on our website";
+}
+
+const LEGAL = {
+  terms: () => `
+    <h2 id="legal-title">Terms of Service</h2>
+    <p class="muted small">Last updated ${escapeHTML(BUSINESS.legalUpdated)}</p>
+    <p>These terms are an agreement between you and ${escapeHTML(BUSINESS.name)} ("we", "us") for using our website and app (the "Service"). By creating an account you agree to them.</p>
+    <h3>1. Who can use ${escapeHTML(BUSINESS.name)}</h3>
+    <p>You must be 13 or older to create your own account. If you're under 13, a parent or guardian must set up and manage the account for you. If you're under 18, please get your parent or guardian's permission first, and they should review these terms with you.</p>
+    <h3>2. Your account</h3>
+    <p>Keep your password private and tell us straight away if you think someone else is using your account. You're responsible for what happens on your account. Please give a real name and an email address you can access.</p>
+    <h3>3. Plans, payments and cancelling</h3>
+    <ul>
+      <li>The Free plan costs nothing. Pro and Premium are paid subscriptions, billed monthly or yearly at the price shown when you sign up.</li>
+      <li>Subscriptions renew automatically at the end of each billing period until you cancel. You can cancel at any time from the plans page ("Manage billing"). You keep your paid features until the end of the period you've already paid for, and you won't be charged again.</li>
+      <li>Payments are handled securely by Stripe. We never see or store your full card number.</li>
+      <li>Refunds: we don't usually refund part-used billing periods, but this doesn't affect any rights you have under consumer law where you live (for example, a cooling-off period). If something has gone wrong, please contact us.</li>
+      <li>If we change our prices, we'll tell you before the change applies to your subscription, and you can cancel before then.</li>
+    </ul>
+    <h3>4. Fair use</h3>
+    <p>"Unlimited" features are for one person's normal personal training. To keep the Service working for everyone, we may limit very heavy or automated use.</p>
+    <h3>5. Training, health and safety</h3>
+    <p>Our training plans, coaching tips and food guidance are created by AI and are general information only. They are not medical, physiotherapy or dietary advice, and they may sometimes be wrong. Always warm up, train within your limits, and stop if anything hurts. Speak to a parent, coach, doctor or physio before starting new training if you have an injury, a health condition or any doubts – and about any allergies or special diets. Young players should train with adult supervision where appropriate.</p>
+    <h3>6. Using the Service properly</h3>
+    <p>Please don't misuse the Service – for example by trying to break its limits or security, copying it, reselling it, or using it to send harmful or abusive content. We may suspend accounts that do.</p>
+    <h3>7. Our content</h3>
+    <p>The Service, its design and its content belong to us. Plans generated for you are yours to use for your own training.</p>
+    <h3>8. Changes and availability</h3>
+    <p>We're always improving the Service and may change or remove features. We aim to keep it running smoothly but can't promise it will always be available or error-free. We may update these terms; if the changes are important we'll let you know, and continuing to use the Service means you accept them.</p>
+    <h3>9. Our responsibility to you</h3>
+    <p>We provide the Service with reasonable care and skill. As far as the law allows, we aren't responsible for losses that weren't foreseeable, or that come from not following the safety guidance above. Nothing in these terms limits liability that can't be limited by law.</p>
+    <h3>10. Ending your account</h3>
+    <p>You can stop using the Service at any time, and ask us to delete your account by contacting us. We may close accounts that break these terms.</p>
+    ${BUSINESS.country ? `<h3>11. Law</h3><p>These terms are governed by the law of ${escapeHTML(BUSINESS.country)}.</p>` : ""}
+    <h3>Contact</h3>
+    <p>Questions about these terms? Please ${legalContact()}.</p>`,
+
+  privacy: () => `
+    <h2 id="legal-title">Privacy Policy</h2>
+    <p class="muted small">Last updated ${escapeHTML(BUSINESS.legalUpdated)}</p>
+    <p>This policy explains what information ${escapeHTML(BUSINESS.name)} collects, why, and the choices you have. We keep it to what we need to run your coaching.</p>
+    <h3>What we collect</h3>
+    <ul>
+      <li><strong>Account details:</strong> your name, email address and password (stored securely – we can't see it), and when you agreed to our terms.</li>
+      <li><strong>Training information:</strong> the answers you give the planner (like position, age group, strong foot, kit, weaknesses and goals), the plans we make for you, and your weekly check-ins.</li>
+      <li><strong>Coach chats and diet tracking:</strong> the questions you ask, your food preferences and foods to avoid, and the meals, water and energy you log.</li>
+      <li><strong>Subscription details:</strong> your plan and billing status. Card details go straight to Stripe – we never receive your full card number.</li>
+      <li><strong>Usage counts:</strong> how many plans and coach questions you've used, so we can apply your plan's limits.</li>
+    </ul>
+    <h3>How we use it</h3>
+    <p>To run your account, make your training and diet plans, answer your questions, apply your plan's limits, take payments, keep the Service secure and fix problems. We don't sell your information, we don't show ads, and we don't use it for advertising.</p>
+    <h3>Who helps us</h3>
+    <ul>
+      <li><strong>Supabase</strong> – stores accounts and training data.</li>
+      <li><strong>Stripe</strong> – handles payments and subscriptions.</li>
+      <li><strong>Our AI provider (Anthropic)</strong> – your planner answers, coach questions and diet details are sent to it to create your plans and replies. Please don't share things like your full address, school or medical records in the chat.</li>
+      <li><strong>Our hosting provider</strong> – runs the website.</li>
+    </ul>
+    <p>These providers only use your information to provide their service to us. Some may store data outside your country, with appropriate protections in place.</p>
+    <h3>Stored on your device</h3>
+    <p>We use your browser's storage (not advertising cookies) to keep you logged in if you ask us to, and to save your diet log, check-ins and saved-plans list on your device.</p>
+    <h3>Children</h3>
+    <p>Many of our players are young. Players under 13 need a parent or guardian to set up and manage their account. We only collect what's needed for coaching. If you're a parent and think your child has given us information without your permission, contact us and we'll delete it.</p>
+    <h3>How long we keep it</h3>
+    <p>We keep your information while your account is open. When you ask us to delete your account, we delete your personal information, except anything we must keep by law (for example, payment records).</p>
+    <h3>Your choices and rights</h3>
+    <p>You can ask to see, correct, download or delete your information, or object to how we use it. Depending on where you live, you may also be able to complain to your data protection authority. To use these rights, ${legalContact()}.</p>
+    <h3>Changes</h3>
+    <p>If we change this policy in an important way, we'll let you know in the app.</p>`
+};
+
+function openLegal(which) {
+  document.querySelectorAll("[data-legal-tab]").forEach(t => t.classList.toggle("active", t.dataset.legalTab === which));
+  $("legal-body").innerHTML = LEGAL[which]();
+  $("legal-modal").hidden = false;
+  $("legal-body").scrollTop = 0;
+  $("legal-close").focus();
+}
+const closeLegal = () => ($("legal-modal").hidden = true);
+document.addEventListener("click", e => {
+  const link = e.target.closest("[data-legal]");
+  if (link) { e.preventDefault(); openLegal(link.dataset.legal); }
+});
+document.querySelectorAll("[data-legal-tab]").forEach(t => t.addEventListener("click", () => openLegal(t.dataset.legalTab)));
+$("legal-close").addEventListener("click", closeLegal);
+$("legal-modal").addEventListener("click", e => { if (e.target === $("legal-modal")) closeLegal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("legal-modal").hidden) closeLegal(); });
+
+// Footer
+$("footer-year").textContent = new Date().getFullYear();
+if (BUSINESS.contactEmail) {
+  $("footer-contact").href = "mailto:" + BUSINESS.contactEmail;
+  $("footer-contact").hidden = false;
 }
 
 /* ==========================================================================
