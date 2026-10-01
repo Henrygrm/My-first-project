@@ -214,6 +214,10 @@
   .fc-day-time { font-size: 0.75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
   .fc-day-focus { display: inline-block; font-size: 0.75rem; font-weight: 700; color: var(--brand-dark); background: var(--brand-soft); padding: 3px 10px; border-radius: 999px; margin-bottom: 10px; }
   .fc-day.rest .fc-day-focus { color: var(--muted); background: #eef2ef; }
+  .fc-day.club { background: #f3f8ff; border-color: #cfe0f7; }
+  .fc-day.club .fc-day-focus { color: #1f4f8a; background: #e1edfb; }
+  .fc-day.match { background: #fffaf0; border-color: #f1d58a; }
+  .fc-day.match .fc-day-focus { color: #8a5a00; background: #fdeec4; }
   .fc-day ul { margin: 0; padding: 0; list-style: none; }
   .fc-day li { font-size: 0.87rem; line-height: 1.45; padding: 6px 0; border-top: 1px solid #f0f4f1; }
   .fc-day li:first-child { border-top: none; }
@@ -465,6 +469,23 @@
   .week-bar { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; }
   .week-bar span { width: 100%; max-width: 34px; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, var(--lime), var(--brand)); }
   .week-bar em { font-style: normal; font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+  .diet-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .diet-day { display: grid; justify-items: center; gap: 2px; padding: 8px 2px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); cursor: pointer; font: inherit; color: var(--text); min-width: 0; }
+  .diet-day strong { font-size: 0.78rem; }
+  .diet-day span { font-size: 1.05rem; line-height: 1; }
+  .diet-day.today strong { text-decoration: underline; text-underline-offset: 3px; }
+  .diet-day.match { background: #fdeec4; border-color: #f1d58a; }
+  .diet-day.active { outline: 2px solid var(--brand); outline-offset: 1px; background: var(--brand-soft); }
+  .diet-day.match.active { outline-color: #c99400; background: #fbe3a0; }
+  .diet-day-menu { display: grid; gap: 10px; }
+  .diet-day-title small { display: block; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+  .diet-day-menu.match { background: #fffaf0; border: 1px solid #f1d58a; border-radius: 14px; padding: 12px; }
+  .diet-day-menu.match .diet-day-title strong { color: #8a5a00; }
+  .menu-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .menu-list li { padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); font-size: 0.9rem; line-height: 1.45; }
+  .menu-list small { color: var(--muted); font-weight: 600; }
+  .game-tips { border-color: #f1d58a; background: #fffaf0; }
+  .diet-update { margin: 0; }
 
   /* ---------- BOOT, LINKS, CONSENT, FOOTER, LEGAL ---------- */
   .boot-screen { display: grid; place-content: center; justify-items: center; gap: 24px; }
@@ -1309,6 +1330,12 @@ const DRILLS = {
     { name: "1v1 / 2v2 game", detail: "First to 5 goals, use small goals or bottles", min: 15, needs: ["ball", "partner"] },
     { name: "Keep-ball", detail: "Keep the ball away from your partner in a small box", min: 8, needs: ["ball", "partner"] }
   ],
+  sharpen: [
+    { name: "Quick feet", detail: "Fast feet on the spot, 4 × 15 s with full rest", min: 4, needs: [] },
+    { name: "Crisp passing & first touch", detail: "Easy, sharp touches against a wall or with a friend – no tiring yourself out", min: 8, needs: ["ball"] },
+    { name: "Short sharp touches", detail: "Toe taps and sole rolls at match speed, 4 × 30 s", min: 5, needs: ["ball"] },
+    { name: "3 short sprints", detail: "3 × 10 m at 90% with a full walk back – just to wake the legs up", min: 4, needs: [] }
+  ],
   light: [
     { name: "Easy ball touches", detail: "Slow, relaxed toe taps & rolls", min: 8, needs: ["ball"] },
     { name: "Mobility & stretching", detail: "Hips, hamstrings, calves & groin", min: 10, needs: [] },
@@ -1355,6 +1382,7 @@ const DRILLS = {
 for (const [cat, list] of Object.entries(DRILLS)) list.forEach(d => (d.cat = cat));
 
 const FOCUS_INFO = {
+  sharpen:     { label: "Pre-match sharpen-up", icon: "⚡", type: "sharpen" },
   ballMastery: { label: "Ball Mastery", icon: "⚽", type: "skill" },
   passing:     { label: "Passing", icon: "🎯", type: "skill" },
   firstTouch:  { label: "First Touch", icon: "👟", type: "skill" },
@@ -1440,6 +1468,9 @@ function sessionLength(type, available, ageGroup) {
     case "strength":
       return { minutes: Math.min(time, 30),
         why: "Bodyweight strength needs quality reps, not long sessions – 20–30 min is ideal." };
+    case "sharpen":
+      return { minutes: Math.min(time, 20),
+        why: "The day before your game – short and sharp so your legs feel fresh and fast tomorrow." };
     case "light":
       return { minutes: Math.min(time, Math.max(15, Math.min(30, round5(time * 0.5)))),
         why: "3rd training day in a row – a lighter, shorter session lets your body recover while keeping your touch sharp." };
@@ -1450,13 +1481,46 @@ function sessionLength(type, available, ageGroup) {
   }
 }
 
+// Club days and game day are fixed. The player's own sessions go on the other days:
+// never the day after the game (recovery), only a short sharpen-up the day before,
+// spread out, and always leaving at least one full rest day.
+function scheduleWeek(p, daysWanted) {
+  const club = (Array.isArray(p.clubDays) ? p.clubDays : []).filter(d => DAY_NAMES.includes(d));
+  const game = DAY_NAMES.includes(p.gameDay) ? p.gameDay : null;
+  const dayAt = i => DAY_NAMES[(i + 7) % 7];
+  const preGame = game ? dayAt(DAY_NAMES.indexOf(game) - 1) : null;
+  const postGame = game ? dayAt(DAY_NAMES.indexOf(game) + 1) : null;
+  if (!club.length && !game) return { club, game, preGame, postGame, solo: TRAINING_DAYS[daysWanted], capped: false };
+
+  const fixed = new Set([...club, game].filter(Boolean));
+  const free = DAY_NAMES.filter(d => !fixed.has(d) && d !== postGame);
+  // Keep at least one full rest day (the day after the game counts if it's free).
+  const restAlready = postGame && !fixed.has(postGame) ? 1 : 0;
+  const maxSolo = Math.max(0, free.length - (restAlready ? 0 : 1));
+  const wanted = Math.min(daysWanted, maxSolo);
+  const penalty = {};
+  free.forEach(d => {
+    const i = DAY_NAMES.indexOf(d);
+    penalty[d] = (d === preGame ? 10 : 0) + [dayAt(i - 1), dayAt(i + 1)].filter(n => fixed.has(n)).length * 2;
+  });
+  const solo = [];
+  while (solo.length < wanted) {
+    const pick = free.filter(d => !solo.includes(d)).sort((a, b) => penalty[a] - penalty[b] || DAY_NAMES.indexOf(a) - DAY_NAMES.indexOf(b))[0];
+    solo.push(pick);
+    const i = DAY_NAMES.indexOf(pick);
+    [dayAt(i - 1), dayAt(i + 1)].forEach(n => { if (n in penalty) penalty[n] += 3; }); // spread sessions out
+  }
+  return { club, game, preGame, postGame, solo, capped: wanted < daysWanted };
+}
+
 function fakeTrainingPlan(p) {
   const equipment = p.equipment || [];
   const has = d => d.needs.every(n => equipment.includes(n));
   const weak = p.foot === "Left" ? "right" : p.foot === "Right" ? "left" : "weaker";
   const available = parseInt(p.sessionTime, 10) || 45;
   const daysCount = Math.min(6, Math.max(1, parseInt(p.daysPerWeek, 10) || 3));
-  const trainDays = TRAINING_DAYS[daysCount];
+  const week = scheduleWeek(p, daysCount);
+  const trainDays = week.solo;
   const rotating = p.focusMode === "rotating" || !hasSpecificFocus(p);
 
   const drillsFor = cat => (cat === "position" ? DRILLS[p.position] : DRILLS[cat] || []).filter(has);
@@ -1487,8 +1551,32 @@ function fakeTrainingPlan(p) {
   const leastUsed = pool => pool.slice().sort((a, b) => (used[a.name] || 0) - (used[b.name] || 0));
   let streak = 0, next = 0;
   return DAY_NAMES.map(day => {
+    if (day === week.game) {
+      streak++;
+      return { day, focus: "Game day", icon: "🏟️", match: true, minutes: 0,
+        why: "Game day – fuel up, warm up properly and give it everything.",
+        drills: [
+          { name: "Warm up properly", detail: "Do your team's warm-up (Premium has a full match-day routine)", minutes: 0 },
+          { name: "Play your game", detail: "Enjoy it – try one thing you've worked on this week", minutes: 0 },
+          { name: "After the game", detail: "Recovery snack within an hour, then stretch and drink plenty", minutes: 0 }
+        ] };
+    }
+    if (week.club.includes(day)) {
+      streak++;
+      return { day, focus: "Club training", icon: "👕", club: true, minutes: 0,
+        why: day === week.preGame ? "Club training the day before your game – go easy on extra work today." : "Your club session counts as training – no extra session today.",
+        drills: [
+          { name: "Club training", detail: "Train with your team and give it your best", minutes: 0 },
+          { name: "Bring this week's focus", detail: `Look for chances to practise: ${p.goal && !/nothing specific/i.test(p.goal) ? p.goal : "your weaker foot and first touch"}`, minutes: 0 }
+        ] };
+    }
     if (!trainDays.includes(day)) {
       streak = 0;
+      if (day === week.postGame) {
+        return { day, focus: "Recovery day", rest: true, drills: [
+          { name: "Easy recovery", detail: "Light walk, gentle stretching or a swim – nothing hard" },
+          { name: "Refuel & sleep", detail: "Eat well, drink plenty and get a good night's sleep" } ] };
+      }
       return day === "Sunday"
         ? { day, focus: "Rest day", rest: true, drills: [
             { name: "Full rest", detail: "Sleep well and eat good food" },
@@ -1498,15 +1586,15 @@ function fakeTrainingPlan(p) {
             { name: "Optional", detail: "Light walk or stretching, drink plenty of water" } ] };
     }
     streak++;
-    const cat = streak >= 3 ? "light" : order[next++ % order.length];
+    const cat = day === week.preGame ? "sharpen" : streak >= 3 ? "light" : order[next++ % order.length];
     const info = FOCUS_INFO[cat];
     const { minutes, why } = sessionLength(info.type, available, p.ageGroup);
     const label = cat === "position" ? `${p.position} Skills` : info.label;
     const icon = cat === "position" && p.position === "Goalkeeper" ? "🧤" : info.icon;
 
     // Warm-up and cool-down scale with the session length.
-    const warm = cat === "light" ? 0 : minutes <= 20 ? 5 : minutes <= 45 ? 8 : 10;
-    const cool = cat === "light" ? 0 : minutes <= 20 ? 3 : 5;
+    const warm = cat === "light" ? 0 : cat === "sharpen" ? 4 : minutes <= 20 ? 5 : minutes <= 45 ? 8 : 10;
+    const cool = cat === "light" ? 0 : cat === "sharpen" ? 2 : minutes <= 20 ? 3 : 5;
     const drills = [];
     if (warm) drills.push({ name: "Warm-up", detail: equipment.includes("ball") ? "Jog, dynamic stretches & easy touches" : "Jog, high knees, heel flicks & dynamic stretches", minutes: warm });
 
@@ -1525,13 +1613,15 @@ function fakeTrainingPlan(p) {
     };
     take(drillsFor(cat));
     // Top up skill sessions with weak-foot and position work, fitness with strength.
-    if (info.type === "skill" || info.type === "game") {
+    if (cat === "sharpen") {
+      // nothing extra – keep the legs fresh for tomorrow
+    } else if (info.type === "skill" || info.type === "game") {
       if (p.foot !== "Both") take(leastUsed(drillsFor("weakFoot")), 1);
       take(leastUsed(["position", "ballMastery", "firstTouch", "passing", "dribbling"].flatMap(drillsFor)));
     } else if (info.type !== "light") {
       take(leastUsed(drillsFor("strength")));
     }
-    if (remaining >= 4 && cat !== "light") {
+    if (remaining >= 4 && cat !== "light" && cat !== "sharpen") {
       drills.push(equipment.includes("partner") && equipment.includes("ball")
         ? { name: "Small-sided game", detail: "Play 1v1 or 2v2 – try today's skills in a game", minutes: remaining }
         : { name: "Free practice", detail: "Repeat your favourite drill from today", minutes: remaining });
@@ -2039,8 +2129,24 @@ const QUESTIONS = [
   { key: "ageGroup", text: "Nice! What is your age group?", options: ["Under 10", "10-13", "14-17", "18+"] },
   { key: "foot", text: "Which is your strong foot? 👟", options: ["Left", "Right", "Both"] },
   { key: "equipment", multi: true, text: "What do you have access to when you train? Tap everything that applies, then hit Done ✅",
-    options: EQUIPMENT },
-  { key: "daysPerWeek", text: "How many days a week can you train? 📅", options: ["1 day", "2 days", "3 days", "4 days", "5 days", "6 days"],
+    options: EQUIPMENT, parseMulti: parseEquipment, labelMulti: equipmentLabel,
+    multiPlaceholder: "Tap all that apply, or type e.g. \"a ball and a wall\"",
+    multiHelp: "Tap the things you have (ball, cones, goal, wall, a friend, a pitch or park), then Done." },
+  { key: "clubDays", multi: true, text: "Do you train with a club or team? Tap the days you have club training, then hit Done 👕",
+    options: DAY_NAMES.map(d => ({ key: d, label: d.slice(0, 3) })), noneChip: "🚫 No club training",
+    parseMulti: parseDays, labelMulti: clubDaysLabel,
+    multiPlaceholder: "Tap your club days, or type e.g. \"Tuesday and Thursday\"",
+    multiHelp: "Tap the days you train with your club (or \"No club training\"), then Done." },
+  { key: "gameDay", text: "When is your game day? 🏟️", options: ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "No regular game"],
+    parse: text => {
+      const lower = text.toLowerCase();
+      if (/\b(no|none|not|don'?t|never)\b/.test(lower)) return "No regular game";
+      return DAY_NAMES.find(d => lower.includes(d.slice(0, 3).toLowerCase())) || null;
+    } },
+  { key: "daysPerWeek", options: ["1 day", "2 days", "3 days", "4 days", "5 days", "6 days"],
+    text: () => (profile.clubDays || []).length || DAY_NAMES.includes(profile.gameDay)
+      ? "On top of that, how many days a week can you train on your own? 📅 I'll fit them around your club and games."
+      : "How many days a week can you train? 📅",
     parse: text => {
       const lower = text.toLowerCase();
       const word = Object.keys(NUMBER_WORDS).find(w => lower.includes(w));
@@ -2092,11 +2198,12 @@ async function askQuestion() {
   plannerOptions.innerHTML = "";
   waitingForAnswer = false;
   updateProgress();
-  await botSay(plannerMsgs, q.text);
+  await botSay(plannerMsgs, typeof q.text === "function" ? q.text() : q.text);
   if (run !== plannerRun) return; // the planner was restarted meanwhile
 
   if (q.multi) {
     const selected = new Set();
+    if (q.noneChip) plannerOptions.appendChild(makeChip(q.noneChip, () => handleAnswer([])));
     q.options.forEach(o => {
       const chip = makeChip(o.label, () => {
         selected.has(o.key) ? selected.delete(o.key) : selected.add(o.key);
@@ -2104,8 +2211,9 @@ async function askQuestion() {
       });
       plannerOptions.appendChild(chip);
     });
-    plannerOptions.appendChild(makeChip("✅ Done", () => handleAnswer(Array.from(selected)), true));
-    plannerInput.placeholder = "Tap all that apply, or type e.g. \"a ball and a wall\"";
+    // Keep answers in the options' order (e.g. Mon before Thu).
+    plannerOptions.appendChild(makeChip("✅ Done", () => handleAnswer(q.options.map(o => o.key).filter(k => selected.has(k))), true));
+    plannerInput.placeholder = q.multiPlaceholder;
   } else if (q.options) {
     q.options.forEach(opt => plannerOptions.appendChild(makeChip(opt, () => handleAnswer(opt))));
     plannerInput.placeholder = "Tap an option or type your answer...";
@@ -2140,19 +2248,29 @@ function equipmentLabel(keys) {
   return keys.length ? EQUIPMENT.filter(e => keys.includes(e.key)).map(e => e.label).join(", ") : "Nothing – just me";
 }
 
+// Turns "tues and thurs" into ["Tuesday", "Thursday"].
+function parseDays(text) {
+  const lower = text.toLowerCase();
+  return DAY_NAMES.filter(d => new RegExp("\\b" + d.slice(0, 3).toLowerCase()).test(lower));
+}
+
+function clubDaysLabel(days) {
+  return days && days.length ? days.map(d => d.slice(0, 3)).join(", ") : "No club training";
+}
+
 function handleAnswer(answer) {
   if (!waitingForAnswer) return; // ignore clicks while the coach is "typing"
   const q = QUESTIONS[step];
   let shown = answer;
   if (q.multi) {
-    const keys = Array.isArray(answer) ? answer : parseEquipment(answer);
-    if (!Array.isArray(answer) && keys.length === 0 && !/nothing|none|no\b|just me/i.test(answer)) {
+    const keys = Array.isArray(answer) ? answer : q.parseMulti(answer);
+    if (!Array.isArray(answer) && keys.length === 0 && !/nothing|none|no\b|not|just me/i.test(answer)) {
       addMessage(plannerMsgs, "user", answer);
-      addMessage(plannerMsgs, "bot", "Hmm, I didn't catch that. Tap the things you have (ball, cones, goal, wall, a friend, a pitch or park), then Done.");
+      addMessage(plannerMsgs, "bot", "Hmm, I didn't catch that. " + q.multiHelp);
       return;
     }
     answer = keys;
-    shown = equipmentLabel(keys);
+    shown = q.labelMulti(keys);
   } else if (q.options) {
     const match = (q.parse && q.parse(answer)) || matchOption(answer, q.options);
     if (!match) {
@@ -2222,6 +2340,17 @@ function formatMinutes(total) {
   return h ? `${h} h${m ? " " + m + " min" : ""}` : `${m} min`;
 }
 
+// A session the player does on their own (not rest, club training or a game).
+const isSoloSession = d => !d.rest && !d.club && !d.match;
+
+// Club days and game day, e.g. "Club: Tue, Thu · Game: Saturday".
+function teamWeekLabel(answers) {
+  const parts = [];
+  if ((answers.clubDays || []).length) parts.push("👕 Club: " + clubDaysLabel(answers.clubDays));
+  if (DAY_NAMES.includes(answers.gameDay)) parts.push("🏟️ Game: " + answers.gameDay);
+  return parts.join(" · ");
+}
+
 // Draws a plan into `container`. What's shown depends on the player's plan:
 // Free = drill names only, Pro = step-by-step instructions, Premium = + PDF download.
 function renderPlan(container, plan, answers, { scroll = true } = {}) {
@@ -2230,16 +2359,18 @@ function renderPlan(container, plan, answers, { scroll = true } = {}) {
   const wrap = document.createElement("div");
   wrap.className = "fc-plan";
   const tags = [answers.position, answers.ageGroup, answers.foot + " foot"].map(t => `<span class="fc-tag">${escapeHTML(t)}</span>`).join("");
-  const sessions = plan.filter(d => !d.rest);
+  const sessions = plan.filter(isSoloSession);
+  const teamDays = plan.filter(d => d.club || d.match).length;
   const totalMinutes = sessions.reduce((s, d) => s + (parseInt(d.minutes, 10) || 0), 0);
   const stats = [
-    ["📅", "Sessions", sessions.length],
+    ["📅", teamDays ? "Your sessions" : "Sessions", sessions.length],
+    ...(teamDays ? [["👕", "Club & games", teamDays]] : []),
     ["⏱", "Total time", formatMinutes(totalMinutes)],
     ["🧰", "Kit", equipmentLabel(answers.equipment || [])]
   ].map(([icon, label, value]) => `
     <div class="fc-stat"><span class="fc-stat-label">${icon} ${label}</span><strong>${escapeHTML(value)}</strong></div>`).join("");
 
-  const rotationDays = plan.filter(d => d.rotating && !d.rest);
+  const rotationDays = plan.filter(d => d.rotating && isSoloSession(d));
   const rotationSection = rotationDays.length ? `
     <div class="fc-rotation">
       <div class="fc-rotation-head">
@@ -2273,14 +2404,14 @@ function renderPlan(container, plan, answers, { scroll = true } = {}) {
     ${rotationSection}
     <div class="fc-days">
       ${plan.map(d => `
-        <div class="fc-day ${d.rest ? "rest" : ""}">
+        <div class="fc-day ${d.rest ? "rest" : d.match ? "match" : d.club ? "club" : ""}">
           <div class="fc-day-top">
             <span class="fc-day-name">${escapeHTML(d.day)}</span>
-            <span class="fc-day-time">${d.rest ? "😴 Rest" : "⏱ " + escapeHTML(d.minutes) + " min"}</span>
+            <span class="fc-day-time">${d.rest ? "😴 Rest" : d.match ? "🏟️ Game" : d.club ? "👕 Club" : "⏱ " + escapeHTML(d.minutes) + " min"}</span>
           </div>
           <span class="fc-day-focus">${d.icon ? escapeHTML(d.icon) + " " : ""}${escapeHTML(d.focus)}</span>
-          ${d.why && steps ? `<p class="fc-day-why">💡 ${escapeHTML(d.why)}</p>` : ""}
-          <ul>${d.drills.map(dr => drillHTML(dr, d.rest)).join("")}</ul>
+          ${d.why && (steps || d.club || d.match) ? `<p class="fc-day-why">💡 ${escapeHTML(d.why)}</p>` : ""}
+          <ul>${d.drills.map(dr => drillHTML(dr, !isSoloSession(d))).join("")}</ul>
         </div>`).join("")}
     </div>
     ${steps ? "" : `<div class="plan-lock-note"><span>🔒 <strong>Want to know how to do each drill?</strong> Pro shows step-by-step instructions for every drill.</span></div>`}
@@ -2288,6 +2419,8 @@ function renderPlan(container, plan, answers, { scroll = true } = {}) {
     <div class="fc-plan-note">
       ${rotationDays.length ? `🔄 Mode: <strong>All-round – main focus changes every training day</strong><br>`
         : `🎯 Main goal: <strong>${escapeHTML(answers.goal)}</strong><br>💪 Working on: <strong>${escapeHTML(answers.weaknesses)}</strong><br>`}
+      ${teamWeekLabel(answers) ? `${escapeHTML(teamWeekLabel(answers))} – your sessions are planned around these, with a light day before the game and recovery after it.<br>` : ""}
+      ${teamDays && sessions.length < (parseInt(answers.daysPerWeek, 10) || 0) ? `📅 I fitted in ${sessions.length} of your ${parseInt(answers.daysPerWeek, 10)} own sessions so you still get proper rest around your club training and games.<br>` : ""}
       Rest days are part of the plan – that's when your body actually gets stronger. Always warm up, drink water and stop if anything hurts.
     </div>`;
 
@@ -2492,7 +2625,7 @@ function renderSaved() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "saved-item";
-    const sessions = entry.plan.filter(d => !d.rest).length;
+    const sessions = entry.plan.filter(isSoloSession).length;
     button.innerHTML = `<div><strong>${escapeHTML(niceDate(new Date(entry.createdAt)))}${entry.label ? " · " + escapeHTML(entry.label) : ""}</strong>
       <span>${escapeHTML(entry.answers.position || "")} · ${sessions} sessions · ${escapeHTML(entry.answers.sessionTime || "")}</span></div><em>Open →</em>`;
     button.addEventListener("click", () => {
@@ -2623,6 +2756,23 @@ const FOODS = {
   halfTime: [
     ["Water and a few orange slices", []],
     ["Water and half a banana", []]
+  ],
+  // The night before a game: a carb-rich "fuel-up" dinner.
+  fuelDinner: [
+    ["Pasta with tomato sauce, chicken and peas", ["meat", "gluten"]],
+    ["Rice with a mild bean and vegetable chilli", []],
+    ["Jacket potatoes with tuna, sweetcorn and salad", ["fish"]],
+    ["Wholewheat pasta with a lentil and tomato sauce", ["gluten"]],
+    ["Noodle and tofu stir-fry with plenty of vegetables", []],
+    ["Creamy pea and spinach risotto", ["dairy"]],
+    ["Sweet potato and chickpea curry with rice", []]
+  ],
+  eveningSnack: [
+    ["A bowl of cereal with milk", ["dairy", "gluten"]],
+    ["A banana and a glass of milk", ["dairy"]],
+    ["Toast with jam and a glass of water", ["gluten"]],
+    ["Rice pudding made with oat milk", []],
+    ["A pot of soy yoghurt with berries", []]
   ]
 };
 
@@ -2633,14 +2783,52 @@ const AVOID_WORDS = {
   meat: "meat", chicken: "meat", beef: "meat", pork: "meat", turkey: "meat"
 };
 
+// What to eat on each kind of day. [slot, when, food pool]
 const DAY_SLOTS = {
   training: [["Breakfast", "7:30", "breakfast"], ["Morning snack", "10:30", "snack"], ["Lunch", "12:30", "lunch"],
              ["Pre-training snack", "1–2 h before", "preTraining"], ["Recovery snack", "within 1 h after", "recovery"], ["Dinner", "18:30", "dinner"]],
   rest:     [["Breakfast", "8:00", "breakfast"], ["Lunch", "12:30", "lunch"], ["Afternoon snack", "15:30", "snack"], ["Dinner", "18:30", "dinner"]],
-  match:    [["Breakfast", "3–4 h before kick-off", "breakfast"], ["Pre-match meal", "3 h before", "preMatch"], ["Top-up snack", "1 h before", "preTraining"],
-             ["Half-time", "half-time", "halfTime"], ["Recovery snack", "within 1 h after", "recovery"], ["Dinner", "evening", "dinner"]]
+  fuel:     [["Breakfast", "7:30", "breakfast"], ["Morning snack", "10:30", "snack"], ["Lunch", "12:30", "lunch"],
+             ["Afternoon snack", "15:30", "preTraining"], ["Fuel-up dinner", "18:00", "fuelDinner"], ["Evening snack", "before bed", "eveningSnack"]],
+  match:    [["Game-day breakfast", "morning", "breakfast"], ["Pre-match meal", "3–4 h before kick-off", "preMatch"], ["Top-up snack", "60–90 min before", "preTraining"],
+             ["Warm-up & half-time", "sips of water + fruit", "halfTime"], ["Recovery snack", "within 30–60 min after", "recovery"], ["Recovery dinner", "evening", "dinner"]],
+  recovery: [["Breakfast", "8:00", "breakfast"], ["Morning snack", "10:30", "recovery"], ["Lunch", "12:30", "lunch"], ["Afternoon snack", "15:30", "snack"], ["Dinner", "18:30", "dinner"]]
 };
-const DAY_TYPES = { training: "⚽ Training day", rest: "😴 Rest day", match: "🏟️ Match day" };
+const DAY_TYPES = { training: "⚽ Training day", fuel: "🍝 Fuel-up day", match: "🏟️ Game day", recovery: "🔁 Recovery day", rest: "😴 Rest day" };
+const DAY_TYPE_NOTES = {
+  training: "Carbs at every meal and a snack 1–2 h before you train.",
+  fuel: "Day before the game – top up your energy stores with a carb-rich dinner and an early night.",
+  match: "Maximum energy – familiar foods, big meal finished 3–4 h before kick-off, sip water all day.",
+  recovery: "Day after the game – refuel, rehydrate and rest your legs.",
+  rest: "Normal healthy meals – your body is repairing and getting stronger."
+};
+const GAME_DAY_TIPS = [
+  "The night before: a carb-rich dinner (pasta, rice or potatoes) and a good night's sleep fill up your energy stores.",
+  "Finish your pre-match meal 3–4 hours before kick-off so your stomach is settled when you play.",
+  "Morning kick-off? Make breakfast your pre-match meal – eat it about 3 hours before, then have the top-up snack.",
+  "Nothing new on game day – stick to foods you know your stomach is happy with.",
+  "Skip greasy, fried, very spicy or fizzy foods and drinks before the game.",
+  "Drink 2 glasses of water with your pre-match meal, sip until kick-off, and drink at half-time. Water is all you need.",
+  "After the final whistle: a recovery snack within an hour, then a proper meal with carbs and protein."
+];
+
+// The diet week follows the training plan: game day gets the maximum-energy menu,
+// the day before is a fuel-up day and the day after is for recovery.
+function dietWeekTypes(gameDayPref) {
+  const plan = userData.latest && userData.latest.plan;
+  const planGame = plan && (plan.find(d => d.match) || {}).day;
+  const game = planGame || (DAY_NAMES.includes(gameDayPref) ? gameDayPref : null);
+  const training = plan ? plan.filter(d => !d.rest && !d.match).map(d => d.day) : ["Tuesday", "Thursday"];
+  const at = (day, n) => DAY_NAMES[(DAY_NAMES.indexOf(day) + n + 7) % 7];
+  return DAY_NAMES.map(day => {
+    if (day === game) return "match";
+    if (game && day === at(game, -1)) return "fuel";
+    if (training.includes(day)) return "training";
+    if (game && day === at(game, 1)) return "recovery";
+    return "rest";
+  });
+}
+
 const WATER_TARGET = { "Under 10": 6, "10-13": 7, "14-17": 8, "18+": 9 };
 const VEG_TARGET = 5;
 
@@ -2651,7 +2839,7 @@ const GOAL_NOTES = {
   allround: "Healthy all-round: aim for a rainbow of fruit and veg every day and keep sugary drinks for special occasions."
 };
 
-function fakeDietPlan({ diet, avoid, goal, ageGroup, seed = 0 }) {
+function fakeDietPlan({ diet, avoid, goal, ageGroup, seed = 0, week }) {
   const excluded = new Set(DIET_EXCLUDES[diet] || []);
   const avoidText = String(avoid || "").toLowerCase();
   Object.entries(AVOID_WORDS).forEach(([word, tag]) => { if (avoidText.includes(word)) excluded.add(tag); });
@@ -2663,10 +2851,12 @@ function fakeDietPlan({ diet, avoid, goal, ageGroup, seed = 0 }) {
     if (!options.length) return "A piece of fruit and a glass of water";
     return options[(i + seed) % options.length][0];
   };
-  const days = {};
-  Object.entries(DAY_SLOTS).forEach(([type, slots], t) => {
-    days[type] = slots.map(([slot, time, key], i) => ({ slot, time, food: pick(key, i + t * 2) }));
-  });
+  const types = Array.isArray(week) && week.length === 7 ? week.map(t => (t in DAY_SLOTS ? t : "rest")) : dietWeekTypes();
+  // Each day of the week gets different meals so the menu rotates.
+  const days = DAY_NAMES.map((day, d) => ({
+    day, type: types[d],
+    meals: DAY_SLOTS[types[d]].map(([slot, time, key], i) => ({ slot, time, food: pick(key, i + d * 2) }))
+  }));
   const young = ["Under 10", "10-13"].includes(ageGroup);
   const protein = { vegan: "beans, lentils, tofu, soy yoghurt, hummus", vegetarian: "eggs, milk, yoghurt, beans, lentils, tofu",
     pescatarian: "fish, eggs, milk, yoghurt, beans, tofu" }[diet] || "eggs, milk, yoghurt, beans, fish, chicken, tofu";
@@ -2679,7 +2869,8 @@ function fakeDietPlan({ diet, avoid, goal, ageGroup, seed = 0 }) {
       young ? "You're still growing – eat regular meals and snacks, and never skip breakfast." : "Keep meal times regular, especially around training.",
       "This is general healthy-eating guidance. For allergies, medical conditions or special diets, check with a parent, doctor or dietitian."
     ],
-    days
+    week: days,
+    gameDayTips: types.includes("match") ? GAME_DAY_TIPS.slice() : []
   };
 }
 
@@ -2715,54 +2906,95 @@ function fakeDietFeedback({ logs, waterTarget, diet }) {
 const dietData = () => (userData.diet ||= { prefs: null, plan: null, logs: {}, feedback: null, seed: 0 });
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
-// Today's default day type from the latest training plan.
-function todaysDayType() {
-  const latest = userData.latest;
-  if (!latest) return "training";
-  const name = new Date().toLocaleDateString("en-GB", { weekday: "long" });
-  const day = latest.plan.find(d => d.day === name);
-  return day && !day.rest ? "training" : "rest";
+const todayName = () => DAY_NAMES[(new Date().getDay() + 6) % 7];
+const waterExtra = type => (type === "rest" ? 0 : 2); // +2 glasses on training, game and the days around it
+
+// The menu for a type of day: today's own menu if it matches, else another day of that type this week.
+function mealsFor(plan, type) {
+  const today = plan.week.find(w => w.day === todayName());
+  if (today && today.type === type) return today.meals;
+  return (plan.week.find(w => w.type === type) || today || plan.week[0]).meals;
 }
 
 function todayLog() {
   const data = dietData();
   const key = dayKey();
-  data.logs[key] ||= { dayType: todaysDayType(), meals: {}, water: 0, veg: 0, energy: 0 };
+  const today = data.plan.week.find(w => w.day === todayName());
+  data.logs[key] ||= { dayType: today ? today.type : "training", meals: {}, water: 0, veg: 0, energy: 0 };
   const log = data.logs[key];
-  log.totalMeals = DAY_SLOTS[log.dayType].length;
+  if (!data.plan.week.some(w => w.type === log.dayType)) log.dayType = today ? today.type : data.plan.week[0].type;
+  log.totalMeals = mealsFor(data.plan, log.dayType).length;
   return log;
 }
 
 function dayScore(log, waterTarget) {
   if (!log) return 0;
-  const total = log.totalMeals || DAY_SLOTS[log.dayType || "training"].length;
+  const total = log.totalMeals || (DAY_SLOTS[log.dayType] || DAY_SLOTS.training).length;
   const meals = Object.values(log.meals || {}).filter(Boolean).length / total;
   return Math.round(Math.min(1, meals) * 50 + Math.min(1, (log.water || 0) / waterTarget) * 30 + Math.min(1, (log.veg || 0) / VEG_TARGET) * 20);
 }
 
 /* ---------- rendering ---------- */
+// Builds (or rebuilds) the diet plan for the current training week.
+async function buildDietPlan(section, message) {
+  const data = dietData();
+  section.innerHTML = `<div class="spinner"></div><p class="muted" style="text-align:center">${escapeHTML(message)}</p>`;
+  data.plan = await getDietPlan({ ...data.prefs, seed: data.seed || 0, week: dietWeekTypes(data.prefs.gameDay) });
+  saveData();
+}
+
+let dietShownDay = null; // which day of "This week's menu" is open
+
 function renderDiet(section) {
   if (!hasFeature(currentUser, "premium")) return; // Premium only
   const data = dietData();
   if (!data.plan) return renderDietSetup(section);
+  if (!Array.isArray(data.plan.week)) { // plan from before the weekly menu – upgrade it
+    buildDietPlan(section, "Turning your fuel plan into a full weekly menu…")
+      .then(() => renderDiet(section))
+      .catch(() => renderDietSetup(section, data.prefs));
+    return;
+  }
 
   const plan = data.plan;
   const log = todayLog();
-  const extraWater = log.dayType === "rest" ? 0 : 2;
-  const waterTarget = plan.waterTarget + extraWater;
-  const meals = plan.days[log.dayType] || [];
+  const waterTarget = plan.waterTarget + waterExtra(log.dayType);
+  const meals = mealsFor(plan, log.dayType);
   const score = dayScore(log, waterTarget);
+  const typesThisWeek = Object.keys(DAY_TYPES).filter(t => plan.week.some(w => w.type === t));
+  const weekChanged = dietWeekTypes(data.prefs.gameDay).join() !== plan.week.map(w => w.type).join();
+  if (!plan.week.some(w => w.day === dietShownDay)) dietShownDay = todayName();
+  const shown = plan.week.find(w => w.day === dietShownDay) || plan.week[0];
 
   const last7 = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d; });
   const bars = last7.map(d => {
     const l = data.logs[dayKey(d)];
-    const s = l ? dayScore(l, plan.waterTarget + (l.dayType === "rest" ? 0 : 2)) : 0;
+    const s = l ? dayScore(l, plan.waterTarget + waterExtra(l.dayType)) : 0;
     return `<div class="week-bar" title="${escapeHTML(niceDate(d))}: ${s}%"><span style="height:${Math.max(4, s)}%"></span><em>${escapeHTML(d.toLocaleDateString(undefined, { weekday: "narrow" }))}</em></div>`;
   }).join("");
 
   section.innerHTML = `
     <div class="diet-head"><h3>🥗 AI Diet Plan &amp; Tracker</h3><span class="premium-chip">⭐ Premium</span></div>
-    <p class="panel-intro">Your fuel plan for ${escapeHTML(DIET_LABELS[data.prefs.diet])} eating${data.prefs.avoid ? `, avoiding ${escapeHTML(data.prefs.avoid)}` : ""}. Tick things off as you go.</p>
+    <p class="panel-intro">Your weekly fuel plan for ${escapeHTML(DIET_LABELS[data.prefs.diet])} eating${data.prefs.avoid ? `, avoiding ${escapeHTML(data.prefs.avoid)}` : ""}, built around your training week. Tick things off as you go.</p>
+    ${weekChanged ? `<div class="plan-lock-note diet-update"><span>📅 <strong>Your training week has changed.</strong> Update your menu so it matches your new training and game days.</span><button type="button" class="btn btn-primary btn-sm" id="diet-update-week">Update my menu</button></div>` : ""}
+
+    <div class="diet-card">
+      <div class="diet-card-top"><strong>📅 This week's menu</strong><small class="muted">tap a day</small></div>
+      <div class="diet-week" role="tablist" aria-label="Days of the week">
+        ${plan.week.map(w => `<button type="button" role="tab" class="diet-day ${w.type}${w.day === shown.day ? " active" : ""}${w.day === todayName() ? " today" : ""}" data-diet-day="${escapeHTML(w.day)}" aria-selected="${w.day === shown.day}">
+          <strong>${escapeHTML(w.day.slice(0, 3))}</strong><span>${escapeHTML(DAY_TYPES[w.type].split(" ")[0])}</span></button>`).join("")}
+      </div>
+      <div class="diet-day-menu ${shown.type}">
+        <div class="diet-day-title"><strong>${escapeHTML(shown.day)} · ${escapeHTML(DAY_TYPES[shown.type])}${shown.type === "match" ? " – Maximum Energy" : ""}</strong>
+          <small>${escapeHTML(DAY_TYPE_NOTES[shown.type])}</small></div>
+        <ul class="menu-list">${shown.meals.map(m => `<li><strong>${escapeHTML(m.slot)}</strong> <small>${escapeHTML(m.time)}</small><br>${escapeHTML(m.food)}</li>`).join("")}</ul>
+      </div>
+    </div>
+
+    ${(plan.gameDayTips || []).length ? `<div class="diet-card game-tips">
+      <div class="diet-card-top"><strong>🏟️ Game-day energy plan</strong><small class="muted">${escapeHTML((plan.week.find(w => w.type === "match") || {}).day || "")}</small></div>
+      <ul class="tip-list">${plan.gameDayTips.map(t => `<li>${escapeHTML(t)}</li>`).join("")}</ul>
+    </div>` : ""}
 
     <div class="diet-card">
       <div class="diet-card-top">
@@ -2770,7 +3002,7 @@ function renderDiet(section) {
         <span class="score-pill ${score >= 80 ? "good" : ""}">${score}% on track</span>
       </div>
       <div class="choice-row" role="group" aria-label="Type of day">
-        ${Object.entries(DAY_TYPES).map(([k, label]) => `<label><input type="radio" name="daytype" value="${k}" ${log.dayType === k ? "checked" : ""}><span>${label}</span></label>`).join("")}
+        ${typesThisWeek.map(k => [k, DAY_TYPES[k]]).map(([k, label]) => `<label><input type="radio" name="daytype" value="${k}" ${log.dayType === k ? "checked" : ""}><span>${label}</span></label>`).join("")}
       </div>
       <ul class="meal-list">
         ${meals.map((m, i) => `<li><label class="meal-row">
@@ -2812,6 +3044,16 @@ function renderDiet(section) {
     </div>`;
 
   const persist = () => { saveData(); renderDiet(section); };
+  section.querySelectorAll("[data-diet-day]").forEach(b => b.addEventListener("click", () => { dietShownDay = b.dataset.dietDay; renderDiet(section); }));
+  if (weekChanged) $("diet-update-week").addEventListener("click", async () => {
+    try {
+      await buildDietPlan(section, "Updating your menu for your new training week…");
+      toast("Your menu now matches your training week. 🥗");
+    } catch (err) {
+      toast(err.message || "Couldn't update your menu. Please try again.");
+    }
+    renderDiet(section);
+  });
   section.querySelectorAll('input[name="daytype"]').forEach(r => r.addEventListener("change", () => { log.dayType = r.value; log.meals = {}; persist(); }));
   section.querySelectorAll("[data-meal]").forEach(c => c.addEventListener("change", () => { log.meals[c.dataset.meal] = c.checked; persist(); }));
   section.querySelectorAll(".count-btn").forEach(b => b.addEventListener("click", () => {
@@ -2833,9 +3075,8 @@ function renderDiet(section) {
   });
   $("diet-rebuild").addEventListener("click", async () => {
     data.seed = (data.seed || 0) + 1;
-    section.innerHTML = `<div class="spinner"></div>`;
     try {
-      data.plan = await getDietPlan({ ...data.prefs, seed: data.seed });
+      await buildDietPlan(section, "Finding new meal ideas…");
       toast("New meal ideas ready. 🥗");
     } catch (err) {
       toast(err.message || "Couldn't get new meal ideas. Please try again.");
@@ -2849,11 +3090,13 @@ const DIET_LABELS = { any: "any", vegetarian: "vegetarian", vegan: "vegan", pesc
 
 function renderDietSetup(section, prefs = {}) {
   const answers = (userData.latest && userData.latest.answers) || {};
+  const planGame = userData.latest && (userData.latest.plan.find(d => d.match) || {}).day;
+  const gameDefault = prefs.gameDay || (DAY_NAMES.includes(answers.gameDay) ? answers.gameDay : "Saturday");
   const radios = (name, options, current) => `<div class="choice-row">${options.map(([v, label], i) =>
     `<label><input type="radio" name="${name}" value="${v}" ${(current ? current === v : i === 0) ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
   section.innerHTML = `
     <div class="diet-head"><h3>🥗 AI Diet Plan &amp; Tracker</h3><span class="premium-chip">⭐ Premium</span></div>
-    <p class="panel-intro">Answer a few questions and your AI coach builds a fuel plan for training days, rest days and match days. Then track your meals, water and energy every day.</p>
+    <p class="panel-intro">Answer a few questions and your AI coach builds a full week of meals around your training – with a maximum-energy menu for game day. Then track your meals, water and energy every day.</p>
     <div class="checkin-form" id="diet-form" role="form">
       <div><span class="fieldset-label">How do you eat?</span>
         ${radios("diet", [["any", "Everything"], ["vegetarian", "Vegetarian"], ["vegan", "Vegan"], ["pescatarian", "Pescatarian"]], prefs.diet)}</div>
@@ -2863,6 +3106,10 @@ function renderDietSetup(section, prefs = {}) {
         ${radios("goal", [["energy", "⚡ Energy for training"], ["recover", "🔁 Recover faster"], ["strength", "💪 Build strength"], ["allround", "🌈 Healthy all-round"]], prefs.goal)}</div>
       <label class="field"><span>Age group</span>
         <select id="diet-age">${["Under 10", "10-13", "14-17", "18+"].map(a => `<option ${(prefs.ageGroup || answers.ageGroup || "14-17") === a ? "selected" : ""}>${a}</option>`).join("")}</select></label>
+      ${planGame
+        ? `<p class="muted small">🏟️ Game day: <strong>${escapeHTML(planGame)}</strong> (from your training plan). Your menu follows your training week.</p>`
+        : `<label class="field"><span>Game day</span>
+        <select id="diet-game">${[...DAY_NAMES, "No regular game"].map(d => `<option ${gameDefault === d ? "selected" : ""}>${d}</option>`).join("")}</select></label>`}
       <button type="button" class="btn btn-primary" data-submit>${prefs.diet ? "Update my diet plan" : "Create my diet plan"}</button>
       <p class="muted small">General healthy-eating guidance, not medical advice. With allergies or a medical condition, check with a parent, doctor or dietitian.</p>
     </div>`;
@@ -2871,11 +3118,10 @@ function renderDietSetup(section, prefs = {}) {
   onSubmit(form, async () => {
     if (!hasFeature(currentUser, "premium")) return;
     const data = dietData();
-    data.prefs = { diet: picked("diet"), avoid: $("diet-avoid").value.trim().slice(0, 120), goal: picked("goal"), ageGroup: $("diet-age").value };
-    section.innerHTML = `<div class="spinner"></div><p class="muted" style="text-align:center">Your AI coach is building your fuel plan…</p>`;
+    data.prefs = { diet: picked("diet"), avoid: $("diet-avoid").value.trim().slice(0, 120), goal: picked("goal"), ageGroup: $("diet-age").value,
+      gameDay: $("diet-game") ? $("diet-game").value : planGame };
     try {
-      data.plan = await getDietPlan({ ...data.prefs, seed: data.seed || 0 });
-      saveData();
+      await buildDietPlan(section, "Your AI coach is building your weekly menu…");
       renderDiet(section);
       toast("Your diet plan is ready! 🥗");
     } catch (err) {
@@ -2891,7 +3137,7 @@ function renderCheckin(section) {
     section.innerHTML = `<h3>📝 Weekly check-in</h3><div class="empty-state">Make your first plan in the Weekly Training Planner.<br>At the end of the week, check in here and I'll adapt next week's plan.</div>`;
     return;
   }
-  const planned = latest.plan.filter(d => !d.rest).length;
+  const planned = latest.plan.filter(isSoloSession).length;
   const radios = (name, options) => `<div class="choice-row">${options.map(([v, label], i) =>
     `<label><input type="radio" name="${name}" value="${v}" ${i === 0 ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
   section.innerHTML = `<h3>📝 Weekly check-in</h3>
@@ -3000,11 +3246,11 @@ async function downloadPlanPDF(plan, answers) {
     line(`${answers.position} · ${answers.ageGroup} · ${answers.foot} foot · ${answers.daysPerWeek} · ${answers.sessionTime} sessions`, 11, "normal", [95, 112, 104], 14);
     for (const d of plan) {
       y += 6;
-      line(`${d.day} – ${d.focus}${d.rest ? "" : ` (${d.minutes} min)`}`, 13, "bold", [15, 31, 23], 6);
+      line(`${d.day} – ${d.focus}${isSoloSession(d) ? ` (${d.minutes} min)` : ""}`, 13, "bold", [15, 31, 23], 6);
       if (d.why && !d.rest) line(d.why, 9, "italic", [95, 112, 104], 4);
       for (const dr of d.drills) {
         line(`• ${dr.name}${dr.minutes ? ` – ${dr.minutes} min` : ""}: ${dr.detail}`, 10, "normal");
-        if (!d.rest) drillSteps(dr).forEach((s, i) => line(`    ${i + 1}. ${s}`, 9, "normal", [95, 112, 104], 3));
+        if (isSoloSession(d)) drillSteps(dr).forEach((s, i) => line(`    ${i + 1}. ${s}`, 9, "normal", [95, 112, 104], 3));
       }
     }
     y += 10;

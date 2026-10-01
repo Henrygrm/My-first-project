@@ -13,12 +13,13 @@ const aiServer = http.createServer((req, res) => {
   req.on("end", () => {
     const body = JSON.parse(raw);
     aiRequests.push(body);
-    const day = (d, rest) => ({ day: d, focus: rest ? "Rest" : "Shooting", icon: "🥅", rest, rotating: false,
+    const day = (d, rest) => ({ day: d, focus: rest ? "Rest" : "Shooting", icon: "🥅", rest, club: false, match: false, rotating: false,
       minutes: rest ? 0 : 30, why: rest ? "" : "Test", drills: [{ name: "Drill", detail: "Do it", minutes: rest ? 0 : 30 }] });
     const props = body.output_config?.format?.schema?.properties || {};
     const meal = slot => ({ slot, time: "7:30", food: "Porridge" });
     const text = props.tips ? JSON.stringify({ tips: ["Drink more water", "Great breakfasts"] })
-      : props.waterTarget ? JSON.stringify({ waterTarget: 8, notes: ["Portion guide"], days: { training: [meal("Breakfast")], rest: [meal("Breakfast")], match: [meal("Breakfast")] } })
+      : props.waterTarget ? JSON.stringify({ waterTarget: 8, notes: ["Portion guide"], gameDayTips: ["Nothing new on game day"],
+          week: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(d => ({ day: d, type: "rest", meals: [meal("Breakfast")] })) })
       : body.output_config?.format ? JSON.stringify({ days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((d, i) => day(d, i % 2 === 1)) })
       : "Test reply";
     res.setHeader("content-type", "application/json");
@@ -116,8 +117,10 @@ const webhook = async (event) => {
   return res.status;
 };
 const ask = token => call("chat", "POST", { token, body: { messages: [{ role: "user", content: "How do I shoot?" }] } });
-const askDiet = (token, action = "plan") => call("diet", "POST", { token, body: { action, input: { diet: "vegan", avoid: "nuts", goal: "energy", ageGroup: "14-17", logs: { a: { water: 3 }, b: { water: 5 } } } } });
-const askPlan = token => call("plan", "POST", { token, body: { profile: { position: "Striker", ageGroup: "14-17", foot: "Right", equipment: ["ball"], daysPerWeek: "3 days", sessionTime: "45 min", weaknesses: "left foot", goal: "goals" } } });
+const askDiet = (token, action = "plan") => call("diet", "POST", { token, body: { action, input: { diet: "vegan", avoid: "nuts", goal: "energy", ageGroup: "14-17",
+  week: ["training", "rest", "training", "rest", "fuel", "match", "recovery"], logs: { a: { water: 3 }, b: { water: 5 } } } } });
+const askPlan = token => call("plan", "POST", { token, body: { profile: { position: "Striker", ageGroup: "14-17", foot: "Right", equipment: ["ball"],
+  clubDays: ["Tuesday", "Thursday", "Funday"], gameDay: "Saturday", daysPerWeek: "3 days", sessionTime: "45 min", weaknesses: "left foot", goal: "goals" } } });
 
 before(async () => {
   await new Promise(r => aiServer.listen(0, r));
@@ -244,13 +247,23 @@ test("Premium: unlimited questions and plans, and the AI diet tracker", async ()
 
   aiRequests.length = 0;
   assert.equal((await ask("token-ana")).body.left, null);
-  assert.equal((await askPlan("token-ana")).status, 200);
+  const planned = await askPlan("token-ana");
+  assert.equal(planned.status, 200);
+  // Club days and game day are marked from the player's answers, whatever the AI says.
+  assert.deepEqual(planned.body.plan.filter(d => d.club).map(d => d.day), ["Tuesday", "Thursday"]);
+  assert.deepEqual(planned.body.plan.filter(d => d.match).map(d => d.day), ["Saturday"]);
+  const planRequest = aiRequests.find(r => r.output_config?.format?.schema?.properties?.days);
+  assert.match(planRequest.messages[0].content, /Club training days: Tuesday, Thursday\nGame day: Saturday/);
   assert.equal((await askPlan("token-ana")).status, 200); // no weekly limit
   const diet = await askDiet("token-ana");
   assert.equal(diet.status, 200);
   assert.equal(diet.body.plan.waterTarget, 8);
+  // The week follows the training week's day types, with game-day tips.
+  assert.deepEqual(diet.body.plan.week.map(w => w.type), ["training", "rest", "training", "rest", "fuel", "match", "recovery"]);
+  assert.deepEqual(diet.body.plan.gameDayTips, ["Nothing new on game day"]);
   const dietRequest = aiRequests.find(r => r.output_config?.format?.schema?.properties?.waterTarget);
   assert.match(dietRequest.messages[0].content, /Diet: vegan/);
+  assert.match(dietRequest.messages[0].content, /Saturday – match/);
   assert.match(dietRequest.system, /Never give calorie targets/);
   const feedback = await askDiet("token-ana", "feedback");
   assert.deepEqual(feedback.body.tips, ["Drink more water", "Great breakfasts"]);

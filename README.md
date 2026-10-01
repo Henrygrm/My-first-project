@@ -10,6 +10,8 @@ What's inside:
 - **Log in / Sign up first** – nothing else shows until you're logged in ("Keep me logged in" is optional).
 - **Plans page** – Free, Pro (Most popular) and Premium, monthly or yearly (15% off).
 - **Weekly Training Planner**, **Ask a Coach**, **My Plans** and **Premium** tabs, locked by plan.
+- The planner asks for **club training days** and **game day** and plans around them: no extra session on club days, a short sharpen-up (or rest) the day before the game and recovery the day after.
+- The Premium **diet tracker** gives a full **7-day menu** that follows the training week, with a **maximum-energy game-day menu**, a fuel-up day before and a recovery day after.
 
 | | Free | Pro | Premium |
 |---|---|---|---|

@@ -5,7 +5,7 @@ import { useAllowance } from "../lib/usage.js";
 import { planFor } from "../lib/plans.js";
 
 // POST /api/diet { action: "plan" | "feedback", input } – Premium only.
-//   plan     -> { plan: { waterTarget, notes, days: { training, rest, match } } }
+//   plan     -> { plan: { waterTarget, notes, week: [{ day, type, meals }], gameDayTips } }
 //   feedback -> { tips: [..] }
 export async function POST(request) {
   if (!isLive()) return json({ error: "AI coach not configured", demo: true }, 503);
