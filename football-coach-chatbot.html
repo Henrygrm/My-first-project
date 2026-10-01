@@ -488,7 +488,6 @@
   .menu-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .menu-list li { padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); font-size: 0.9rem; line-height: 1.45; }
   .menu-list small { color: var(--muted); font-weight: 600; }
-  .game-tips { border-color: #f1d58a; background: #fffaf0; }
   .diet-update { margin: 0; }
 
   /* ---------- BOOT, LINKS, CONSENT, FOOTER, LEGAL ---------- */
@@ -3027,11 +3026,6 @@ function renderDiet(section) {
       </div>
     </div>
 
-    ${(plan.gameDayTips || []).length ? `<div class="diet-card game-tips">
-      <div class="diet-card-top"><strong>🏟️ Game-day energy plan</strong><small class="muted">${escapeHTML((plan.week.find(w => w.type === "match") || {}).day || "")}</small></div>
-      <ul class="tip-list">${plan.gameDayTips.map(t => `<li>${escapeHTML(t)}</li>`).join("")}</ul>
-    </div>` : ""}
-
     <div class="diet-card">
       <div class="diet-card-top">
         <strong>Today · ${escapeHTML(niceDate(new Date()))}</strong>
@@ -3071,8 +3065,6 @@ function renderDiet(section) {
     </div>
 
     <div class="diet-card">
-      <div class="diet-card-top"><strong>📋 Your fuel plan notes</strong></div>
-      <ul class="tip-list">${plan.notes.map(n => `<li>${escapeHTML(n)}</li>`).join("")}</ul>
       <div class="plan-actions" style="padding:0">
         <button type="button" class="btn btn-ghost btn-sm" id="diet-rebuild">🔄 New meal ideas</button>
         <button type="button" class="btn btn-ghost btn-sm" id="diet-prefs">⚙️ Change preferences</button>
