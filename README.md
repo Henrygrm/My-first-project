@@ -106,8 +106,8 @@ To test Stripe webhooks locally, use the Stripe CLI: `stripe listen --forward-to
 
 ## Launch checklist
 
-1. **Fill in your business details** at the top of the script in `public/index.html` (`BUSINESS`: contact email and country), then run `npm run sync:bolt`. They appear in the Terms of Service and Privacy Policy and the footer's Contact link.
-2. **Have the Terms and Privacy Policy checked** for your country (they're a plain-English starting point, written for this app: accounts and ages, subscriptions and cancelling, AI coaching safety, and which services handle data).
+1. **Fill in your business details** at the top of the script in `public/index.html` (`BUSINESS`): replace `[BUSINESS NAME]`, `[ABN]`, `[SUPPORT EMAIL]` and `[DATE]`, then run `npm run sync:bolt`. Anything still in square brackets shows highlighted in yellow on the legal pages.
+2. **Have the legal pages checked by an Australian lawyer.** They're written for a Sydney business (NSW law, the Australian Consumer Law, the Privacy Act and the Spam Act) as a plain-English starting point. The pages are Terms, Privacy, Refunds & Cancelling, Health & Injury, AI Disclaimer, Cookies & Storage and Contact, each with its own address: `/terms`, `/privacy`, `/refunds`, `/health`, `/ai`, `/cookies`, `/contact`.
 3. Set up **Claude**, **Supabase** and **Stripe** as above, and add every key to Vercel's environment variables.
 4. In Supabase → Authentication → URL Configuration, set the **Site URL** to your live address (sign-up confirmation and password-reset emails link back to it).
 5. Make a test purchase with Stripe's test card `4242 4242 4242 4242`, check the plan upgrades, then try **Manage billing** and cancel.

@@ -502,10 +502,20 @@
   .consent input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--brand); flex-shrink: 0; }
   .legal-links { text-align: center; font-size: 0.85rem; color: var(--muted); margin: 14px 0 0; line-height: 1.6; }
   .app-footer { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; align-items: center; margin-top: 24px; font-size: 0.85rem; color: var(--muted); }
-  .legal-card { width: min(720px, 100%); max-height: calc(100vh - 32px); text-align: left; padding: 22px 22px 0; position: relative; display: flex; flex-direction: column; }
-  .legal-tabs { display: flex; gap: 8px; flex-wrap: wrap; padding-right: 44px; }
-  .legal-close { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--surface); color: var(--muted); font-size: 1.4rem; cursor: pointer; }
-  .legal-body { overflow-y: auto; padding: 8px 2px 22px; line-height: 1.6; font-size: 0.93rem; }
+  .legal-page { position: fixed; inset: 0; z-index: 60; overflow-y: auto; background: var(--bg, #f4f7f5); }
+  body.legal-open { overflow: hidden; }
+  .legal-wrap { width: min(780px, 100%); margin: 0 auto; padding: 16px 16px 48px; }
+  .legal-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .legal-brand { font-family: var(--heading); font-weight: 800; }
+  .legal-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .legal-nav a { text-decoration: none; color: inherit; }
+  .legal-body { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 8px 22px 22px; line-height: 1.6; font-size: 0.95rem; }
+  .legal-body li { margin-bottom: 4px; }
+  .placeholder { background: #fff3b0; color: #6b4e00; padding: 0 4px; border-radius: 4px; font-weight: 700; }
+  .contact-card { background: var(--brand-soft); border-radius: 14px; padding: 12px 16px; margin: 8px 0 12px; }
+  .contact-card p { margin: 4px 0; }
+  .footer-links { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; }
+  .footer-links a { color: var(--brand-dark); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
   .legal-body h2 { font-size: 1.5rem; font-weight: 800; margin: 12px 0 4px; }
   .legal-body h3 { font-size: 1.02rem; font-weight: 800; margin: 18px 0 4px; letter-spacing: -0.01em; }
   .legal-body p, .legal-body ul { margin: 0 0 8px; }
@@ -606,13 +616,13 @@
         <button type="button" class="link-btn" id="forgot-link">Forgot password?</button>
         <label class="remember" id="remember-row"><input type="checkbox" id="auth-remember"> Keep me logged in on this device</label>
         <label class="consent" id="consent-row" hidden><input type="checkbox" id="auth-consent">
-          <span>I agree to the <button type="button" class="link-btn" data-legal="terms">Terms</button> and <button type="button" class="link-btn" data-legal="privacy">Privacy Policy</button>, and I'm 13 or older – or my parent or guardian is setting up this account for me.</span></label>
+          <span>I agree to the <a class="link-btn" href="#terms" data-legal="terms">Terms of Service</a> and <a class="link-btn" href="#privacy" data-legal="privacy">Privacy Policy</a>, and I'm 13 or older – or my parent or guardian is setting up this account for me.</span></label>
         <p class="form-error" id="auth-error" role="alert" hidden></p>
         <button type="button" class="btn btn-primary btn-block" id="auth-submit">Log in</button>
         <button type="button" class="link-btn back-link" id="auth-back" hidden>← Back to log in</button>
       </div>
       <p class="test-note" id="auth-test-note">🧪 Test mode: accounts are saved only in this browser. Don't use a real password.</p>
-      <p class="legal-links"><button type="button" class="link-btn" data-legal="terms">Terms</button> · <button type="button" class="link-btn" data-legal="privacy">Privacy</button></p>
+      <footer class="app-footer" data-site-footer></footer>
     </div>
   </section>
 </main>
@@ -683,8 +693,8 @@
   </div>
   <p class="plans-foot"><button type="button" class="btn btn-ghost btn-sm" id="manage-billing" hidden>Manage billing, invoices or cancel</button></p>
   <p class="plans-foot" id="plans-test-note">🧪 Test mode: upgrading is pretend – no payment is taken.</p>
-  <p class="plans-foot legal-links">Subscriptions renew automatically until you cancel. Cancelling stops the next payment; you keep your plan until the end of the period you've paid for.<br>
-    <button type="button" class="link-btn" data-legal="terms">Terms</button> · <button type="button" class="link-btn" data-legal="privacy">Privacy</button></p>
+  <p class="plans-foot legal-links">Subscriptions renew automatically until you cancel. Cancelling stops the next payment; you keep your plan until the end of the period you've paid for.</p>
+  <footer class="app-footer" data-site-footer></footer>
 </main>
 
 <!-- =====================================================================
@@ -763,24 +773,19 @@
       <!-- TAB 4: PREMIUM -->
       <div class="fc-panel" id="panel-premium"><div id="premium-content"></div></div>
     </div>
-    <footer class="app-footer">
-      <span>© <span id="footer-year"></span> Pitchside Coaching AI</span>
-      <button type="button" class="link-btn" data-legal="terms">Terms</button>
-      <button type="button" class="link-btn" data-legal="privacy">Privacy</button>
-      <a class="link-btn" id="footer-contact" hidden>Contact</a>
-    </footer>
+    <footer class="app-footer" data-site-footer></footer>
   </main>
 </div>
 
-<!-- Terms & Privacy -->
-<div class="modal" id="legal-modal" hidden>
-  <div class="modal-card legal-card" role="dialog" aria-modal="true" aria-labelledby="legal-title">
-    <button type="button" class="legal-close" id="legal-close" aria-label="Close">×</button>
-    <div class="legal-tabs" role="tablist">
-      <button type="button" class="sub-tab" data-legal-tab="terms">Terms of Service</button>
-      <button type="button" class="sub-tab" data-legal-tab="privacy">Privacy Policy</button>
-    </div>
-    <div class="legal-body" id="legal-body"></div>
+<!-- Legal & support pages: /#terms, /#privacy, /#refunds, /#health, /#ai, /#cookies, /#contact -->
+<div class="legal-page" id="legal-page" hidden role="dialog" aria-modal="true" aria-labelledby="legal-title">
+  <div class="legal-wrap">
+    <header class="legal-top">
+      <button type="button" class="btn btn-ghost btn-sm" id="legal-close">← Back</button>
+      <span class="legal-brand">⚽ Pitchside Coaching AI</span>
+    </header>
+    <nav class="legal-nav" id="legal-nav" aria-label="Legal and support pages"></nav>
+    <article class="legal-body" id="legal-body"></article>
   </div>
 </div>
 
@@ -799,14 +804,19 @@
 /* ==========================================================================
    0. YOUR BUSINESS DETAILS – fill these in before you publish
    --------------------------------------------------------------------------
-   Shown in the Terms of Service and Privacy Policy.
+   Shown on the legal pages, the Contact page and the footer. Anything left in
+   [SQUARE BRACKETS] is highlighted on the pages so you can't miss it.
    ========================================================================== */
 const BUSINESS = {
-  name: "Pitchside Coaching AI",
-  contactEmail: "",            // e.g. "hello@pitchsidecoaching.com" – where players and parents can reach you
-  country: "",                 // e.g. "England and Wales" – the law that applies to your Terms
-  legalUpdated: "1 October 2026"
+  tradingName: "Pitchside Coaching AI",  // the name customers see
+  legalName: "[BUSINESS NAME]",          // your registered business or company name (from ASIC)
+  abn: "[ABN]",                          // your 11-digit ABN
+  email: "[SUPPORT EMAIL]",              // e.g. "support@pitchsidecoaching.com.au"
+  location: "Sydney, NSW, Australia",
+  legalUpdated: "[DATE]",                // e.g. "2 October 2026" – change it whenever you edit a legal page
+  gstRegistered: false                   // set to true once you're registered for GST
 };
+const TIME_ZONE = "Australia/Sydney";    // all dates, daily limits and billing use Sydney time
 
 /* ==========================================================================
    1. PLANS – what each subscription includes
@@ -1148,21 +1158,44 @@ const UserData = (() => {
   };
 })();
 
-const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; }; // local day
+/* ---------- Sydney time: every date, day and limit uses Australia/Sydney ---------- */
+// The calendar date and time in Sydney for a moment in time.
+function sydneyParts(date = new Date()) {
+  const p = {};
+  new Intl.DateTimeFormat("en-AU", { timeZone: TIME_ZONE, year: "numeric", month: "numeric", day: "numeric",
+    hour: "numeric", minute: "numeric", second: "numeric", hourCycle: "h23" })
+    .formatToParts(date).forEach(x => { p[x.type] = Number(x.value); });
+  const weekday = (new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay() + 6) % 7; // 0 = Monday
+  return { y: p.year, m: p.month, d: p.day, h: p.hour % 24, min: p.minute, s: p.second, weekday };
+}
+// The moment it's midnight in Sydney at the start of a calendar date (handles daylight saving).
+function sydneyMidnight(y, m, d) {
+  const wall = Date.UTC(y, m - 1, d);
+  const offset = t => { const p = sydneyParts(new Date(t)); return Date.UTC(p.y, p.m - 1, p.d, p.h, p.min, p.s) - Math.floor(t / 1000) * 1000; };
+  const guess = wall - offset(wall);
+  return new Date(wall - offset(guess));
+}
+// Sydney calendar date `n` days from today, as { y, m, d }.
+function sydneyDay(n = 0, from = new Date()) {
+  const p = sydneyParts(from);
+  const dt = new Date(Date.UTC(p.y, p.m - 1, p.d + n));
+  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
+}
+const todayKey = () => { const t = sydneyDay(); return `${t.y}-${t.m}-${t.d}`; }; // Sydney day
 
 // Start of the current calendar month or week (weeks start on Monday).
 function periodStart(period, now = new Date()) {
-  const d = new Date(now.getFullYear(), now.getMonth(), period === "month" ? 1 : now.getDate());
-  if (period === "week") d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return d;
+  const p = sydneyParts(now);
+  const back = period === "month" ? p.d - 1 : period === "week" ? p.weekday : 0;
+  const t = sydneyDay(-back, now);
+  return sydneyMidnight(t.y, t.m, t.d);
 }
 function nextPeriodStart(period, now = new Date()) {
-  const d = periodStart(period, now);
-  if (period === "month") d.setMonth(d.getMonth() + 1);
-  else d.setDate(d.getDate() + 7);
-  return d;
+  const p = sydneyParts(periodStart(period, now));
+  const dt = new Date(Date.UTC(p.y, p.m - 1 + (period === "month" ? 1 : 0), p.d + (period === "week" ? 7 : period === "day" ? 1 : 0)));
+  return sydneyMidnight(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
 }
-const niceDate = d => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+const niceDate = d => d.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: TIME_ZONE });
 
 // True when the server is counting (real AI + real accounts).
 const serverCounts = user => Backend.ai && Backend.auth && user && user.left;
@@ -2934,9 +2967,9 @@ function fakeDietFeedback({ logs, waterTarget, diet }) {
 
 /* ---------- tracker state ---------- */
 const dietData = () => (userData.diet ||= { prefs: null, plan: null, logs: {}, feedback: null, seed: 0 });
-const dayKey = (d = new Date()) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+const dayKey = (d = new Date()) => { const p = sydneyParts(d); return `${p.y}-${p.m}-${p.d}`; };
 
-const todayName = () => DAY_NAMES[(new Date().getDay() + 6) % 7];
+const todayName = () => DAY_NAMES[sydneyParts().weekday];
 const waterExtra = type => (type === "rest" ? 0 : 2); // +2 glasses on training, game and the days around it
 
 // The menu for a type of day: today's own menu if it matches, else another day of that type this week.
@@ -3001,11 +3034,12 @@ function renderDiet(section) {
   if (!plan.week.some(w => w.day === dietShownDay)) dietShownDay = todayName();
   const shown = plan.week.find(w => w.day === dietShownDay) || plan.week[0];
 
-  const last7 = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d; });
+  // Midday in Sydney on each of the last 7 days.
+  const last7 = Array.from({ length: 7 }, (_, i) => { const t = sydneyDay(i - 6); return new Date(sydneyMidnight(t.y, t.m, t.d).getTime() + 12 * 3600e3); });
   const bars = last7.map(d => {
     const l = data.logs[dayKey(d)];
     const s = l ? dayScore(l, plan.waterTarget + waterExtra(l.dayType)) : 0;
-    return `<div class="week-bar" title="${escapeHTML(niceDate(d))}: ${s}%"><span style="height:${Math.max(4, s)}%"></span><em>${escapeHTML(d.toLocaleDateString(undefined, { weekday: "narrow" }))}</em></div>`;
+    return `<div class="week-bar" title="${escapeHTML(niceDate(d))}: ${s}%"><span style="height:${Math.max(4, s)}%"></span><em>${escapeHTML(d.toLocaleDateString("en-AU", { weekday: "narrow", timeZone: TIME_ZONE }))}</em></div>`;
   }).join("");
 
   section.innerHTML = `
@@ -3283,7 +3317,8 @@ async function downloadPlanPDF(plan, answers) {
     }
     y += 10;
     line("Always warm up, drink water and stop if anything hurts.", 9, "italic", [95, 112, 104]);
-    doc.save(`pitchside-plan-${new Date().toISOString().slice(0, 10)}.pdf`);
+    const t = sydneyDay();
+    doc.save(`pitchside-plan-${t.y}-${String(t.m).padStart(2, "0")}-${String(t.d).padStart(2, "0")}.pdf`);
     toast("Your plan PDF is downloading. 📄");
   } catch (err) {
     console.error(err);
@@ -3297,104 +3332,312 @@ async function downloadPlanPDF(plan, answers) {
    Plain-English starting point. Fill in BUSINESS (top of the script) and have
    them checked for your country before you launch.
    ========================================================================== */
-function legalContact() {
-  return BUSINESS.contactEmail
-    ? `email us at <a href="mailto:${escapeHTML(BUSINESS.contactEmail)}">${escapeHTML(BUSINESS.contactEmail)}</a>`
-    : "contact us using the details on our website";
-}
+/* ==========================================================================
+   LEGAL PAGES – Terms, Privacy, Health, AI, Refunds, Cookies, Contact
+   --------------------------------------------------------------------------
+   Written for a business in Sydney, NSW, Australia. Fill in BUSINESS at the
+   top of this script; anything still in [SQUARE BRACKETS] shows highlighted.
+   Have a lawyer check these before launch – they're a plain-English start.
+   ========================================================================== */
+// Shows a value, or highlights it if it's still a [PLACEHOLDER].
+const isPlaceholder = v => /^\[.*\]$/.test(String(v));
+const ph = v => (isPlaceholder(v) ? `<mark class="placeholder">${escapeHTML(v)}</mark>` : escapeHTML(v));
+const supportEmail = () => (isPlaceholder(BUSINESS.email)
+  ? ph(BUSINESS.email)
+  : `<a href="mailto:${escapeHTML(BUSINESS.email)}">${escapeHTML(BUSINESS.email)}</a>`);
+const legalLink = (key, text) => `<a href="#${key}" data-legal="${key}">${escapeHTML(text)}</a>`;
+const us = () => `${ph(BUSINESS.legalName)} (ABN ${ph(BUSINESS.abn)}), trading as ${escapeHTML(BUSINESS.tradingName)}`;
+const priceList = () => ["pro", "premium"].map(k =>
+  `${PLANS[k].name}: ${money(PLANS[k].prices.month)} a month or ${money(PLANS[k].prices.year)} a year`).join("; ");
+const gstLine = () => (BUSINESS.gstRegistered
+  ? "All prices are in Australian dollars (AUD) and include GST."
+  : "All prices are in Australian dollars (AUD). We are not currently registered for GST, so no GST is charged.");
+
+const LEGAL_PAGES = [
+  ["terms", "Terms of Service"],
+  ["privacy", "Privacy Policy"],
+  ["refunds", "Refunds & Cancelling"],
+  ["health", "Health & Injury"],
+  ["ai", "AI Disclaimer"],
+  ["cookies", "Cookies & Storage"],
+  ["contact", "Contact & Support"]
+];
 
 const LEGAL = {
   terms: () => `
-    <h2 id="legal-title">Terms of Service</h2>
-    <p class="muted small">Last updated ${escapeHTML(BUSINESS.legalUpdated)}</p>
-    <p>These terms are an agreement between you and ${escapeHTML(BUSINESS.name)} ("we", "us") for using our website and app (the "Service"). By creating an account you agree to them.</p>
-    <h3>1. Who can use ${escapeHTML(BUSINESS.name)}</h3>
-    <p>You must be 13 or older to create your own account. If you're under 13, a parent or guardian must set up and manage the account for you. If you're under 18, please get your parent or guardian's permission first, and they should review these terms with you.</p>
-    <h3>2. Your account</h3>
-    <p>Keep your password private and tell us straight away if you think someone else is using your account. You're responsible for what happens on your account. Please give a real name and an email address you can access.</p>
-    <h3>3. Plans, payments and cancelling</h3>
+    <h3>1. About these Terms</h3>
+    <p>These Terms of Service ("Terms") are an agreement between you and ${us()} ("we", "us", "our"), based in ${escapeHTML(BUSINESS.location)}. They cover your use of the ${escapeHTML(BUSINESS.tradingName)} website and app (the "Service"). By creating an account or using the Service, you agree to these Terms, our ${legalLink("privacy", "Privacy Policy")}, our ${legalLink("refunds", "Refund & Cancellation Policy")}, our ${legalLink("health", "Health & Injury Disclaimer")} and our ${legalLink("ai", "AI Disclaimer")}.</p>
+
+    <h3>2. Players under 18</h3>
+    <p>Under the <em>Minors (Property and Contracts) Act 1970</em> (NSW), people under 18 have limited ability to enter into contracts. So if the player is under 18:</p>
     <ul>
-      <li>The Free plan costs nothing. Pro and Premium are paid subscriptions, billed monthly or yearly at the price shown when you sign up.</li>
-      <li>Subscriptions renew automatically at the end of each billing period until you cancel. You can cancel at any time from the plans page ("Manage billing"). You keep your paid features until the end of the period you've already paid for, and you won't be charged again.</li>
-      <li>Payments are handled securely by Stripe. We never see or store your full card number.</li>
-      <li>Refunds: we don't usually refund part-used billing periods, but this doesn't affect any rights you have under consumer law where you live (for example, a cooling-off period). If something has gone wrong, please contact us.</li>
-      <li>If we change our prices, we'll tell you before the change applies to your subscription, and you can cancel before then.</li>
+      <li>a parent or legal guardian must create the account using their own email address and accept these Terms on the player's behalf;</li>
+      <li>only the parent or guardian may buy, change or cancel a paid plan, and they are responsible for all payments; and</li>
+      <li>the parent or guardian is responsible for supervising the player's use of the Service and training.</li>
     </ul>
-    <h3>4. Fair use</h3>
-    <p>"Unlimited" features are for one person's normal personal training. To keep the Service working for everyone, we may limit very heavy or automated use.</p>
-    <h3>5. Training, health and safety</h3>
-    <p>Our training plans, coaching tips and food guidance are created by AI and are general information only. They are not medical, physiotherapy or dietary advice, and they may sometimes be wrong. Always warm up, train within your limits, and stop if anything hurts. Speak to a parent, coach, doctor or physio before starting new training if you have an injury, a health condition or any doubts – and about any allergies or special diets. Young players should train with adult supervision where appropriate.</p>
-    <h3>6. Using the Service properly</h3>
-    <p>Please don't misuse the Service – for example by trying to break its limits or security, copying it, reselling it, or using it to send harmful or abusive content. We may suspend accounts that do.</p>
-    <h3>7. Our content</h3>
-    <p>The Service, its design and its content belong to us. Plans generated for you are yours to use for your own training.</p>
-    <h3>8. Changes and availability</h3>
-    <p>We're always improving the Service and may change or remove features. We aim to keep it running smoothly but can't promise it will always be available or error-free. We may update these terms; if the changes are important we'll let you know, and continuing to use the Service means you accept them.</p>
-    <h3>9. Our responsibility to you</h3>
-    <p>We provide the Service with reasonable care and skill. As far as the law allows, we aren't responsible for losses that weren't foreseeable, or that come from not following the safety guidance above. Nothing in these terms limits liability that can't be limited by law.</p>
-    <h3>10. Ending your account</h3>
-    <p>You can stop using the Service at any time, and ask us to delete your account by contacting us. We may close accounts that break these terms.</p>
-    ${BUSINESS.country ? `<h3>11. Law</h3><p>These terms are governed by the law of ${escapeHTML(BUSINESS.country)}.</p>` : ""}
-    <h3>Contact</h3>
-    <p>Questions about these terms? Please ${legalContact()}.</p>`,
+    <p>By accepting these Terms for a player under 18, you confirm that you are their parent or legal guardian.</p>
+
+    <h3>3. Your account</h3>
+    <p>Give accurate details, keep your password private, and tell us straight away at ${supportEmail()} if you think someone else is using your account. Accounts are for one person and can't be shared or transferred.</p>
+
+    <h3>4. Plans and prices</h3>
+    <ul>
+      <li><strong>Free</strong> costs nothing and has limits shown on the Plans page.</li>
+      <li><strong>Pro</strong> and <strong>Premium</strong> are paid subscriptions (${priceList()}). The features of each plan are shown on the Plans page.</li>
+      <li>${gstLine()}</li>
+      <li>"Unlimited" features are for one person's normal, personal training and have a fair-use limit (currently 300 coach questions a day and 30 training plans a week) so the Service stays fast and affordable for everyone.</li>
+    </ul>
+
+    <h3>5. Automatic renewal and payment</h3>
+    <ul>
+      <li>Paid plans are subscriptions that <strong>renew automatically</strong> – monthly or yearly, depending on what you choose – and are charged to your payment method at the start of each period until you cancel.</li>
+      <li>The price, billing period and the fact that it renews automatically are shown to you before you pay.</li>
+      <li>For yearly plans, we'll email you a reminder before each renewal.</li>
+      <li>Payments are processed by Stripe. We never see or store your full card number.</li>
+      <li>If a payment fails, we may move your account to the Free plan until payment is made.</li>
+      <li>If we change a plan's price, we'll tell you at least 30 days before the new price applies to you, and you can cancel before then.</li>
+      <li>Billing dates and daily or weekly limits follow Sydney time (Australia/Sydney).</li>
+    </ul>
+
+    <h3>6. Changing plan and cancelling</h3>
+    <p>You can upgrade, downgrade or cancel at any time from <strong>Plans → Manage billing</strong>, or by emailing ${supportEmail()}. When you cancel, you won't be charged again and you keep your paid features until the end of the period you've already paid for. Full details, including refunds, are in our ${legalLink("refunds", "Refund & Cancellation Policy")}.</p>
+
+    <h3>7. Acceptable use</h3>
+    <p>You must not:</p>
+    <ul>
+      <li>use the Service for anything unlawful, harmful, abusive, harassing or offensive;</li>
+      <li>try to get the AI coach to produce harmful, explicit or illegal content;</li>
+      <li>get around plan limits, share accounts, or use bots, scripts or scrapers;</li>
+      <li>try to hack, overload, copy, reverse-engineer or resell the Service; or</li>
+      <li>enter other people's personal information, or sensitive details you don't need to share.</li>
+    </ul>
+    <p>We may suspend or close accounts that break these Terms. If we close a paid account without a good reason related to your conduct, we'll refund any unused part of your subscription.</p>
+
+    <h3>8. Training, health and AI</h3>
+    <p>The Service gives general football training, fitness and food information only. It is not medical, physiotherapy or dietary advice. Please read our ${legalLink("health", "Health & Injury Disclaimer")} and ${legalLink("ai", "AI Disclaimer")} – the coach is an AI and can make mistakes.</p>
+
+    <h3>9. Our content</h3>
+    <p>The Service, its design and content belong to us or our licensors. Training plans created for you are yours to use for your own personal training.</p>
+
+    <h3>10. Your rights under the Australian Consumer Law</h3>
+    <p>Our services come with guarantees that cannot be excluded under the Australian Consumer Law (ACL). Nothing in these Terms excludes, restricts or changes any consumer guarantee, right or remedy you have under the ACL or any other law that cannot lawfully be excluded. If we fail to meet a consumer guarantee, you may be entitled to have the problem fixed, or to a refund or compensation, as the ACL allows.</p>
+
+    <h3>11. Limitation of liability</h3>
+    <p>Subject to section 10, and to the extent permitted by law:</p>
+    <ul>
+      <li>we are not liable for indirect or consequential loss, or loss that was not reasonably foreseeable;</li>
+      <li>we are not liable for injury or loss caused by ignoring our safety guidance, training beyond your ability, or not seeking professional advice when you should have; and</li>
+      <li>we don't promise that the Service will always be available, uninterrupted or error-free.</li>
+    </ul>
+    <p>Nothing in these Terms limits liability for death or personal injury caused by our negligence, or any liability that cannot be limited by law.</p>
+
+    <h3>12. Changes to the Service and these Terms</h3>
+    <p>We may improve, change or remove features. We may update these Terms; if a change materially affects you, we'll tell you in the app or by email before it takes effect. If you don't agree, you can cancel before it applies.</p>
+
+    <h3>13. Ending your account</h3>
+    <p>You can stop using the Service and delete your account at any time (see our ${legalLink("privacy", "Privacy Policy")} for how your data is deleted).</p>
+
+    <h3>14. Governing law and disputes</h3>
+    <p>These Terms are governed by the laws of New South Wales, Australia. You and we submit to the exclusive jurisdiction of the courts of New South Wales and the courts that can hear appeals from them. Before going to court, please contact us at ${supportEmail()} so we can try to fix the problem. You can also contact NSW Fair Trading (13 32 20, <a href="https://www.fairtrading.nsw.gov.au" target="_blank" rel="noopener">fairtrading.nsw.gov.au</a>).</p>
+
+    <h3>15. Contact</h3>
+    <p>${us()} · ${escapeHTML(BUSINESS.location)} · ${supportEmail()}</p>`,
 
   privacy: () => `
-    <h2 id="legal-title">Privacy Policy</h2>
-    <p class="muted small">Last updated ${escapeHTML(BUSINESS.legalUpdated)}</p>
-    <p>This policy explains what information ${escapeHTML(BUSINESS.name)} collects, why, and the choices you have. We keep it to what we need to run your coaching.</p>
-    <h3>What we collect</h3>
+    <p>This policy explains how ${us()} ("we") handles personal information. We follow the Australian Privacy Principles in the <em>Privacy Act 1988</em> (Cth). We only collect what we need to run your coaching.</p>
+
+    <h3>1. What we collect</h3>
     <ul>
-      <li><strong>Account details:</strong> your name, email address and password (stored securely – we can't see it), and when you agreed to our terms.</li>
-      <li><strong>Training information:</strong> the answers you give the planner (like position, age group, strong foot, kit, weaknesses and goals), the plans we make for you, and your weekly check-ins.</li>
-      <li><strong>Coach chats and diet tracking:</strong> the questions you ask, your food preferences and foods to avoid, and the meals, water and energy you log.</li>
-      <li><strong>Subscription details:</strong> your plan and billing status. Card details go straight to Stripe – we never receive your full card number.</li>
-      <li><strong>Usage counts:</strong> how many plans and coach questions you've used, so we can apply your plan's limits.</li>
+      <li><strong>Account details:</strong> name, email address, date of birth (to check whether the player is under 18), a securely hashed password (we can't see it), and the date and time you agreed to our Terms and Privacy Policy. For players under 18, the account belongs to the parent or guardian, so we use the parent's email address and only the player's first name or nickname.</li>
+      <li><strong>Training information:</strong> your planner answers (position, age group, strong foot, kit, training and game days, weaknesses and goals), the plans we make and your weekly check-ins.</li>
+      <li><strong>Coach chats and diet tracker (Premium):</strong> the questions you ask, food preferences and foods to avoid, and the meals, water and energy you log.</li>
+      <li><strong>Payment and plan details:</strong> your plan, billing status and Stripe customer number. Card details go straight to Stripe – we never receive your full card number.</li>
+      <li><strong>Usage and technical details:</strong> how many plans and questions you've used (to apply your plan's limits), and basic technical logs (such as IP address and browser type) kept by our hosting provider for security.</li>
+      <li><strong>Marketing choice:</strong> whether you've opted in to emails, and when.</li>
     </ul>
-    <h3>How we use it</h3>
-    <p>To run your account, make your training and diet plans, answer your questions, apply your plan's limits, take payments, keep the Service secure and fix problems. We don't sell your information, we don't show ads, and we don't use it for advertising.</p>
-    <h3>Who helps us</h3>
+    <p><strong>Health information.</strong> Things like allergies, foods you avoid, or whether you have pain or an injury can be "sensitive information". Entering them is always optional. We only collect it with your consent, which you give by choosing to enter it, and only use it to tailor your plans.</p>
+
+    <h3>2. Why we collect it</h3>
+    <p>To create and run your account, make your training and diet plans, answer your questions, apply your plan's limits, take payments, provide support, keep the Service safe and fix problems – and, only if you opt in, to send you tips and offers. We don't sell your personal information and we don't show ads.</p>
+
+    <h3>3. Who we share it with</h3>
     <ul>
-      <li><strong>Supabase</strong> – stores accounts and training data.</li>
-      <li><strong>Stripe</strong> – handles payments and subscriptions.</li>
-      <li><strong>Our AI provider (Anthropic)</strong> – your planner answers, coach questions and diet details are sent to it to create your plans and replies. Please don't share things like your full address, school or medical records in the chat.</li>
-      <li><strong>Our hosting provider</strong> – runs the website.</li>
+      <li><strong>Stripe</strong> – processes payments and subscriptions.</li>
+      <li><strong>Anthropic</strong> – provides the AI (Claude) behind the coach. Your planner answers, coach questions and diet details are sent to it to create your plans and replies. Please don't share things like your address, school or medical records in the chat.</li>
+      <li><strong>Supabase</strong> – our login and database provider.</li>
+      <li><strong>Vercel</strong> – hosts the website and server.</li>
+      <li><strong>Google Fonts</strong> and <strong>Cloudflare (cdnjs)</strong> – deliver the site's fonts and the PDF tool, which means your browser's IP address is sent to them.</li>
     </ul>
-    <p>These providers only use your information to provide their service to us. Some may store data outside your country, with appropriate protections in place.</p>
-    <h3>Stored on your device</h3>
-    <p>We use your browser's storage (not advertising cookies) to keep you logged in if you ask us to, and to save your diet log, check-ins and saved-plans list on your device.</p>
-    <h3>Children</h3>
-    <p>Many of our players are young. Players under 13 need a parent or guardian to set up and manage their account. We only collect what's needed for coaching. If you're a parent and think your child has given us information without your permission, contact us and we'll delete it.</p>
-    <h3>How long we keep it</h3>
-    <p>We keep your information while your account is open. When you ask us to delete your account, we delete your personal information, except anything we must keep by law (for example, payment records).</p>
-    <h3>Your choices and rights</h3>
-    <p>You can ask to see, correct, download or delete your information, or object to how we use it. Depending on where you live, you may also be able to complain to your data protection authority. To use these rights, ${legalContact()}.</p>
-    <h3>Changes</h3>
-    <p>If we change this policy in an important way, we'll let you know in the app.</p>`
+    <p>We may also disclose information if the law requires it.</p>
+
+    <h3>4. Overseas storage</h3>
+    <p>Some of these providers are based in, or store and process data in, other countries – mainly the <strong>United States</strong>, and possibly others where they operate. We take reasonable steps, including through their terms and data protection commitments, to make sure they handle your information in line with the Australian Privacy Principles.</p>
+
+    <h3>5. Children</h3>
+    <p>For players under 18, a parent or guardian creates and owns the account, and we collect the minimum we need: the player's first name or nickname, date of birth and training answers. We don't send marketing emails to under-18 accounts. A parent or guardian can ask to see, correct or delete their child's information at any time.</p>
+
+    <h3>6. Stored on your device</h3>
+    <p>We use your browser's storage to keep you logged in and save some app data on your device. See our ${legalLink("cookies", "Cookies & Storage notice")}.</p>
+
+    <h3>7. Security and how long we keep it</h3>
+    <p>We use encrypted connections (HTTPS), hashed passwords and access controls. We keep your information while your account is open. When you delete your account, we delete your personal information, except records we must keep by law (for example, tax and payment records, which Stripe and we keep for the required period). If a data breach is likely to cause serious harm, we'll notify you and the OAIC as the law requires.</p>
+
+    <h3>8. Access, correction and deletion</h3>
+    <p>You can ask to see or correct the personal information we hold about you, or ask us to delete it, by emailing ${supportEmail()}. You can also delete your account yourself in the app. We'll respond within 30 days. We may need to confirm your identity first.</p>
+
+    <h3>9. Marketing emails</h3>
+    <p>We only send marketing emails if you've opted in (adults only). Every email identifies ${ph(BUSINESS.legalName)} and has an unsubscribe link, and we'll process unsubscribes within 5 business days, as the <em>Spam Act 2003</em> (Cth) requires. Service emails (such as receipts and password resets) are not marketing.</p>
+
+    <h3>10. Complaints</h3>
+    <p>If you're unhappy with how we've handled your personal information, please email us first at ${supportEmail()}. We'll respond within 30 days. If you're not satisfied with our response, you can complain to the Office of the Australian Information Commissioner (OAIC): <a href="https://www.oaic.gov.au" target="_blank" rel="noopener">oaic.gov.au</a> or 1300 363 992.</p>
+
+    <h3>11. Changes and contact</h3>
+    <p>If we change this policy in an important way, we'll tell you in the app or by email. Contact: ${us()}, ${escapeHTML(BUSINESS.location)} · ${supportEmail()}.</p>`,
+
+  refunds: () => `
+    <p>This policy sits alongside our ${legalLink("terms", "Terms of Service")}. It does not limit your rights under the Australian Consumer Law (ACL).</p>
+
+    <h3>1. Cancelling</h3>
+    <ul>
+      <li>You can cancel a paid plan at any time – there's no lock-in contract and no cancellation fee.</li>
+      <li>Go to <strong>Plans → Manage billing</strong> and choose <strong>Cancel</strong>, or email ${supportEmail()} and we'll do it for you.</li>
+      <li>Your plan stays active until the end of the period you've already paid for, then moves to Free. You won't be charged again.</li>
+      <li>For players under 18, only the parent or guardian who holds the account can cancel or change the plan.</li>
+    </ul>
+
+    <h3>2. Changing plan</h3>
+    <p>You can switch between Pro and Premium, or between monthly and yearly billing, in <strong>Manage billing</strong>. Any price difference is worked out for the rest of your billing period, and you'll see the amount before you confirm.</p>
+
+    <h3>3. Refunds</h3>
+    <ul>
+      <li><strong>Problems with the Service:</strong> if the Service has a major problem (for example, it doesn't work as described and we can't fix it), you're entitled under the ACL to cancel and get a refund for the unused part of your subscription. For a minor problem, we'll fix it within a reasonable time – and if we don't, you can ask for a refund.</li>
+      <li><strong>Charged by mistake:</strong> if you were charged after cancelling, or charged twice, we'll refund it.</li>
+      <li><strong>Change of mind:</strong> we don't usually refund a billing period you've started just because you changed your mind, but we look at every request fairly – please contact us.</li>
+      <li>Approved refunds go back to your original payment method, usually within 5–10 business days.</li>
+    </ul>
+
+    <h3>4. Yearly plans</h3>
+    <p>We email you a reminder before a yearly plan renews, so you have time to cancel if you don't want another year.</p>
+
+    <h3>5. If we can't sort it out</h3>
+    <p>Email ${supportEmail()} first – we want to fix it. If we can't resolve your issue, you can contact <strong>NSW Fair Trading</strong> on 13 32 20 or at <a href="https://www.fairtrading.nsw.gov.au" target="_blank" rel="noopener">fairtrading.nsw.gov.au</a>.</p>`,
+
+  health: () => `
+    <p><strong>${escapeHTML(BUSINESS.tradingName)} gives general football training and fitness information only. It is not medical advice.</strong></p>
+    <ul>
+      <li><strong>Check first:</strong> speak to a doctor or physiotherapist before starting a new training program, especially if you have an injury, a health condition (such as asthma, a heart condition or diabetes), you're returning from injury, or you're unsure whether training is safe for you.</li>
+      <li><strong>Stop if it hurts:</strong> stop straight away if you feel pain, dizziness, chest pain or shortness of breath beyond normal tiredness, and get medical help if needed. Never train through pain.</li>
+      <li><strong>Head knocks:</strong> after any knock to the head, stop playing and see a doctor before returning to sport.</li>
+      <li><strong>Kids and teenagers:</strong> young players should train with a parent, guardian or coach supervising, in a safe space, with the right footwear and plenty of water.</li>
+      <li><strong>Food:</strong> diet tips are general healthy-eating guidance. For allergies, medical conditions or special diets, check with a doctor or dietitian.</li>
+      <li><strong>Your judgement:</strong> you're responsible for training within your ability and in a safe place. Warm up, cool down and rest when you need to.</li>
+    </ul>
+    <p>In an emergency, call <strong>000</strong>.</p>`,
+
+  ai: () => `
+    <p><strong>The coach in ${escapeHTML(BUSINESS.tradingName)} is an artificial intelligence (AI), not a human coach.</strong> It's powered by Claude, an AI model made by Anthropic.</p>
+    <ul>
+      <li><strong>It can make mistakes.</strong> AI can give answers that are wrong, incomplete or not right for you. Use common sense and check anything important with a qualified coach, doctor or physio.</li>
+      <li><strong>It isn't a professional.</strong> It doesn't diagnose injuries or medical conditions and doesn't replace a doctor, physio, dietitian or qualified coach.</li>
+      <li><strong>Keep personal details out.</strong> Don't share your full name, address, school, phone number or medical records in the chat.</li>
+      <li><strong>Parents:</strong> please talk with your child about using AI safely and check in on what they're asking.</li>
+    </ul>
+    <p>If the coach says something that seems unsafe or wrong, please tell us at ${supportEmail()}.</p>`,
+
+  cookies: () => `
+    <p><strong>We don't use advertising cookies, analytics or tracking.</strong></p>
+    <h3>What we store on your device</h3>
+    <ul>
+      <li><strong>Login:</strong> a secure login token in your browser's storage, so you stay logged in (only between visits if you tick "Keep me logged in").</li>
+      <li><strong>App data:</strong> your diet log, check-ins and some plan details are saved in your browser's storage so the app works quickly.</li>
+    </ul>
+    <p>These are needed for the Service to work, so they don't need your consent. You can clear them at any time in your browser settings (this logs you out).</p>
+    <h3>Other services</h3>
+    <ul>
+      <li><strong>Google Fonts</strong> and <strong>Cloudflare (cdnjs)</strong> deliver fonts and the PDF tool. Your browser sends them your IP address to download these files.</li>
+      <li><strong>Stripe</strong> sets its own cookies on its secure payment pages to prevent fraud – see Stripe's privacy policy.</li>
+    </ul>
+    <p>If we ever add analytics or tracking, we'll update this notice and ask for your consent first. More in our ${legalLink("privacy", "Privacy Policy")}.</p>`,
+
+  contact: () => `
+    <p>Questions, problems with your plan, billing or privacy? We're here to help.</p>
+    <div class="contact-card">
+      <p><strong>Email:</strong> ${supportEmail()}</p>
+      <p><strong>Business:</strong> ${us()}</p>
+      <p><strong>Location:</strong> ${escapeHTML(BUSINESS.location)}</p>
+      <p class="muted small">We aim to reply within 2 business days (Sydney time).</p>
+    </div>
+    <h3>Quick help</h3>
+    <ul>
+      <li><strong>Change or cancel your plan:</strong> Plans → Manage billing. See ${legalLink("refunds", "Refunds & Cancelling")}.</li>
+      <li><strong>See, correct or delete your data:</strong> email us, or see our ${legalLink("privacy", "Privacy Policy")}.</li>
+      <li><strong>Something the AI coach said seems wrong or unsafe:</strong> email us so we can look into it.</li>
+      <li><strong>Complaints:</strong> email us first. If we can't fix it, you can contact NSW Fair Trading (13 32 20) or, for privacy complaints, the OAIC (1300 363 992).</li>
+    </ul>`
 };
 
-function openLegal(which) {
-  document.querySelectorAll("[data-legal-tab]").forEach(t => t.classList.toggle("active", t.dataset.legalTab === which));
-  $("legal-body").innerHTML = LEGAL[which]();
-  $("legal-modal").hidden = false;
-  $("legal-body").scrollTop = 0;
-  $("legal-close").focus();
+/* ---------- legal pages as full pages with their own address (e.g. /#terms) ---------- */
+let legalOpenedHere = false;
+// Changes the address without adding a history step. Uses the full address so it also works
+// inside embedded previews; if the browser refuses, the page still changes.
+function setAddress(hash) {
+  try { history.replaceState(null, "", location.href.split("#")[0] + hash); } catch (e) { /* embedded preview */ }
 }
-const closeLegal = () => ($("legal-modal").hidden = true);
+
+function renderLegal(key) {
+  const title = (LEGAL_PAGES.find(([k]) => k === key) || [])[1];
+  $("legal-nav").innerHTML = LEGAL_PAGES.map(([k, t]) =>
+    `<a href="#${k}" class="sub-tab ${k === key ? "active" : ""}" data-legal="${k}" ${k === key ? 'aria-current="page"' : ""}>${escapeHTML(t)}</a>`).join("");
+  $("legal-body").innerHTML = `<h2 id="legal-title">${escapeHTML(title)}</h2>
+    <p class="muted small">Last updated ${ph(BUSINESS.legalUpdated)}</p>${LEGAL[key]()}`;
+  document.title = `${title} – ${BUSINESS.tradingName}`;
+  $("legal-page").hidden = false;
+  document.body.classList.add("legal-open");
+  $("legal-page").scrollTop = 0;
+}
+function closeLegalView() {
+  $("legal-page").hidden = true;
+  document.body.classList.remove("legal-open");
+  document.title = BUSINESS.tradingName;
+}
+// Reacts to the address: /#terms, /#privacy… show that page; anything else shows the app.
+function routeLegal() {
+  const key = location.hash.slice(1);
+  if (LEGAL[key]) renderLegal(key);
+  else if (!$("legal-page").hidden) closeLegalView();
+}
+function openLegal(key) {
+  if (location.hash.slice(1) === key) return renderLegal(key);
+  if (!$("legal-page").hidden) {
+    // Moving between legal pages replaces the address, so "Back" always returns to the app.
+    setAddress("#" + key);
+    return renderLegal(key);
+  }
+  legalOpenedHere = true;
+  location.hash = key; // triggers routeLegal
+}
+function closeLegal() {
+  if (legalOpenedHere) { legalOpenedHere = false; history.back(); return; }
+  setAddress("");
+  closeLegalView();
+}
+window.addEventListener("hashchange", routeLegal);
 document.addEventListener("click", e => {
   const link = e.target.closest("[data-legal]");
   if (link) { e.preventDefault(); openLegal(link.dataset.legal); }
 });
-document.querySelectorAll("[data-legal-tab]").forEach(t => t.addEventListener("click", () => openLegal(t.dataset.legalTab)));
 $("legal-close").addEventListener("click", closeLegal);
-$("legal-modal").addEventListener("click", e => { if (e.target === $("legal-modal")) closeLegal(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("legal-modal").hidden) closeLegal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("legal-page").hidden) closeLegal(); });
 
-// Footer
-$("footer-year").textContent = new Date().getFullYear();
-if (BUSINESS.contactEmail) {
-  $("footer-contact").href = "mailto:" + BUSINESS.contactEmail;
-  $("footer-contact").hidden = false;
+// The same footer on every screen, with every legal page.
+function renderFooters() {
+  const links = LEGAL_PAGES.map(([k, t]) => legalLink(k, t.replace(" of Service", "").replace(" & Support", ""))).join("");
+  document.querySelectorAll("[data-site-footer]").forEach(f => {
+    f.innerHTML = `<span>© ${sydneyParts().y} ${escapeHTML(BUSINESS.tradingName)} · ${escapeHTML(BUSINESS.location)}</span><nav class="footer-links" aria-label="Legal and support">${links}</nav>`;
+  });
 }
+renderFooters();
+routeLegal();
 
 /* ==========================================================================
    START

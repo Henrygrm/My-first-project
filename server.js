@@ -41,6 +41,9 @@ http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
     const api = /^\/api\/([a-z-]+)$/.exec(url.pathname);
     if (api) return await runApi(api[1], req, res);
+    // Short links to the legal pages, e.g. /terms -> /#terms (same as vercel.json).
+    const legal = /^\/(terms|privacy|refunds|health|ai|cookies|contact)\/?$/.exec(url.pathname);
+    if (legal) { res.writeHead(307, { Location: "/#" + legal[1] }); return res.end(); }
 
     const file = path.join(root, path.normalize(url.pathname === "/" ? "/index.html" : url.pathname));
     if (!file.startsWith(root)) { res.statusCode = 403; return res.end(); }
