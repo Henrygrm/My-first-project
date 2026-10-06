@@ -297,3 +297,33 @@ test("The website page and the one-file app are the same", async () => {
   const bolt = fs.readFileSync(new URL("../football-coach-chatbot.html", import.meta.url), "utf8");
   assert.ok(site === bolt, "Run `npm run sync:bolt` after editing public/index.html");
 });
+
+test("Ask a Coach: Claude gets the coach's rules plus this player's profile", async () => {
+  aiRequests.length = 0;
+  const r = await call("chat", "POST", { token: "token-ana", body: {
+    messages: [{ role: "user", content: "What should I do the day before my game?" }],
+    context: { position: "Winger", ageGroup: "10-13", foot: "Left", equipment: ["ball", "rocket"], clubDays: ["Tuesday"], gameDay: "Saturday",
+      week: [{ day: "Friday", focus: "Pre-match sharpen-up", minutes: 20 }], weaknesses: "x".repeat(500) }
+  } });
+  assert.equal(r.status, 200);
+  const req = aiRequests.find(q => q.messages?.[0]?.content === "What should I do the day before my game?");
+  assert.equal(req.model, "claude-opus-5-5");
+  assert.equal(req.output_config.effort, "medium");
+  const [rules, profile] = req.system.map(b => b.text);
+  assert.match(rules, /Never diagnose/);
+  assert.match(rules, /AI coach built with Anthropic's Claude/);
+  assert.match(profile, /Player: position Winger, age group 10-13, strong foot Left/);
+  assert.match(profile, /Kit: a ball\n/);                 // unknown kit dropped
+  assert.match(profile, /game day: Saturday/);
+  assert.match(profile, /Fri Pre-match sharpen-up \(20 min\)/);
+  assert.match(profile, /\(Sydney time\)/);
+  assert.ok(!profile.includes("x".repeat(121)));           // long text clipped
+});
+
+test("The page's coach rules match the server's", async () => {
+  const fs = await import("node:fs");
+  const page = fs.readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+  const { COACH_SYSTEM } = await import("../lib/coach-ai.js");
+  const pageRules = /const COACH_RULES = `([\s\S]*?)`;/.exec(page)[1];
+  assert.equal(pageRules, COACH_SYSTEM, "Copy COACH_SYSTEM from lib/coach-ai.js into COACH_RULES in public/index.html");
+});

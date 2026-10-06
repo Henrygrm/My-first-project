@@ -4,7 +4,9 @@
 `football-coach-chatbot.html` is an identical copy for Bolt (run `npm run sync:bolt` after editing the page).
 
 - **On the website** (this repo deployed with its `/api` server and keys): real accounts (Supabase), real payments (Stripe) and the real AI coach (Claude).
-- **Anywhere else** (Bolt, a preview, opening the file): **test mode** – pretend accounts saved in the browser, pretend upgrades and example AI answers. The page switches automatically.
+- **Anywhere else** (Bolt, a preview, opening the file): **test mode** – pretend accounts saved in the browser and pretend upgrades. The page switches automatically.
+
+**Ask a Coach is always the real AI (Claude by Anthropic).** On the website your server asks Claude with your key, and sends the player's profile (position, age group, kit, club and game days, this week's plan, diet choices) so every answer is tailored. In a claude.ai preview the coach answers through the viewer's own Claude account. A copy with no AI connected says so instead of pretending. The coach's rules are `COACH_SYSTEM` in `lib/coach-ai.js` (copy any change into `COACH_RULES` in `public/index.html` – a test checks they match).
 
 What's inside:
 - **Log in / Sign up first** – nothing else shows until you're logged in ("Keep me logged in" is optional).
