@@ -5,560 +5,586 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Pitchside Coaching AI</title>
 <meta name="description" content="Pitchside Coaching AI – personalised weekly football training plans, an AI coach you can ask anything, and Premium tools for rising stars.">
-<meta name="theme-color" content="#1fae52">
+<meta name="theme-color" content="#0f1714">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Pitchside Coaching AI">
 <meta property="og:description" content="Train smarter. Play better. Weekly training plans built around you, and an AI football coach whenever you're stuck.">
 <meta name="twitter:card" content="summary">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%231d6f47'/><path d='M16 4v24' stroke='white' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='none' stroke='white' stroke-width='2'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* ============ THEME ============ */
+  /* ==========================================================================
+     PITCHSIDE DESIGN SYSTEM
+     Floodlit-pitch dark for structure, warm paper for reading, one pitch-green
+     accent for actions, active states and progress. Borders over shadows.
+     ========================================================================== */
   :root {
-    --brand: #1fae52;
-    --brand-dark: #178a41;
-    --brand-soft: #eaf7ef;
-    --lime: #7ed321;
-    --lime-soft: #f4fbe9;
-    --bg: #f6f8f7;
-    --card: #ffffff;
-    --surface: #fafcfb;
-    --track: #eef2ef;
-    --text: #0f1f17;
-    --muted: #5f7068;
-    --border: #e2ebe5;
-    --ink: #0f1f17;
-    --gold: #f2b233;
-    --gold-soft: #fff6e0;
-    --danger: #d64545;
-    --radius-lg: 28px;
-    --radius: 18px;
-    --shadow: 0 1px 2px rgba(15, 31, 23, 0.04), 0 20px 50px -20px rgba(31, 174, 82, 0.25);
-    --heading: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+    --paper: #f3f2ee;        /* page */
+    --panel: #faf9f6;        /* containers */
+    --raised: #ffffff;       /* inputs, the plan sheet */
+    --tint: #ebeae5;         /* quiet fills */
+    --ink: #121816;
+    --ink-2: #333b37;
+    --muted: #646c68;
+    --faint: #8d938f;
+    --line: #dfddd6;
+    --line-2: #c9c6bd;
+    --night: #0f1714;        /* header, today, match days */
+    --night-2: #18221e;
+    --night-line: #2b3832;
+    --night-text: #eef1ed;
+    --night-muted: #9aa59f;
+    --accent: #1d6f47;       /* pitch green: the only accent */
+    --accent-ink: #155537;
+    --accent-soft: #e3ede6;
+    --on-night-accent: #5fb98a;
+    --danger: #a8322b;
+    --r-sm: 3px;
+    --r: 6px;
+    --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --pop: 0 18px 40px -18px rgba(15, 23, 20, 0.45);
+    /* names used by older inline styles */
+    --brand: var(--accent); --brand-dark: var(--accent-ink); --brand-soft: var(--accent-soft);
+    --bg: var(--paper); --card: var(--raised); --surface: var(--panel); --border: var(--line); --text: var(--ink);
+    --heading: var(--display);
     color-scheme: light;
   }
 
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-
+  html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
-    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    color: var(--text);
-    background: var(--bg);
+    font: 400 16px/1.5 var(--body);
+    color: var(--ink);
+    background: var(--paper);
     -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
   }
-  button { font-family: inherit; }
-  h1, h2, h3 { font-family: var(--heading); letter-spacing: -0.03em; margin: 0; }
-  .fc-gradient {
-    background: linear-gradient(90deg, var(--brand), var(--lime));
-    -webkit-background-clip: text; background-clip: text;
-    color: transparent;
+  button, input, select { font-family: inherit; }
+  h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 700; line-height: 1.05; letter-spacing: 0.005em; }
+  a { color: var(--accent-ink); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .eyebrow, .fieldset-label {
+    display: block; font: 600 0.78rem/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
   }
+  .muted { color: var(--muted); margin: 0; }
+  .small { font-size: 0.85rem; }
+
+  /* ---------- brand ---------- */
+  .brand { display: flex; align-items: center; gap: 10px; color: inherit; }
+  .brand-logo { width: 30px; height: 30px; flex-shrink: 0; display: block; }
+  .brand-logo svg { width: 100%; height: 100%; display: block; }
+  .brand-name { font: 700 1.3rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.06em; display: flex; align-items: baseline; gap: 8px; }
+  .brand-name small { font: 500 0.8rem/1 var(--body); letter-spacing: 0.02em; text-transform: none; opacity: 0.7; }
+
+  /* ---------- buttons ---------- */
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    border: 1px solid transparent; border-radius: 14px; cursor: pointer;
-    font: 700 0.98rem "Inter", sans-serif; padding: 13px 20px;
-    transition: background 0.2s, transform 0.15s, border-color 0.2s;
-    white-space: nowrap;
+    border: 1px solid transparent; border-radius: var(--r-sm); cursor: pointer;
+    font: 600 0.95rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 14px 20px; white-space: nowrap;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
   }
-  .btn:hover { transform: translateY(-1px); }
-  .btn:disabled { opacity: 0.6; cursor: default; transform: none; }
-  .btn:focus-visible, .fc-chip:focus-visible, .fc-tab:focus-visible, .auth-tab:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
-  .btn-primary { background: var(--brand); color: #fff; box-shadow: 0 10px 22px -12px rgba(31, 174, 82, 0.7); }
-  .btn-primary:hover { background: var(--brand-dark); }
-  .btn-ghost { background: var(--card); color: var(--text); border-color: var(--border); }
-  .btn-ghost:hover { border-color: var(--brand); }
+  .btn:disabled { opacity: 0.55; cursor: default; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-ink); }
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line-2); }
+  .btn-ghost:hover { border-color: var(--ink); }
   .btn-dark { background: var(--ink); color: #fff; }
-  .btn-gold { background: var(--gold); color: var(--ink); }
-  .btn-sm { padding: 9px 14px; font-size: 0.88rem; border-radius: 12px; }
+  .btn-dark:hover { background: #000; }
+  .btn-sm { padding: 10px 14px; font-size: 0.85rem; }
   .btn-block { width: 100%; }
+  .link-btn { background: none; border: none; padding: 0; font: inherit; font-weight: 600; color: var(--accent-ink); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
 
-  /* ============ MAIN CARD ============ */
-  .fc-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-  }
+  /* ---------- screens ---------- */
+  .boot-screen { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 28px; background: var(--night); color: var(--night-text); }
+  .boot-screen[hidden] { display: none; }
+  .spinner { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line-2); border-top-color: var(--ink); animation: spin 0.8s linear infinite; margin: 20px auto; }
+  .boot-screen .spinner { border-color: var(--night-line); border-top-color: var(--night-text); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .noscript { max-width: 520px; margin: 40px auto; padding: 16px; text-align: center; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); }
 
-  .fc-topbar {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-  }
-  .fc-coach { display: flex; align-items: center; gap: 12px; }
-  .fc-logo {
-    width: 44px; height: 44px; border-radius: 14px;
-    background: linear-gradient(135deg, var(--brand), #27c35f);
-    display: grid; place-items: center; font-size: 1.3rem;
-    box-shadow: 0 6px 16px rgba(31, 174, 82, 0.35);
-    flex-shrink: 0;
-  }
-  .fc-coach-name { font-family: var(--heading); font-weight: 800; font-size: 1.05rem; letter-spacing: -0.02em; }
-  .fc-status { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); }
-  .fc-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2); }
-
-  /* segmented tabs */
-  .fc-tabs { display: flex; gap: 4px; padding: 4px; background: #f0f4f1; border-radius: 999px; }
-  .fc-tab {
-    border: none; background: transparent; cursor: pointer;
-    font: 600 0.9rem "Inter", sans-serif; color: var(--muted);
-    padding: 10px 18px; border-radius: 999px;
-    transition: all 0.2s;
-    white-space: nowrap;
-  }
-  .fc-tab:hover { color: var(--text); }
-  .fc-tab.active { background: var(--card); color: var(--brand-dark); box-shadow: 0 2px 8px rgba(15, 31, 23, 0.08); }
-
-  /* ============ PANELS ============ */
-  .fc-panel { display: none; flex-direction: column; }
-  .fc-panel.active { display: flex; }
-
-  .fc-progress { padding: 14px 20px 0; }
-  .fc-progress-row { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
-  .fc-progress-track { height: 6px; background: #edf2ee; border-radius: 999px; overflow: hidden; }
-  .fc-progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--brand), var(--lime)); border-radius: 999px; transition: width 0.4s ease; }
-
-  .fc-messages {
-    height: clamp(380px, 58vh, 540px);
-    overflow-y: auto;
-    padding: 20px;
-    display: flex; flex-direction: column; gap: 14px;
-    scroll-behavior: smooth;
-  }
-
-  .fc-msg { display: flex; gap: 10px; align-items: flex-end; max-width: 80%; animation: fc-pop 0.3s ease; }
-  .fc-msg.user { align-self: flex-end; flex-direction: row-reverse; }
-  .fc-avatar {
-    width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px;
-    display: grid; place-items: center; font-size: 0.95rem;
-    background: linear-gradient(135deg, var(--brand), #27c35f);
-  }
-  .fc-msg.user .fc-avatar { background: #0f1f17; color: #fff; font-size: 0.7rem; font-weight: 700; border-radius: 50%; }
-  .fc-bubble {
-    padding: 12px 16px; border-radius: 18px;
-    font-size: 0.95rem; line-height: 1.55;
-    white-space: pre-wrap; word-wrap: break-word;
-  }
-  .fc-msg.bot .fc-bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 6px; }
-  .fc-msg.user .fc-bubble { background: linear-gradient(135deg, var(--brand), #22b85a); color: #fff; border-bottom-right-radius: 6px; box-shadow: 0 6px 16px -6px rgba(31, 174, 82, 0.5); }
-  @keyframes fc-pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-
-  .fc-typing span { display: inline-block; width: 7px; height: 7px; margin: 0 2px; background: var(--brand); border-radius: 50%; animation: fc-blink 1.2s infinite; }
-  .fc-typing span:nth-child(2) { animation-delay: 0.2s; }
-  .fc-typing span:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes fc-blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
-
-  /* ============ CHIPS + INPUT ============ */
-  .fc-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 20px 12px; }
-  .fc-options:empty { display: none; }
-  .fc-chip {
-    border: 1px solid var(--border); background: var(--card); color: var(--text);
-    font: 600 0.88rem "Inter", sans-serif;
-    padding: 10px 16px; border-radius: 999px; cursor: pointer;
-    transition: all 0.15s;
-  }
-  .fc-chip:hover { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); transform: translateY(-1px); }
-  .fc-chip.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
-  .fc-chip.primary:hover { background: var(--brand-dark); color: #fff; }
-
-  .fc-inputbar { padding: 12px 20px 20px; border-top: 1px solid var(--border); }
-  .fc-inputwrap {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 999px; padding: 6px 6px 6px 20px;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-  .fc-inputwrap:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(31, 174, 82, 0.12); }
-  .fc-input {
-    flex: 1; min-width: 0; border: none; outline: none; background: transparent;
-    font: 400 1rem "Inter", sans-serif; color: var(--text); /* 16px stops iOS zoom */
-    padding: 10px 0;
-  }
-  .fc-send {
-    width: 44px; height: 44px; flex-shrink: 0; border: none; border-radius: 50%;
-    background: var(--brand); color: #fff; cursor: pointer;
-    display: grid; place-items: center;
-    transition: background 0.2s, transform 0.15s;
-  }
-  .fc-send:hover { background: var(--brand-dark); transform: scale(1.05); }
-  .fc-send:disabled { background: #b9dcc5; cursor: default; transform: none; }
-  .fc-send svg { width: 20px; height: 20px; }
-
-  /* ============ TRAINING PLAN ============ */
-  .fc-plan { background: var(--card); border: 1px solid var(--border); border-radius: 22px; overflow: hidden; animation: fc-pop 0.4s ease; flex-shrink: 0; }
-  .fc-plan-head { padding: 20px; background: linear-gradient(135deg, var(--brand-soft), #f4fbe9); border-bottom: 1px solid var(--border); }
-  .fc-plan-head h3 { font-family: var(--heading); font-weight: 800; letter-spacing: -0.02em; font-size: 1.3rem; margin: 0 0 10px; }
-  .fc-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .fc-tag { background: var(--card); border: 1px solid var(--border); color: var(--brand-dark); padding: 4px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
-
-  .fc-rotation { margin: 16px 16px 0; padding: 16px; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(135deg, #ffffff, var(--brand-soft)); }
-  .fc-rotation-head h4 { font-family: var(--heading); font-weight: 800; letter-spacing: -0.01em; font-size: 1.05rem; margin: 0 0 4px; }
-  .fc-rotation-head p { margin: 0 0 14px; font-size: 0.87rem; color: var(--muted); line-height: 1.5; }
-  .fc-rotation-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 20px; }
-  .fc-rotation-step { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 12px 8px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; position: relative; }
-  .fc-rotation-step:not(:last-child)::after { content: "→"; position: absolute; left: 100%; width: 20px; top: 50%; transform: translateY(-50%); text-align: center; color: var(--brand); font-weight: 800; font-size: 1rem; }
-  .fc-rotation-day { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--brand-dark); }
-  .fc-rotation-icon { font-size: 1.4rem; }
-  .fc-rotation-name { font-size: 0.82rem; font-weight: 600; line-height: 1.3; }
-  .fc-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; padding: 16px; }
-  .fc-day { border: 1px solid var(--border); border-radius: 16px; padding: 14px; background: var(--card); }
-  .fc-day.rest { background: var(--surface); border-style: dashed; }
-  .fc-day-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
-  .fc-day-name { font-family: var(--heading); font-weight: 800; letter-spacing: -0.01em; }
-  .fc-day-time { font-size: 0.75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
-  .fc-day-focus { display: inline-block; font-size: 0.75rem; font-weight: 700; color: var(--brand-dark); background: var(--brand-soft); padding: 3px 10px; border-radius: 999px; margin-bottom: 10px; }
-  .fc-day.rest .fc-day-focus { color: var(--muted); background: #eef2ef; }
-  .fc-day.club { background: #f3f8ff; border-color: #cfe0f7; }
-  .fc-day.club .fc-day-focus { color: #1f4f8a; background: #e1edfb; }
-  .fc-day.match { background: #fffaf0; border-color: #f1d58a; }
-  .fc-day.match .fc-day-focus { color: #8a5a00; background: #fdeec4; }
-  .fc-day ul { margin: 0; padding: 0; list-style: none; }
-  .fc-day li { font-size: 0.87rem; line-height: 1.45; padding: 6px 0; border-top: 1px solid #f0f4f1; }
-  .fc-day li:first-child { border-top: none; }
-  .fc-day li span { display: block; color: var(--muted); font-size: 0.8rem; }
-  .fc-drill-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-  .fc-drill-top em { font-style: normal; font-size: 0.75rem; font-weight: 700; color: var(--brand-dark); white-space: nowrap; }
-  .fuel-link { display: block; width: 100%; margin-top: 10px; padding: 9px 11px; text-align: left; font: inherit; font-size: 0.8rem; line-height: 1.45; color: var(--brand-dark); background: var(--brand-soft); border: 1px solid #bfe5cc; border-radius: 12px; cursor: pointer; }
-  .fuel-link strong { display: block; margin-top: 2px; text-decoration: underline; text-underline-offset: 3px; }
-  .fuel-link:hover { border-color: var(--brand); }
-  .fuel-link.match { color: #8a5a00; background: #fdeec4; border-color: #f1d58a; }
-  .fc-day-why { margin: -2px 0 10px; font-size: 0.78rem; line-height: 1.45; color: var(--muted); background: #f7faf8; border-left: 3px solid var(--lime); padding: 6px 8px; border-radius: 0 8px 8px 0; }
-  .fc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-top: 14px; }
-  .fc-stat { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; }
-  .fc-stat-label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-bottom: 2px; }
-  .fc-stat strong { font-size: 0.9rem; line-height: 1.35; }
-  .fc-chip.selected { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
-  .fc-chip.selected::before { content: "✓ "; font-weight: 800; }
-  .fc-plan-note { margin: 0 16px 16px; padding: 14px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); font-size: 0.87rem; color: var(--muted); line-height: 1.6; }
-  .fc-plan-note strong { color: var(--text); }
-
-  /* ============ PHONES ============ */
-  @media (max-width: 640px) {
-    .fc-section { padding: 32px 12px; }
-    .fc-topbar { padding: 14px; }
-    .fc-tabs { width: 100%; }
-    .fc-tab { flex: 1; padding: 10px 8px; font-size: 0.85rem; }
-    .fc-messages { padding: 14px; height: 62vh; }
-    .fc-msg { max-width: 92%; }
-    .fc-options, .fc-progress { padding-left: 14px; padding-right: 14px; }
-    .fc-inputbar { padding: 10px 14px 14px; }
-    .fc-rotation-steps { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .fc-rotation-step::after { display: none; }
-  }
-
-  /* =====================================================================
-     SCREENS: login → plans → app
-     ===================================================================== */
-  .screen { min-height: 100vh; }
-
-  /* ---------- LOGIN / SIGN UP ---------- */
-  .auth-screen { display: grid; grid-template-columns: 1.05fr 1fr; }
+  /* ==========================================================================
+     LOG IN / SIGN UP
+     ========================================================================== */
+  .auth-screen { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
   .auth-hero {
     position: relative; overflow: hidden;
-    background: repeating-linear-gradient(90deg, #13823a 0 72px, #16913f 72px 144px);
-    color: #fff; padding: 48px clamp(24px, 5vw, 64px);
-    display: flex; flex-direction: column; justify-content: space-between; gap: 32px;
+    background: var(--night); color: var(--night-text);
+    padding: 40px clamp(24px, 5vw, 64px); display: flex; flex-direction: column; justify-content: space-between; gap: 40px;
   }
-  .auth-hero::before, .auth-hero::after { content: ""; position: absolute; border: 3px solid rgba(255, 255, 255, 0.35); pointer-events: none; }
-  .auth-hero::before { width: 220px; height: 220px; border-radius: 50%; right: -70px; top: 50%; transform: translateY(-50%); }
-  .auth-hero::after { top: 0; bottom: 0; right: 40px; border-width: 0 0 0 3px; }
-  .auth-hero > * { position: relative; z-index: 1; }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .brand-logo {
-    width: 46px; height: 46px; border-radius: 14px;
-    background: linear-gradient(135deg, var(--brand), #27c35f);
-    display: grid; place-items: center; font-size: 1.35rem;
-    box-shadow: 0 8px 20px -6px rgba(31, 174, 82, 0.55); flex-shrink: 0;
+  .auth-hero .pitch-lines { position: absolute; right: -300px; top: -40px; width: 620px; color: #1c2823; pointer-events: none; }
+  .auth-hero > * { position: relative; }
+  .auth-hero h1 { font-size: clamp(2.8rem, 6vw, 4.6rem); text-transform: uppercase; line-height: 0.92; letter-spacing: 0.01em; max-width: 9ch; }
+  .auth-hero p { color: var(--night-muted); font-size: 1.1rem; max-width: 34ch; margin: 18px 0 0; }
+  .auth-points { list-style: none; margin: 0; padding: 0; max-width: 440px; counter-reset: pt; }
+  .auth-points li { counter-increment: pt; display: grid; grid-template-columns: 40px 1fr; padding: 13px 0; border-top: 1px solid var(--night-line); color: var(--night-text); font-weight: 500; }
+  .auth-points li::before { content: counter(pt, decimal-leading-zero); font: 600 0.9rem/1.6 var(--display); color: var(--on-night-accent); letter-spacing: 0.06em; }
+  .auth-side { display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
+  .auth-card { width: min(400px, 100%); }
+  .auth-card h2 { font-size: 2.2rem; text-transform: uppercase; }
+  .auth-sub { color: var(--muted); margin: 8px 0 24px; }
+  .auth-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+  .auth-tab { background: none; border: none; padding: 0 0 12px; margin-bottom: -1px; cursor: pointer; font: 600 1rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); border-bottom: 2px solid transparent; }
+  .auth-tab.active { color: var(--ink); border-bottom-color: var(--accent); }
+  .auth-form { display: grid; gap: 16px; }
+  .field { display: grid; gap: 6px; }
+  .field > span { font: 600 0.78rem/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-2); }
+  .field input, .field select, .checkin-form input[type=text] {
+    width: 100%; height: 48px; padding: 0 14px; font-size: 1rem; color: var(--ink);
+    background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-sm);
   }
-  .auth-hero .brand-logo { background: #fff; box-shadow: none; }
-  .brand-name { font-family: var(--heading); font-weight: 800; font-size: 1.45rem; letter-spacing: -0.03em; line-height: 1; }
-  .brand-name small { display: block; font-family: "Inter", sans-serif; font-size: 0.62em; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; margin-top: 3px; }
-  .auth-hero h1 { font-weight: 800; font-size: clamp(2.2rem, 4.6vw, 3.8rem); line-height: 1.05; max-width: 14ch; text-wrap: balance; }
-  .auth-hero p { font-size: 1.1rem; line-height: 1.6; max-width: 440px; opacity: 0.92; margin: 16px 0 0; }
-  .auth-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-  .auth-points li { display: flex; gap: 12px; align-items: center; background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.22); padding: 12px 16px; border-radius: 14px; font-weight: 600; max-width: 420px; }
+  .field input:focus, .field select:focus, .checkin-form input[type=text]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  #forgot-link { justify-self: start; font-size: 0.9rem; }
+  .remember, .consent { display: flex; gap: 10px; align-items: flex-start; font-size: 0.92rem; color: var(--ink-2); cursor: pointer; line-height: 1.45; }
+  .remember input, .consent input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); flex-shrink: 0; }
+  .form-error { margin: 0; padding: 10px 12px; font-size: 0.92rem; color: var(--danger); background: #f7ebe9; border: 1px solid #e6c5c1; border-radius: var(--r-sm); }
+  .form-error.info { color: var(--accent-ink); background: var(--accent-soft); border-color: #c4dacb; }
+  .back-link { justify-self: center; font-size: 0.92rem; }
+  .test-note { margin: 20px 0 0; font-size: 0.85rem; color: var(--muted); padding-top: 14px; border-top: 1px dashed var(--line-2); }
 
-  .auth-side { display: grid; place-items: center; padding: 40px 16px; }
-  .auth-card { width: min(420px, 100%); background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 32px 28px; }
-  .auth-card h2 { font-weight: 800; font-size: 1.7rem; }
-  .auth-sub { color: var(--muted); margin: 6px 0 20px; line-height: 1.5; }
-  .auth-tabs { display: flex; gap: 4px; padding: 4px; background: var(--track); border-radius: 999px; margin-bottom: 20px; }
-  .auth-tab { flex: 1; border: none; background: none; padding: 10px; border-radius: 999px; font: 600 0.95rem "Inter", sans-serif; color: var(--muted); cursor: pointer; }
-  .auth-tab.active { background: var(--card); color: var(--text); box-shadow: 0 2px 8px rgba(15, 31, 23, 0.08); }
-  .auth-form { display: grid; gap: 14px; }
-  .field { display: grid; gap: 6px; font-weight: 600; font-size: 0.9rem; }
-  .field input, .field select, .field textarea {
-    font: 400 1rem "Inter", sans-serif; color: var(--text);
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; width: 100%;
-  }
-  .field textarea { resize: vertical; min-height: 70px; }
-  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px rgba(31, 174, 82, 0.15); }
-  .field small { font-weight: 400; color: var(--muted); }
-  .remember { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
-  .remember input { width: 18px; height: 18px; accent-color: var(--brand); }
-  .form-error { margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 0.9rem; background: #fdecec; border: 1px solid #f4c4c4; }
-  .test-note { margin: 18px 0 0; font-size: 0.82rem; color: var(--muted); background: var(--surface); border: 1px dashed var(--border); padding: 10px 12px; border-radius: 12px; line-height: 1.45; }
+  /* ==========================================================================
+     PLANS
+     ========================================================================== */
+  .plans-screen { max-width: 1120px; margin: 0 auto; padding: 24px 24px 40px; }
+  .plans-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .plans-head { padding: 44px 0 28px; display: grid; gap: 10px; max-width: 640px; }
+  .plans-head h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); text-transform: uppercase; }
+  .plans-head p { margin: 0; color: var(--muted); font-size: 1.05rem; }
+  .billing-toggle { display: inline-flex; border: 1px solid var(--line-2); border-radius: var(--r-sm); margin-bottom: 24px; overflow: hidden; }
+  .billing-option { border: none; background: transparent; cursor: pointer; padding: 11px 18px; font: 600 0.88rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .billing-option + .billing-option { border-left: 1px solid var(--line-2); }
+  .billing-option[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .save-tag { font: 600 0.75rem/1 var(--body); text-transform: none; letter-spacing: 0; color: var(--accent); }
+  .billing-option[aria-pressed="true"] .save-tag { color: var(--on-night-accent); }
+  .plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line-2); border-radius: var(--r); background: var(--panel); }
+  .plan-card { position: relative; padding: 32px 28px 28px; display: flex; flex-direction: column; gap: 6px; }
+  .plan-card + .plan-card { border-left: 1px solid var(--line-2); }
+  .plan-card.popular { background: var(--raised); }
+  .popular-badge { position: absolute; top: 0; left: 28px; transform: translateY(-50%); background: var(--accent); color: #fff; font: 600 0.72rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.12em; padding: 6px 10px; border-radius: var(--r-sm); }
+  .plan-name { font-size: 1.7rem; text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+  .current-tag { font: 600 0.7rem/1 var(--display); letter-spacing: 0.12em; color: var(--accent-ink); border: 1px solid currentColor; padding: 4px 6px; border-radius: var(--r-sm); }
+  .plan-for { margin: 0; color: var(--muted); }
+  .plan-price { margin: 18px 0 0; display: flex; align-items: baseline; gap: 4px; }
+  .price-amount { font: 700 3.2rem/1 var(--display); letter-spacing: -0.01em; }
+  .price-period { color: var(--muted); font-weight: 500; }
+  .price-note { margin: 4px 0 14px; font-size: 0.9rem; color: var(--muted); min-height: 1.4em; }
+  .price-note strong { color: var(--accent-ink); }
+  .plan-list { list-style: none; margin: 0 0 22px; padding: 0; flex: 1; border-top: 1px solid var(--line); }
+  .plan-list li { padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 0.95rem; color: var(--ink-2); }
+  .plans-foot { text-align: center; margin: 18px auto 0; color: var(--muted); font-size: 0.9rem; max-width: 640px; }
+  .legal-links { line-height: 1.6; }
 
-  /* ---------- PLANS PAGE ---------- */
-  .plans-screen { padding: 40px 16px 64px; }
-  .plans-top { max-width: 1100px; margin: 0 auto 8px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-  .plans-head { text-align: center; max-width: 640px; margin: 24px auto 40px; }
-  .plans-head .eyebrow { color: var(--brand); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.85rem; }
-  .plans-head h1 { font-weight: 800; font-size: clamp(2rem, 5vw, 3.2rem); margin: 10px 0 12px; text-wrap: balance; }
-  .plans-head p { color: var(--muted); font-size: 1.08rem; line-height: 1.6; margin: 0; }
-  .plan-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; align-items: center; }
-  .plan-card {
-    position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 26px; padding: 30px 26px;
-    display: flex; flex-direction: column; gap: 16px;
-  }
-  .plan-card.popular { border: 2px solid var(--brand); box-shadow: var(--shadow); padding-block: 40px; }
-  .plan-card.premium { background: linear-gradient(180deg, var(--gold-soft), var(--card) 40%); }
-  .popular-badge {
-    position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
-    background: var(--brand); color: #fff; font-weight: 800; font-size: 0.85rem;
-    padding: 6px 16px; border-radius: 999px; white-space: nowrap;
-  }
-  .plan-name { font-size: 1.35rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
-  .plan-for { color: var(--muted); margin: -8px 0 0; }
-  .plan-price { margin: 0; color: var(--muted); }
-  .plan-price strong { font-family: var(--heading); font-size: 3rem; color: var(--text); letter-spacing: -0.04em; margin-right: 4px; }
-  .plan-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .plan-list li { position: relative; padding-left: 30px; line-height: 1.45; color: var(--text); }
-  .plan-list li::before {
-    content: "✓"; position: absolute; left: 0; top: 1px; width: 21px; height: 21px; border-radius: 50%;
-    display: grid; place-items: center; font-size: 0.72rem; font-weight: 800;
-    background: var(--brand-soft); color: var(--brand-dark);
-  }
-  .plan-card.premium .plan-list li::before { background: var(--gold); color: var(--ink); }
-  .plan-card .btn { margin-top: auto; }
-  .billing-toggle { display: flex; width: fit-content; margin: -12px auto 36px; gap: 4px; padding: 5px; background: var(--card); border: 1px solid var(--border); border-radius: 999px; }
-  .billing-option { border: none; background: transparent; color: var(--muted); cursor: pointer; font: 700 0.95rem "Inter", sans-serif; padding: 10px 20px; border-radius: 999px; display: flex; align-items: center; gap: 8px; }
-  .billing-option[aria-pressed="true"] { background: var(--brand); color: #fff; }
-  .billing-option:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
-  .save-tag { font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: var(--lime-soft); color: var(--brand-dark); }
-  .billing-option[aria-pressed="true"] .save-tag { background: rgba(255, 255, 255, 0.25); color: #fff; }
-  .price-note { margin: -8px 0 0; color: var(--muted); font-size: 0.88rem; min-height: 1.3em; }
-  .price-note strong { color: var(--brand-dark); }
-  .form-error.info { background: var(--brand-soft); border-color: #bfe5cc; }
-  .current-tag { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; background: var(--track); color: var(--muted); padding: 4px 9px; border-radius: 999px; }
-  .plans-foot { text-align: center; color: var(--muted); font-size: 0.88rem; margin: 28px auto 0; max-width: 560px; line-height: 1.5; }
-
-  /* ---------- APP SHELL ---------- */
-  .app-header {
-    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40;
-    background: rgba(246, 248, 247, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-  }
-  .app-header-inner { max-width: 960px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
-  .app-header .brand-logo { width: 40px; height: 40px; border-radius: 12px; font-size: 1.15rem; }
-  .app-header .brand-name { font-size: 1.25rem; }
-  .user-area { margin-left: auto; display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .user-hello { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .plan-badge {
-    font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
-    padding: 5px 10px; border-radius: 999px; border: none; cursor: pointer; white-space: nowrap;
-    background: var(--track); color: var(--muted);
-  }
-  .plan-badge[data-plan="pro"] { background: var(--brand-soft); color: var(--brand-dark); }
-  .plan-badge[data-plan="premium"] { background: var(--gold); color: var(--ink); }
-  .app-main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
-  .usage-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-  .usage-pill { background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 7px 12px; font-size: 0.85rem; color: var(--muted); }
-  .usage-pill strong { color: var(--text); }
-  .usage-pill.out { border-color: #f4c4c4; background: #fdf3f3; }
-
-  .fc-tabs { overflow-x: auto; scrollbar-width: none; }
+  /* ==========================================================================
+     APP SHELL
+     ========================================================================== */
+  .app-header { background: var(--night); color: var(--night-text); }
+  .app-header-inner, .app-nav-inner { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .app-header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; flex-wrap: wrap; }
+  .user-area { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .user-hello { color: var(--night-muted); font-size: 0.92rem; }
+  .plan-badge { background: none; border: 1px solid var(--night-line); color: var(--night-text); border-radius: var(--r-sm); padding: 8px 10px; cursor: pointer; font: 600 0.8rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.12em; }
+  .plan-badge:hover { border-color: var(--night-muted); }
+  .plan-badge::after { content: " plan"; color: var(--night-muted); }
+  .app-header .btn-ghost { color: var(--night-text); border-color: var(--night-line); }
+  .app-header .btn-ghost:hover { border-color: var(--night-muted); }
+  .app-nav { border-top: 1px solid var(--night-line); }
+  .fc-tabs { display: flex; gap: 28px; overflow-x: auto; scrollbar-width: none; }
   .fc-tabs::-webkit-scrollbar { display: none; }
+  .fc-tab {
+    background: none; border: none; cursor: pointer; white-space: nowrap;
+    padding: 15px 0 13px; border-bottom: 3px solid transparent;
+    font: 600 0.95rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.08em; color: var(--night-muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .fc-tab:hover { color: var(--night-text); }
+  .fc-tab.active { color: #fff; border-bottom-color: var(--on-night-accent); }
   .tab-short { display: none; }
-  .tab-lock { font-size: 0.75rem; margin-left: 2px; }
-  .fc-topbar .fc-tabs { max-width: 100%; }
+  .tab-lock { font: 600 0.65rem/1 var(--display); letter-spacing: 0.1em; color: var(--night-muted); border: 1px solid var(--night-line); padding: 3px 5px; border-radius: var(--r-sm); }
+  .app-main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 32px; display: grid; gap: 22px; }
 
-  /* ---------- LOCKS & UPSELLS ---------- */
-  .fc-bubble .fc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .fc-bubble .fc-actions .fc-chip { padding: 8px 14px; font-size: 0.85rem; }
-  .fc-msg.lock .fc-bubble { background: var(--gold-soft); border-color: #f3dca6; }
-  .upsell {
-    margin: 24px; padding: 28px; border-radius: 22px; text-align: center;
-    background: linear-gradient(180deg, var(--surface), var(--card)); border: 1px dashed var(--border);
-  }
-  .upsell-icon { font-size: 2.4rem; }
-  .upsell h3 { font-size: 1.35rem; font-weight: 800; margin: 8px 0; }
-  .upsell p { color: var(--muted); line-height: 1.6; max-width: 460px; margin: 0 auto 16px; }
-  .upsell ul { list-style: none; padding: 0; margin: 0 auto 20px; display: grid; gap: 8px; max-width: 380px; text-align: left; }
-  .upsell li::before { content: "✓ "; color: var(--brand-dark); font-weight: 800; }
-  .locked-line { font-size: 0.8rem; color: var(--muted); }
-  .plan-lock-note {
-    margin: 0 16px 16px; padding: 14px 16px; border-radius: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; justify-content: space-between;
-    background: var(--gold-soft); border: 1px solid #f3dca6; font-size: 0.9rem; line-height: 1.45;
-  }
+  /* ---------- TODAY (the dashboard) ---------- */
+  .dash-today { background: var(--night); color: var(--night-text); border-radius: var(--r); display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); overflow: hidden; }
+  .today-main { padding: 28px 28px 26px; display: flex; flex-direction: column; gap: 10px; }
+  .dash-today .eyebrow { color: var(--night-muted); }
+  .today-title { font-size: clamp(2rem, 3.8vw, 3rem); text-transform: uppercase; line-height: 0.95; }
+  .today-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--night-muted); font-size: 0.95rem; margin: 2px 0 0; }
+  .today-meta strong { color: var(--night-text); font-weight: 600; }
+  .today-meta span + span::before { content: "·"; margin-right: 18px; color: var(--night-line); }
+  .today-next { margin: auto 0 0; display: grid; gap: 0; border-top: 1px solid var(--night-line); }
+  .today-next:empty { display: none; }
+  .today-next div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--night-line); }
+  .today-next dt { font: 600 0.72rem/1.4 var(--display); text-transform: uppercase; letter-spacing: 0.12em; color: var(--night-muted); }
+  .today-next dd { margin: 0; text-align: right; font-weight: 500; }
+  .today-first { margin: 6px 0 0; color: var(--night-text); font-size: 0.98rem; max-width: 52ch; }
+  .today-first span { color: var(--night-muted); }
+  .today-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .dash-today .btn-ghost { color: var(--night-text); border-color: var(--night-line); }
+  .dash-today .btn-ghost:hover { border-color: var(--night-muted); }
+  .today-week { border-left: 1px solid var(--night-line); padding: 28px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .mini-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .mini-day { background: none; border: 1px solid var(--night-line); border-radius: var(--r-sm); color: var(--night-text); cursor: pointer; padding: 8px 0 10px; display: grid; justify-items: center; gap: 8px; font: inherit; min-width: 0; }
+  .mini-day:disabled { cursor: default; }
+  .mini-day b { font: 600 0.78rem/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--night-muted); }
+  .mini-day i { font: 600 0.95rem/1 var(--display); font-style: normal; }
+  .mini-day.rest i { color: var(--night-muted); }
+  .mini-day.training i { color: var(--on-night-accent); }
+  .mini-day.match { background: var(--night-text); color: var(--night); border-color: var(--night-text); }
+  .mini-day.match b { color: var(--night); }
+  .mini-day.today { border-color: var(--on-night-accent); box-shadow: inset 0 0 0 1px var(--on-night-accent); }
+  .mini-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.8rem; color: var(--night-muted); margin: 0; }
+  .today-empty { color: var(--night-muted); margin: 0; font-size: 0.95rem; }
 
-  /* drill steps (Pro+) */
-  .fc-day details { margin-top: 4px; }
-  .fc-day summary { cursor: pointer; font-size: 0.78rem; font-weight: 700; color: var(--brand-dark); list-style: none; }
+  /* ---------- progress row (open, not boxed) ---------- */
+  .progress-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .stat-cell { padding: 14px 18px 14px 0; display: grid; gap: 4px; }
+  .stat-cell + .stat-cell { padding-left: 18px; border-left: 1px solid var(--line); }
+  .stat-cell dt { font: 600 0.72rem/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+  .stat-cell dd { margin: 0; font: 700 1.7rem/1 var(--display); }
+  .stat-cell dd small { font: 500 0.82rem/1.3 var(--body); color: var(--muted); display: block; margin-top: 4px; }
+  .stat-cell.out dd { color: var(--danger); }
+  .stat-bar { height: 3px; background: var(--tint); margin-top: 6px; }
+  .stat-bar span { display: block; height: 100%; background: var(--accent); transition: width 0.4s ease; }
+
+  /* ---------- workspace ---------- */
+  .fc-card { background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--r); overflow: hidden; }
+  .fc-panel { display: none; flex-direction: column; }
+  .fc-panel.active { display: flex; animation: fade 0.18s ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 18px 24px 0; }
+  .panel-head h2 { font-size: 1.35rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .panel-head p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+
+  .fc-progress { padding: 10px 24px 0; }
+  .fc-progress-row { display: flex; justify-content: space-between; font: 600 0.75rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 8px; }
+  .fc-progress-track { height: 3px; background: var(--tint); }
+  .fc-progress-bar { height: 100%; width: 0; background: var(--accent); transition: width 0.35s ease; }
+
+  /* ---------- conversation ---------- */
+  .fc-messages { height: clamp(440px, 68vh, 760px); overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .fc-msg { display: flex; gap: 10px; max-width: min(680px, 88%); animation: fade 0.2s ease; }
+  .fc-msg.user { align-self: flex-end; }
+  .fc-avatar { display: none; }
+  .fc-bubble { font-size: 1rem; line-height: 1.55; white-space: pre-wrap; word-wrap: break-word; }
+  .fc-msg.bot .fc-bubble { color: var(--ink); padding: 2px 0 2px 14px; border-left: 1px solid var(--line-2); }
+  .fc-msg.user .fc-bubble { background: var(--ink); color: #fff; padding: 10px 14px; border-radius: var(--r-sm); }
+  .fc-msg.lock .fc-bubble { border: 1px solid var(--line-2); background: var(--raised); padding: 14px 16px; border-radius: var(--r-sm); }
+  .fc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; white-space: normal; }
+  .fc-typing { display: inline-flex; gap: 5px; padding: 6px 0 6px 14px !important; }
+  .fc-typing span { width: 6px; height: 6px; background: var(--faint); border-radius: 50%; animation: blink 1.2s infinite; }
+  .fc-typing span:nth-child(2) { animation-delay: 0.2s; }
+  .fc-typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+
+  .fc-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--line); }
+  .fc-options:empty { display: none; }
+  .fc-chip {
+    border: 1px solid var(--line-2); background: var(--raised); color: var(--ink); cursor: pointer;
+    font: 600 0.95rem/1.2 var(--body); padding: 10px 14px; border-radius: var(--r-sm);
+    transition: border-color 0.12s, background-color 0.12s;
+  }
+  .fc-chip:hover { border-color: var(--ink); }
+  .fc-chip.selected { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .fc-chip.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .fc-chip.primary:hover { background: var(--accent-ink); }
+
+  .fc-inputbar { padding: 14px 24px 18px; border-top: 1px solid var(--line); background: var(--panel); }
+  .fc-inputwrap { display: flex; gap: 8px; }
+  .fc-input { flex: 1; min-width: 0; height: 50px; padding: 0 14px; font-size: 1rem; color: var(--ink); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-sm); }
+  .fc-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .fc-send { width: 50px; height: 50px; flex-shrink: 0; border: none; border-radius: var(--r-sm); background: var(--ink); color: #fff; cursor: pointer; display: grid; place-items: center; }
+  .fc-send:hover { background: var(--accent); }
+  .fc-send:disabled { opacity: 0.5; cursor: default; background: var(--ink); }
+  .fc-send svg { width: 20px; height: 20px; }
+
+  /* ==========================================================================
+     WEEKLY PLAN (the centrepiece)
+     ========================================================================== */
+  .fc-plan { background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r); width: 100%; max-width: 100%; animation: fade 0.25s ease; }
+  .fc-plan-head { padding: 24px 24px 0; display: grid; gap: 16px; }
+  .fc-plan-head h3 { font-size: 2rem; text-transform: uppercase; margin-top: 4px; }
+  .fc-tags { display: flex; flex-wrap: wrap; color: var(--muted); font-size: 0.95rem; }
+  .fc-tag + .fc-tag::before { content: "·"; margin: 0 8px; }
+  .fc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin: 0; border-top: 1px solid var(--line); }
+  .fc-stat { padding: 12px 16px 14px 0; display: grid; gap: 4px; align-content: start; }
+  .fc-stat + .fc-stat { padding-left: 16px; border-left: 1px solid var(--line); }
+  .fc-stat-label { font: 600 0.72rem/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+  .fc-stat strong { font: 700 1.5rem/1.1 var(--display); }
+  .fc-stat.kit strong { font: 600 0.95rem/1.35 var(--body); }
+
+  /* the week at a glance */
+  .week-board { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
+  .week-board li { min-width: 0; }
+  .week-board li + li .wb-day { border-left: 1px solid var(--line); }
+  .wb-day { width: 100%; height: 100%; background: none; border: none; text-align: left; cursor: pointer; font: inherit; color: inherit; padding: 12px 12px 14px; display: grid; gap: 6px; align-content: start; position: relative; }
+  .wb-day:hover { background: var(--panel); }
+  .wb-name { font: 700 1rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.06em; display: flex; justify-content: space-between; gap: 4px; }
+  .wb-name em { font: 600 0.65rem/1.4 var(--display); font-style: normal; letter-spacing: 0.12em; color: var(--accent-ink); }
+  .wb-kind { font: 600 0.7rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent-ink); }
+  .wb-focus { font-size: 0.88rem; font-weight: 600; line-height: 1.25; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .wb-min { font: 700 1.35rem/1 var(--display); margin-top: auto; }
+  .wb-min small { font: 500 0.75rem var(--body); color: var(--muted); }
+  .wb-day.club .wb-kind { color: var(--ink); }
+  .wb-day.rest { background: repeating-linear-gradient(135deg, transparent 0 7px, rgba(18, 24, 22, 0.035) 7px 8px); }
+  .wb-day.rest .wb-kind, .wb-day.rest .wb-focus { color: var(--faint); }
+  .wb-day.match { background: var(--night); color: var(--night-text); }
+  .wb-day.match .wb-kind, .wb-day.match .wb-name em { color: var(--on-night-accent); }
+  .wb-day.match .wb-focus { color: var(--night-text); }
+  .wb-day.today { box-shadow: inset 0 0 0 2px var(--accent); }
+  .wb-day.match.today { box-shadow: inset 0 0 0 2px var(--on-night-accent); }
+
+  .fc-rotation { padding: 14px 24px; border-bottom: 1px solid var(--line); font-size: 0.92rem; color: var(--ink-2); }
+  .fc-rotation strong { font-weight: 600; color: var(--ink); }
+
+  /* the days, as a training schedule */
+  .fc-days { display: block; }
+  .fc-day { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 20px; padding: 22px 24px; border-bottom: 1px solid var(--line); scroll-margin-top: 12px; }
+  .fc-day-top { display: grid; gap: 6px; align-content: start; }
+  .fc-day-name { font: 700 1.25rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.04em; }
+  .fc-day-time { font: 600 0.95rem/1 var(--display); color: var(--muted); letter-spacing: 0.04em; }
+  .day-tag { justify-self: start; font: 600 0.68rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.14em; color: #fff; background: var(--accent); padding: 4px 6px; border-radius: var(--r-sm); }
+  .day-kind { font: 600 0.72rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent-ink); }
+  .fc-day-body { display: grid; gap: 10px; min-width: 0; }
+  .fc-day-focus { font: 700 1.45rem/1.1 var(--display); text-transform: uppercase; letter-spacing: 0.02em; }
+  .fc-day-why { margin: 0; color: var(--muted); font-size: 0.93rem; max-width: 70ch; }
+  .fc-day ul, .fc-day ol.drills { margin: 0; padding: 0; list-style: none; }
+  .fc-day ol.drills { counter-reset: drill; border-top: 1px solid var(--line); }
+  .fc-day ol.drills > li { counter-increment: drill; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 0 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .fc-day ol.drills > li::before { content: counter(drill, decimal-leading-zero); font: 600 0.9rem/1.5 var(--display); color: var(--faint); letter-spacing: 0.04em; }
+  .fc-drill-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .fc-drill-top strong { font-size: 1.02rem; font-weight: 600; }
+  .fc-drill-top em { font: 700 1.15rem/1 var(--display); font-style: normal; white-space: nowrap; }
+  .drill-detail { display: block; color: var(--ink-2); font-size: 0.95rem; margin-top: 2px; }
+  .drill-kit { display: block; color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
+  .drill-kit b { font: 600 0.7rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.12em; margin-right: 6px; }
+  .fc-day details { margin-top: 8px; }
+  .fc-day summary { cursor: pointer; font: 600 0.8rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-ink); list-style: none; display: inline-flex; align-items: center; gap: 6px; }
   .fc-day summary::-webkit-details-marker { display: none; }
-  .fc-day summary::before { content: "▸ "; }
-  .fc-day details[open] summary::before { content: "▾ "; }
-  .fc-day ol { margin: 6px 0 2px; padding-left: 18px; font-size: 0.8rem; color: var(--muted); display: grid; gap: 3px; }
-  .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; }
+  .fc-day summary::before { content: "+"; font-size: 1rem; width: 12px; }
+  .fc-day details[open] summary::before { content: "−"; }
+  .fc-day details ol { margin: 10px 0 2px; padding-left: 20px; color: var(--ink-2); font-size: 0.95rem; display: grid; gap: 4px; }
+  .notes { display: grid; gap: 4px; font-size: 0.95rem; color: var(--ink-2); }
+  .notes li { padding-left: 14px; position: relative; }
+  .notes li::before { content: ""; position: absolute; left: 0; top: 0.7em; width: 6px; height: 1px; background: var(--faint); }
+  .notes li strong { font-weight: 600; color: var(--ink); }
 
-  /* ---------- MY PLANS ---------- */
-  .panel-body { padding: 20px; display: grid; gap: 14px; }
-  .panel-body > h3 { font-size: 1.2rem; font-weight: 800; }
-  .panel-intro { color: var(--muted); margin: -6px 0 0; line-height: 1.5; }
-  .saved-list { display: grid; gap: 10px; }
-  .saved-item {
-    display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left;
-    width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; cursor: pointer;
-    font: inherit; color: inherit;
-  }
-  .saved-item:hover { border-color: var(--brand); }
-  .saved-item strong { display: block; }
-  .saved-item span { color: var(--muted); font-size: 0.85rem; }
-  .saved-item em { font-style: normal; font-size: 0.8rem; font-weight: 700; color: var(--brand-dark); white-space: nowrap; }
-  .empty-state { text-align: center; color: var(--muted); padding: 32px 16px; line-height: 1.6; }
+  .fc-day.rest { padding-top: 16px; padding-bottom: 16px; background: repeating-linear-gradient(135deg, transparent 0 7px, rgba(18, 24, 22, 0.025) 7px 8px); }
+  .fc-day.rest .fc-day-focus { font-size: 1.1rem; color: var(--muted); }
+  .fc-day.rest .fc-day-name { color: var(--muted); }
+  .fc-day.club .day-kind { color: var(--ink); }
+  .fc-day.match { background: var(--tint); }
+  .fc-day.match .fc-day-top { color: var(--ink); }
+  .fc-day.today { background: var(--raised); }
+  .fc-day.today .fc-day-name { color: var(--accent-ink); }
+  .fc-day.match.today { background: var(--tint); }
 
-  /* ---------- PREMIUM ---------- */
-  .sub-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
-  .sub-tab { border: 1px solid var(--border); background: var(--card); border-radius: 999px; padding: 9px 14px; font: 600 0.88rem "Inter", sans-serif; cursor: pointer; color: var(--text); }
-  .sub-tab.active { background: var(--ink); border-color: var(--ink); color: #fff; }
-  .premium-section { display: grid; gap: 14px; }
-  .checkin-form { display: grid; gap: 14px; }
-  .choice-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fuel-link { margin-top: 4px; justify-self: start; text-align: left; background: none; border: none; border-top: 1px dashed var(--line-2); padding: 10px 0 0; cursor: pointer; font: inherit; font-size: 0.9rem; color: var(--muted); }
+  .fuel-link strong { color: var(--accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; margin-left: 4px; }
+
+  .plan-lock-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0; padding: 16px 24px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 0.95rem; }
+  .plan-lock-note strong { font-weight: 600; }
+  .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 24px; }
+  .plan-actions:empty { display: none; }
+  .fc-plan-note { padding: 0 24px 22px; font-size: 0.88rem; color: var(--muted); display: grid; gap: 4px; }
+  .fc-plan-note p { margin: 0; }
+  .fc-plan-note strong { color: var(--ink-2); font-weight: 600; }
+
+  /* ==========================================================================
+     MY PLANS · PREMIUM · UPSELL
+     ========================================================================== */
+  .panel-body { padding: 24px; display: grid; gap: 14px; }
+  .panel-body > h3, .premium-section > h3, .diet-head h3 { font-size: 1.6rem; text-transform: uppercase; }
+  .panel-intro { margin: 0; color: var(--muted); max-width: 62ch; }
+  .empty-state { padding: 28px 0; color: var(--muted); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .saved-list { display: grid; border-top: 1px solid var(--line); }
+  .saved-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 4px; background: none; border: none; border-bottom: 1px solid var(--line); cursor: pointer; text-align: left; font: inherit; color: inherit; }
+  .saved-item:hover { background: var(--raised); }
+  .saved-item strong { display: block; font: 600 1.1rem/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.04em; }
+  .saved-item span { color: var(--muted); font-size: 0.9rem; }
+  .saved-item em { font: 600 0.8rem/1 var(--display); font-style: normal; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-ink); }
+  #saved-view:not(:empty) { margin-top: 10px; }
+
+  .upsell { padding: 44px 24px; max-width: 620px; display: grid; gap: 12px; }
+  .upsell-icon { font: 600 0.78rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.14em; color: var(--accent-ink); }
+  .upsell h3 { font-size: 2rem; text-transform: uppercase; }
+  .upsell p { margin: 0; color: var(--muted); }
+  .upsell ul { list-style: none; margin: 6px 0 8px; padding: 0; border-top: 1px solid var(--line); }
+  .upsell li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+
+  .sub-tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  .sub-tabs::-webkit-scrollbar { display: none; }
+  .sub-tab { background: none; border: none; cursor: pointer; white-space: nowrap; padding: 4px 0 12px; margin-bottom: -1px; border-bottom: 2px solid transparent; font: 600 0.88rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); text-decoration: none; }
+  .sub-tab:hover { color: var(--ink); }
+  .sub-tab.active { color: var(--ink); border-bottom-color: var(--accent); }
+  .premium-section { display: grid; gap: 16px; padding-top: 6px; }
+  .premium-section h3 { margin-top: 4px; }
+
+  .tip-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .tip-list li { padding: 14px 0; border-bottom: 1px solid var(--line); line-height: 1.5; color: var(--ink-2); }
+  .tip-list li strong { display: block; color: var(--ink); font: 700 1.05rem/1.3 var(--display); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
+  .timeline { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .timeline li { display: grid; grid-template-columns: 76px 1fr; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .timeline time { font: 700 1.2rem/1.2 var(--display); }
+  .timeline strong { display: block; font-weight: 600; }
+  .timeline span { color: var(--muted); font-size: 0.95rem; }
+
+  .checkin-form { display: grid; gap: 22px; max-width: 640px; }
+  .checkin-form .field { gap: 8px; }
+  .choice-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .choice-row label { position: relative; }
-  .choice-row input { position: absolute; opacity: 0; }
-  .choice-row span { display: inline-block; padding: 9px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); cursor: pointer; font-weight: 600; font-size: 0.9rem; }
-  .choice-row input:checked + span { background: var(--brand); border-color: var(--brand); color: #fff; }
-  .choice-row input:focus-visible + span { outline: 3px solid var(--brand); outline-offset: 2px; }
-  .fieldset-label { font-weight: 600; font-size: 0.9rem; margin-bottom: 6px; display: block; }
-  .changes { margin: 0; padding: 14px 16px 14px 34px; background: var(--brand-soft); border-radius: 14px; line-height: 1.6; }
-  .tip-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-  .tip-list li { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; line-height: 1.5; }
-  .tip-list li strong { display: block; margin-bottom: 2px; }
-  .timeline { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
-  .timeline li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: start; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
-  .timeline time { font-weight: 800; color: var(--brand-dark); font-variant-numeric: tabular-nums; font-size: 0.9rem; }
-  .timeline strong { display: block; }
-  .timeline span { color: var(--muted); font-size: 0.88rem; line-height: 1.45; }
+  .choice-row input { position: absolute; opacity: 0; pointer-events: none; }
+  .choice-row span { display: inline-block; padding: 10px 14px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--raised); cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+  .choice-row span:hover { border-color: var(--ink); }
+  .choice-row input:checked + span { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .choice-row input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .changes { margin: 0; padding: 0 0 0 18px; display: grid; gap: 6px; color: var(--ink-2); }
+  #checkin-result:not(:empty) { border-top: 1px solid var(--line); padding-top: 18px; display: grid; gap: 14px; }
 
-  /* ---------- PREMIUM: DIET TRACKER ---------- */
-  .diet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-  .diet-head h3 { font-size: 1.25rem; font-weight: 800; }
-  .premium-chip { font-size: 0.75rem; font-weight: 800; background: var(--gold); color: var(--ink); padding: 4px 10px; border-radius: 999px; }
-  .diet-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 16px; display: grid; gap: 14px; }
+  /* diet tracker */
+  .diet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .premium-chip { font: 600 0.72rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent-ink); border: 1px solid currentColor; padding: 4px 6px; border-radius: var(--r-sm); }
+  .diet-card { display: grid; gap: 14px; padding: 18px 0; border-top: 1px solid var(--line); }
+  .diet-card.today-log { background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r); padding: 20px; }
+  .diet-card > .btn { justify-self: start; }
   .diet-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  .muted { color: var(--muted); margin: 0; }
-  .small { font-size: 0.8rem; }
-  .score-pill { font-size: 0.8rem; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--track); color: var(--muted); font-variant-numeric: tabular-nums; }
-  .score-pill.good { background: var(--brand-soft); color: var(--brand-dark); }
-  .meal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .meal-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); cursor: pointer; line-height: 1.45; font-size: 0.92rem; }
-  .meal-row input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--brand); flex-shrink: 0; }
-  .meal-row small { color: var(--muted); font-weight: 600; }
-  .meal-row:has(input:checked) { background: var(--brand-soft); border-color: #bfe5cc; }
-  .counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
-  .counter { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; }
-  .counter > span { font-weight: 600; font-size: 0.92rem; line-height: 1.3; }
-  .counter small { display: block; font-weight: 400; color: var(--muted); font-size: 0.78rem; }
-  .counter > div { display: flex; align-items: center; gap: 10px; }
-  .counter strong { min-width: 1.6em; text-align: center; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
-  .count-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); font-size: 1.2rem; font-weight: 700; cursor: pointer; color: var(--text); }
-  .count-btn:hover { border-color: var(--brand); }
-  .week-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 120px; align-items: end; }
-  .week-bar { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; }
-  .week-bar span { width: 100%; max-width: 34px; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, var(--lime), var(--brand)); }
-  .week-bar em { font-style: normal; font-size: 0.75rem; color: var(--muted); font-weight: 700; }
-  .diet-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-  .diet-day { display: grid; justify-items: center; gap: 2px; padding: 8px 2px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); cursor: pointer; font: inherit; color: var(--text); min-width: 0; }
-  .diet-day strong { font-size: 0.78rem; }
-  .diet-day span { font-size: 1.05rem; line-height: 1; }
+  .diet-card-top strong { font: 700 1.15rem/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.04em; }
+  .score-pill { font: 700 1rem/1 var(--display); color: var(--muted); }
+  .score-pill.good { color: var(--accent-ink); }
+  .diet-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line-2); border-radius: var(--r-sm); overflow: hidden; }
+  .diet-day { background: var(--raised); border: none; border-left: 1px solid var(--line); cursor: pointer; padding: 10px 2px; display: grid; justify-items: center; gap: 4px; font: inherit; color: var(--ink); min-width: 0; }
+  .diet-day:first-child { border-left: none; }
+  .diet-day strong { font: 700 0.95rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.04em; }
+  .diet-day span { font: 600 0.62rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
   .diet-day.today strong { text-decoration: underline; text-underline-offset: 3px; }
-  .diet-day.match { background: #fdeec4; border-color: #f1d58a; }
-  .diet-day.active { outline: 2px solid var(--brand); outline-offset: 1px; background: var(--brand-soft); }
-  .diet-day.match.active { outline-color: #c99400; background: #fbe3a0; }
+  .diet-day.match { background: var(--night); color: var(--night-text); }
+  .diet-day.match span { color: var(--on-night-accent); }
+  .diet-day.active { box-shadow: inset 0 -3px 0 var(--accent); }
+  .diet-day.match.active { box-shadow: inset 0 -3px 0 var(--on-night-accent); }
   .diet-day-menu { display: grid; gap: 10px; }
-  .diet-day-title small { display: block; color: var(--muted); margin-top: 2px; line-height: 1.4; }
-  .diet-day-menu.match { background: #fffaf0; border: 1px solid #f1d58a; border-radius: 14px; padding: 12px; }
-  .diet-day-menu.match .diet-day-title strong { color: #8a5a00; }
-  .menu-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .menu-list li { padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); font-size: 0.9rem; line-height: 1.45; }
-  .menu-list small { color: var(--muted); font-weight: 600; }
-  .diet-update { margin: 0; }
+  .diet-day-title strong { font: 700 1.25rem/1.15 var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
+  .diet-day-title small { display: block; color: var(--muted); margin-top: 4px; font-size: 0.92rem; }
+  .diet-day-menu.match .diet-day-title strong { color: var(--ink); }
+  .menu-list, .meal-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .menu-list li { padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 0.97rem; line-height: 1.45; }
+  .menu-list small, .meal-row small { color: var(--muted); font-weight: 500; margin-left: 6px; }
+  .meal-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--line); cursor: pointer; line-height: 1.45; }
+  .meal-list li:last-child .meal-row { border-bottom: none; }
+  .meal-row input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); flex-shrink: 0; }
+  .meal-row:has(input:checked) > span { color: var(--muted); }
+  .meal-row:has(input:checked) strong { text-decoration: line-through; text-decoration-color: var(--faint); }
+  .counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); border-top: 1px solid var(--line); }
+  .counter { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0; }
+  .counter + .counter { border-left: 1px solid var(--line); padding-left: 16px; }
+  .counter > span { font-weight: 600; line-height: 1.3; }
+  .counter small { display: block; font-weight: 400; color: var(--muted); font-size: 0.82rem; }
+  .counter > div { display: flex; align-items: center; gap: 8px; }
+  .counter strong { min-width: 1.8em; text-align: center; font: 700 1.5rem/1 var(--display); }
+  .count-btn { width: 38px; height: 38px; border-radius: var(--r-sm); border: 1px solid var(--line-2); background: var(--raised); font-size: 1.2rem; cursor: pointer; color: var(--ink); }
+  .count-btn:hover { border-color: var(--ink); }
+  .week-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; height: 110px; align-items: end; }
+  .week-bar { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; }
+  .week-bar span { width: 100%; max-width: 30px; background: var(--accent); transition: height 0.4s ease; }
+  .week-bar em { font: 600 0.75rem/1 var(--display); font-style: normal; color: var(--muted); text-transform: uppercase; }
+  .diet-update { margin: 0; border: 1px solid var(--line-2); border-radius: var(--r-sm); }
 
-  /* ---------- BOOT, LINKS, CONSENT, FOOTER, LEGAL ---------- */
-  .boot-screen { display: grid; place-content: center; justify-items: center; gap: 24px; }
-  .boot-screen[hidden] { display: none; }
-  .noscript { max-width: 520px; margin: 40px auto; padding: 16px; text-align: center; background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
-  .link-btn { background: none; border: none; padding: 0; font: inherit; font-weight: 700; color: var(--brand-dark); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-  .link-btn:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
-  #forgot-link { justify-self: start; font-size: 0.88rem; margin-top: -6px; }
-  .back-link { justify-self: center; font-size: 0.9rem; }
-  .consent { display: flex; gap: 10px; align-items: flex-start; font-size: 0.86rem; line-height: 1.45; color: var(--muted); cursor: pointer; }
-  .consent input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--brand); flex-shrink: 0; }
-  .legal-links { text-align: center; font-size: 0.85rem; color: var(--muted); margin: 14px 0 0; line-height: 1.6; }
-  .app-footer { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; align-items: center; margin-top: 24px; font-size: 0.85rem; color: var(--muted); }
-  .legal-page { position: fixed; inset: 0; z-index: 60; overflow-y: auto; background: var(--bg, #f4f7f5); }
+  /* ==========================================================================
+     MODALS, TOAST, FOOTER, LEGAL
+     ========================================================================== */
+  .modal { position: fixed; inset: 0; z-index: 50; background: rgba(15, 23, 20, 0.55); display: grid; place-items: center; padding: 16px; }
+  .modal-card { width: min(380px, 100%); background: var(--raised); border-radius: var(--r); padding: 28px 24px; text-align: center; box-shadow: var(--pop); }
+  .modal-card h2 { font-size: 1.6rem; text-transform: uppercase; }
+  .modal-card p { color: var(--muted); margin: 8px 0 0; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 70; background: var(--ink); color: #fff; padding: 12px 16px; border-radius: var(--r-sm); font-size: 0.95rem; box-shadow: var(--pop); max-width: calc(100% - 32px); animation: fade 0.2s ease; }
+
+  .app-footer { display: flex; flex-wrap: wrap; gap: 10px 20px; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 0.85rem; color: var(--muted); }
+  .auth-card .app-footer, .plans-screen .app-footer { margin-top: 24px; }
+  .auth-card .app-footer { justify-content: flex-start; }
+  .footer-links { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .footer-links a { color: var(--ink-2); text-decoration: none; }
+  .footer-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  .legal-page { position: fixed; inset: 0; z-index: 60; overflow-y: auto; background: var(--paper); }
   body.legal-open { overflow: hidden; }
-  .legal-wrap { width: min(780px, 100%); margin: 0 auto; padding: 16px 16px 48px; }
-  .legal-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-  .legal-brand { font-family: var(--heading); font-weight: 800; }
-  .legal-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-  .legal-nav a { text-decoration: none; color: inherit; }
-  .legal-body { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 8px 22px 22px; line-height: 1.6; font-size: 0.95rem; }
-  .legal-body li { margin-bottom: 4px; }
-  .placeholder { background: #fff3b0; color: #6b4e00; padding: 0 4px; border-radius: 4px; font-weight: 700; }
-  .contact-card { background: var(--brand-soft); border-radius: 14px; padding: 12px 16px; margin: 8px 0 12px; }
-  .contact-card p { margin: 4px 0; }
-  .footer-links { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; }
-  .footer-links a { color: var(--brand-dark); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
-  .legal-body h2 { font-size: 1.5rem; font-weight: 800; margin: 12px 0 4px; }
-  .legal-body h3 { font-size: 1.02rem; font-weight: 800; margin: 18px 0 4px; letter-spacing: -0.01em; }
-  .legal-body p, .legal-body ul { margin: 0 0 8px; }
+  .legal-wrap { width: min(780px, 100%); margin: 0 auto; padding: 16px 20px 56px; }
+  .legal-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0 16px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .legal-brand { font: 700 1.1rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.06em; }
+  .legal-nav { display: flex; gap: 6px 20px; flex-wrap: wrap; margin-bottom: 22px; border-bottom: 1px solid var(--line); }
+  .legal-nav .sub-tab { padding: 10px 0 12px; }
+  .legal-body { line-height: 1.65; font-size: 1rem; color: var(--ink-2); }
+  .legal-body h2 { font-size: 2.4rem; text-transform: uppercase; color: var(--ink); margin: 6px 0 4px; }
+  .legal-body h3 { font-size: 1.2rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink); margin: 26px 0 6px; }
+  .legal-body p, .legal-body ul { margin: 0 0 10px; }
   .legal-body ul { padding-left: 20px; }
-  .legal-body a { color: var(--brand-dark); font-weight: 700; }
+  .legal-body li { margin-bottom: 4px; }
+  .legal-body a { color: var(--accent-ink); font-weight: 600; }
+  .placeholder { background: #f3e7b8; color: #5b4500; padding: 0 4px; border-radius: 2px; font-weight: 600; }
+  .contact-card { border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 14px 16px; margin: 10px 0 14px; background: var(--raised); }
+  .contact-card p { margin: 4px 0; }
 
-  /* ---------- MODAL & TOAST ---------- */
-  .modal { position: fixed; inset: 0; z-index: 100; background: rgba(8, 16, 12, 0.5); display: grid; place-items: center; padding: 16px; }
-  .modal-card { width: min(420px, 100%); background: var(--card); border-radius: 26px; padding: 30px 26px; text-align: center; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.5); }
-  .modal-card h2 { font-weight: 800; font-size: 1.5rem; margin: 12px 0 8px; }
-  .modal-card p { color: var(--muted); line-height: 1.55; margin: 0 0 20px; }
-  .spinner { width: 42px; height: 42px; margin: 0 auto; border-radius: 50%; border: 4px solid var(--brand-soft); border-top-color: var(--brand); animation: spin 0.9s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .toast {
-    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 120;
-    max-width: calc(100vw - 32px); background: var(--ink); color: #fff; padding: 13px 18px; border-radius: 14px; font-weight: 600;
-    box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.4);
-  }
-
-  /* ---------- PHONES ---------- */
-  @media (max-width: 860px) {
+  /* ==========================================================================
+     SMALLER SCREENS
+     ========================================================================== */
+  @media (max-width: 900px) {
     .auth-screen { grid-template-columns: 1fr; }
-    .auth-hero { padding: 28px 20px 32px; gap: 18px; }
-    .auth-hero::before { width: 140px; height: 140px; right: -60px; }
-    .auth-hero h1 { font-size: 2rem; }
+    .auth-hero { padding: 28px 20px 32px; gap: 24px; }
+    .auth-hero h1 { font-size: 2.6rem; max-width: none; }
     .auth-hero p { font-size: 1rem; margin-top: 10px; }
     .auth-points { display: none; }
-    .auth-side { padding: 24px 16px 40px; place-items: start center; }
-    .plan-grid { grid-template-columns: 1fr; max-width: 460px; gap: 28px; }
+    .auth-hero .pitch-lines { width: 360px; right: -140px; bottom: -160px; }
+    .auth-side { padding: 28px 20px 36px; align-items: flex-start; }
+    .dash-today { grid-template-columns: 1fr; }
+    .today-week { border-left: none; border-top: 1px solid var(--night-line); padding: 18px 20px 20px; }
+    .plan-grid { grid-template-columns: 1fr; }
+    .plan-card + .plan-card { border-left: none; border-top: 1px solid var(--line-2); }
+    .plan-card.popular { padding-top: 40px; }
   }
   @media (max-width: 640px) {
+    .app-header-inner, .app-nav-inner { padding: 0 16px; }
+    .app-header-inner { min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
     .user-hello { display: none; }
-    .app-header .brand-name { display: none; }
-    .app-main { padding: 16px 12px 40px; }
+    .fc-tabs { gap: 20px; }
     .tab-full { display: none; }
     .tab-short { display: inline; }
-    .fc-tab { flex: 1 0 auto; }
-    .upsell { margin: 14px; padding: 22px 16px; }
-    .panel-body { padding: 14px; }
-    .auth-card { padding: 26px 20px; }
+    .app-main { padding: 16px 12px 24px; gap: 16px; }
+    .today-main { padding: 22px 18px 20px; }
+    .stat-cell { padding: 12px 12px 12px 0; }
+    .stat-cell + .stat-cell { padding-left: 12px; }
+    .progress-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stat-cell:nth-child(3) { border-left: none; padding-left: 0; }
+    .stat-cell:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .fc-messages { padding: 18px 14px; height: clamp(440px, 66vh, 640px); }
+    .fc-msg { max-width: 92%; }
+    .fc-options { padding: 0 14px 12px; }
+    .fc-inputbar { padding: 12px 14px 14px; }
+    .fc-progress { padding: 10px 14px 0; }
+    .fc-plan-head { padding: 18px 16px 0; }
+    .fc-plan-head h3 { font-size: 1.6rem; }
+    .fc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .fc-stat:nth-child(odd) { border-left: none; padding-left: 0; }
+    .fc-stat:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .panel-head { flex-direction: column; gap: 4px; padding: 16px 14px 0; }
+    .wb-day { padding: 10px 4px 12px; justify-items: center; text-align: center; }
+    .wb-focus, .wb-name em, .wb-min small { display: none; }
+    .wb-name { font-size: 0.85rem; }
+    .wb-kind { font-size: 0.58rem; letter-spacing: 0.06em; }
+    .wb-min { font-size: 1.05rem; }
+    .fc-day { grid-template-columns: 1fr; gap: 10px; padding: 18px 16px; }
+    .fc-day-top { grid-auto-flow: column; justify-content: start; align-items: baseline; gap: 12px; }
+    .fc-rotation, .plan-lock-note, .plan-actions { padding-left: 16px; padding-right: 16px; }
+    .fc-plan-note { padding: 0 16px 18px; }
+    .panel-body { padding: 18px 14px; }
+    .counter + .counter { border-left: none; padding-left: 0; border-top: 1px solid var(--line); }
+    .plans-screen { padding: 16px 16px 32px; }
+    .plans-head { padding: 28px 0 20px; }
+    .app-footer { justify-content: flex-start; }
   }
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation: none !important; transition: none !important; }
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   }
 </style>
 </head>
@@ -568,7 +594,7 @@
 
 <!-- Shown for a moment while the page checks whether you're logged in -->
 <div class="screen boot-screen" id="screen-boot">
-  <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
+  <div class="brand"><span class="brand-logo" aria-hidden="true"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="4" fill="#1d6f47"/><path d="M16 4v24" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="6" fill="none" stroke="#fff" stroke-width="2"/></svg></span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
   <div class="spinner" aria-label="Loading"></div>
 </div>
 
@@ -577,17 +603,21 @@
      ===================================================================== -->
 <main class="screen auth-screen" id="screen-auth" hidden>
   <section class="auth-hero">
-    <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
+    <div class="brand"><span class="brand-logo" aria-hidden="true"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="4" fill="#1d6f47"/><path d="M16 4v24" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="6" fill="none" stroke="#fff" stroke-width="2"/></svg></span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
     <div>
       <h1>Train smarter. Play better.</h1>
       <p>Your personal football coach: weekly training plans built around you, and answers whenever you're stuck.</p>
     </div>
     <ul class="auth-points">
-      <li>📅 Weekly plans for your position, age &amp; kit</li>
-      <li>💬 Ask a coach anything, any time</li>
-      <li>⭐ Check-ins that adapt your next week</li>
-      <li>🥗 AI diet plan &amp; tracker (Premium)</li>
+      <li>Weekly plans built around your position, age, kit, club training and games</li>
+      <li>An AI coach that answers your football questions, any time</li>
+      <li>Weekly check-ins that shape next week's plan</li>
+      <li>Diet plan and food tracker with a game-day menu (Premium)</li>
     </ul>
+    <svg class="pitch-lines" viewBox="0 0 600 600" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <rect x="40" y="40" width="520" height="760"/><path d="M40 300h520"/><circle cx="300" cy="300" r="80"/><circle cx="300" cy="300" r="3" fill="currentColor"/>
+      <rect x="170" y="40" width="260" height="110"/><rect x="235" y="40" width="130" height="40"/><path d="M250 150a60 60 0 0 0 100 0"/>
+    </svg>
   </section>
 
   <section class="auth-side">
@@ -621,7 +651,7 @@
         <button type="button" class="btn btn-primary btn-block" id="auth-submit">Log in</button>
         <button type="button" class="link-btn back-link" id="auth-back" hidden>← Back to log in</button>
       </div>
-      <p class="test-note" id="auth-test-note">🧪 Test mode: accounts are saved only in this browser. Don't use a real password.</p>
+      <p class="test-note" id="auth-test-note"><strong>Test mode.</strong> Accounts are saved only in this browser. Don't use a real password.</p>
       <footer class="app-footer" data-site-footer></footer>
     </div>
   </section>
@@ -632,7 +662,7 @@
      ===================================================================== -->
 <main class="screen plans-screen" id="screen-plans" hidden>
   <div class="plans-top">
-    <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
+    <div class="brand"><span class="brand-logo" aria-hidden="true"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="4" fill="#1d6f47"/><path d="M16 4v24" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="6" fill="none" stroke="#fff" stroke-width="2"/></svg></span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
     <button type="button" class="btn btn-ghost btn-sm" id="plans-back" hidden>← Back to my coach</button>
   </div>
   <div class="plans-head">
@@ -661,7 +691,7 @@
     </article>
 
     <article class="plan-card popular" data-plan="pro">
-      <span class="popular-badge">⭐ Most popular</span>
+      <span class="popular-badge">Most popular</span>
       <h2 class="plan-name">Pro <span class="current-tag" hidden>Current</span></h2>
       <p class="plan-for">For players who want to get better</p>
       <p class="plan-price"><strong class="price-amount">$10</strong><span class="price-period">/month</span></p>
@@ -692,7 +722,7 @@
     </article>
   </div>
   <p class="plans-foot"><button type="button" class="btn btn-ghost btn-sm" id="manage-billing" hidden>Manage billing, invoices or cancel</button></p>
-  <p class="plans-foot" id="plans-test-note">🧪 Test mode: upgrading is pretend – no payment is taken.</p>
+  <p class="plans-foot" id="plans-test-note"><strong>Test mode.</strong> Upgrading is pretend and no payment is taken.</p>
   <p class="plans-foot legal-links">Subscriptions renew automatically until you cancel. Cancelling stops the next payment; you keep your plan until the end of the period you've paid for.</p>
   <footer class="app-footer" data-site-footer></footer>
 </main>
@@ -703,7 +733,7 @@
 <div class="screen" id="screen-app" hidden>
   <header class="app-header">
     <div class="app-header-inner">
-      <div class="brand"><span class="brand-logo">⚽</span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
+      <div class="brand"><span class="brand-logo" aria-hidden="true"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="4" fill="#1d6f47"/><path d="M16 4v24" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="6" fill="none" stroke="#fff" stroke-width="2"/></svg></span><span class="brand-name">Pitchside<small>Coaching AI</small></span></div>
       <div class="user-area">
         <span class="user-hello" id="user-hello"></span>
         <button type="button" class="plan-badge" id="plan-badge" data-plan="free" title="Change plan">Free</button>
@@ -711,30 +741,28 @@
         <button type="button" class="btn btn-ghost btn-sm" id="logout-btn">Log out</button>
       </div>
     </div>
+    <div class="app-nav">
+      <div class="app-nav-inner">
+        <nav class="fc-tabs" role="tablist" aria-label="Sections">
+          <button type="button" class="fc-tab active" data-tab="planner"><span class="tab-full">Training planner</span><span class="tab-short">Plan</span></button>
+          <button type="button" class="fc-tab" data-tab="coach"><span class="tab-full">Ask a coach</span><span class="tab-short">Coach</span></button>
+          <button type="button" class="fc-tab" data-tab="saved"><span class="tab-full">My plans</span><span class="tab-short">Plans</span><span class="tab-lock" data-lock="savePlans">Pro</span></button>
+          <button type="button" class="fc-tab" data-tab="premium">Premium<span class="tab-lock" data-lock="premium">Locked</span></button>
+        </nav>
+      </div>
+    </div>
   </header>
 
   <main class="app-main">
-    <div class="usage-strip" id="usage-strip"></div>
+    <!-- Today: what to do now, the week at a glance (built from the latest plan) -->
+    <section class="dash-today" id="today-panel" aria-label="Today"></section>
+    <!-- Usage and progress -->
+    <dl class="progress-row usage-strip" id="usage-strip"></dl>
 
     <div class="fc-card">
-      <div class="fc-topbar">
-        <div class="fc-coach">
-          <div class="fc-logo">⚽</div>
-          <div>
-            <div class="fc-coach-name">Pitchside Coach</div>
-            <div class="fc-status">Online · replies instantly</div>
-          </div>
-        </div>
-        <nav class="fc-tabs" role="tablist">
-          <button type="button" class="fc-tab active" data-tab="planner"><span class="tab-full">📅 Weekly Training Planner</span><span class="tab-short">📅 Plan</span></button>
-          <button type="button" class="fc-tab" data-tab="coach"><span class="tab-full">💬 Ask a Coach</span><span class="tab-short">💬 Coach</span></button>
-          <button type="button" class="fc-tab" data-tab="saved">📂 <span class="tab-full">My Plans</span><span class="tab-short">Plans</span><span class="tab-lock" data-lock="savePlans">🔒</span></button>
-          <button type="button" class="fc-tab" data-tab="premium">⭐ Premium<span class="tab-lock" data-lock="premium">🔒</span></button>
-        </nav>
-      </div>
-
       <!-- TAB 1: WEEKLY TRAINING PLANNER -->
       <div class="fc-panel active" id="panel-planner">
+        <div class="panel-head"><h2>Training planner</h2><p>Answer a few questions to build your week.</p></div>
         <div class="fc-progress">
           <div class="fc-progress-row"><span id="progress-label">Question 1 of 8</span><span id="progress-pct">0%</span></div>
           <div class="fc-progress-track"><div class="fc-progress-bar" id="progress-bar"></div></div>
@@ -755,6 +783,7 @@
 
       <!-- TAB 2: ASK A COACH -->
       <div class="fc-panel" id="panel-coach">
+        <div class="panel-head"><h2>Ask a coach</h2><p>AI coach. General advice, not medical advice.</p></div>
         <div class="fc-messages" id="coach-messages"></div>
         <div class="fc-options" id="coach-suggestions"></div>
         <div class="fc-inputbar">
@@ -782,7 +811,7 @@
   <div class="legal-wrap">
     <header class="legal-top">
       <button type="button" class="btn btn-ghost btn-sm" id="legal-close">← Back</button>
-      <span class="legal-brand">⚽ Pitchside Coaching AI</span>
+      <span class="legal-brand">Pitchside Coaching AI</span>
     </header>
     <nav class="legal-nav" id="legal-nav" aria-label="Legal and support pages"></nav>
     <article class="legal-body" id="legal-body"></article>
@@ -874,7 +903,7 @@ const Store = makeStore("localStorage");          // stays on this device
 const SessionStore = makeStore("sessionStorage");  // forgotten when the tab is closed
 
 /* ==========================================================================
-   3. 🔌 BACKEND DETECTION
+   3. BACKEND DETECTION
    --------------------------------------------------------------------------
    On the Pitchside website (with the /api server running) this page uses the
    REAL login (Supabase), REAL payments (Stripe) and the REAL AI coach (Claude).
@@ -924,7 +953,7 @@ async function api(path, body, method = "POST") {
 }
 
 /* ==========================================================================
-   4. 🔐 LOGIN
+   4. LOGIN
    --------------------------------------------------------------------------
    Two versions with the same functions:
      signUp({ name, email, password, remember }) -> user   (throws Error with a message)
@@ -1113,7 +1142,7 @@ const AuthService = {
 };
 
 /* ==========================================================================
-   5. 💳 PAYMENTS
+   5. PAYMENTS
    --------------------------------------------------------------------------
    Real site: Stripe Checkout (the server creates the checkout page, and the
    Stripe webhook updates the plan after payment). Test mode: pretend.
@@ -1231,7 +1260,7 @@ const Limits = {
 };
 
 /* ==========================================================================
-   7. 🤖 AI COACH
+   7. AI COACH
    --------------------------------------------------------------------------
    Real site: our server asks Claude (the API key stays on the server).
    Test mode: example answers from the built-in library further down.
@@ -1304,7 +1333,7 @@ function coachProfileText(ctx) {
 const PREVIEW_AI_ERRORS = {
   rate_limited: "The AI coach is busy (or your Claude usage limit was reached). Please try again in a little while.",
   session_expired: "Please sign in to Claude again, then ask your question.",
-  refused: "Sorry, I can't help with that one. Ask me anything about improving your football! ⚽",
+  refused: "Sorry, I can't help with that one. Ask me anything about improving your football!",
   prompt_too_large: "That conversation got too long for me – tap \"New chat\" and ask again."
 };
 
@@ -1365,12 +1394,12 @@ async function getDietFeedback(input) {
    ========================================================================== */
 // Equipment keys used by the questions and the drill library.
 const EQUIPMENT = [
-  { key: "ball",    label: "⚽ Ball",               words: ["ball"] },
-  { key: "cones",   label: "🔶 Cones",              words: ["cone", "marker"] },
-  { key: "goal",    label: "🥅 Goal",               words: ["goal", "net"] },
-  { key: "wall",    label: "🧱 Wall",               words: ["wall", "rebound"] },
-  { key: "partner", label: "🧑‍🤝‍🧑 A friend to train with", words: ["friend", "partner", "mate", "brother", "sister", "dad", "mum", "mom", "someone", "teammate"] },
-  { key: "space",   label: "🏟️ Pitch or park",      words: ["pitch", "park", "field", "space", "grass"] }
+  { key: "ball",    label: "Ball",               words: ["ball"] },
+  { key: "cones",   label: "Cones",              words: ["cone", "marker"] },
+  { key: "goal",    label: "Goal",               words: ["goal", "net"] },
+  { key: "wall",    label: "Wall",               words: ["wall", "rebound"] },
+  { key: "partner", label: "A friend to train with", words: ["friend", "partner", "mate", "brother", "sister", "dad", "mum", "mom", "someone", "teammate"] },
+  { key: "space",   label: "Pitch or park",      words: ["pitch", "park", "field", "space", "grass"] }
 ];
 
 // Every drill: name, detail, default minutes, and the equipment it needs.
@@ -1508,23 +1537,23 @@ const DRILLS = {
 for (const [cat, list] of Object.entries(DRILLS)) list.forEach(d => (d.cat = cat));
 
 const FOCUS_INFO = {
-  sharpen:     { label: "Pre-match sharpen-up", icon: "⚡", type: "sharpen" },
-  ballMastery: { label: "Ball Mastery", icon: "⚽", type: "skill" },
-  passing:     { label: "Passing", icon: "🎯", type: "skill" },
-  firstTouch:  { label: "First Touch", icon: "👟", type: "skill" },
-  shooting:    { label: "Shooting & Finishing", icon: "🥅", type: "skill" },
-  dribbling:   { label: "Dribbling & 1v1", icon: "🌀", type: "skill" },
-  speed:       { label: "Speed & Agility", icon: "⚡", type: "speed" },
-  fitness:     { label: "Fitness & Stamina", icon: "🔋", type: "fitness" },
-  strength:    { label: "Strength & Balance", icon: "💪", type: "strength" },
-  gameIQ:      { label: "Game Intelligence", icon: "🧠", type: "skill" },
-  weakFoot:    { label: "Weaker Foot", icon: "🦶", type: "skill" },
+  sharpen:     { label: "Pre-match sharpen-up", icon: "", type: "sharpen" },
+  ballMastery: { label: "Ball Mastery", icon: "", type: "skill" },
+  passing:     { label: "Passing", icon: "", type: "skill" },
+  firstTouch:  { label: "First Touch", icon: "", type: "skill" },
+  shooting:    { label: "Shooting & Finishing", icon: "", type: "skill" },
+  dribbling:   { label: "Dribbling & 1v1", icon: "", type: "skill" },
+  speed:       { label: "Speed & Agility", icon: "", type: "speed" },
+  fitness:     { label: "Fitness & Stamina", icon: "", type: "fitness" },
+  strength:    { label: "Strength & Balance", icon: "", type: "strength" },
+  gameIQ:      { label: "Game Intelligence", icon: "", type: "skill" },
+  weakFoot:    { label: "Weaker Foot", icon: "", type: "skill" },
   heading:     { label: "Heading", icon: "⬆️", type: "skill" },
-  defending:   { label: "Defending", icon: "🛡️", type: "skill" },
-  crossing:    { label: "Crossing", icon: "📐", type: "skill" },
-  game:        { label: "Game Play", icon: "🏟️", type: "game" },
-  light:       { label: "Light Touch & Recovery", icon: "🧘", type: "light" },
-  position:    { label: "Position Skills", icon: "📋", type: "skill" }
+  defending:   { label: "Defending", icon: "", type: "skill" },
+  crossing:    { label: "Crossing", icon: "", type: "skill" },
+  game:        { label: "Game Play", icon: "", type: "game" },
+  light:       { label: "Light Touch & Recovery", icon: "", type: "light" },
+  position:    { label: "Position Skills", icon: "", type: "skill" }
 };
 
 // Words a player might type → the focus they point to.
@@ -1679,7 +1708,7 @@ function fakeTrainingPlan(p) {
   return DAY_NAMES.map(day => {
     if (day === week.game) {
       streak++;
-      return { day, focus: "Game day", icon: "🏟️", match: true, minutes: 0,
+      return { day, focus: "Game day", icon: "", match: true, minutes: 0,
         why: "Game day – fuel up, warm up properly and give it everything.",
         drills: [
           { name: "Warm up properly", detail: "Do your team's warm-up (Premium has a full match-day routine)", minutes: 0 },
@@ -1689,7 +1718,7 @@ function fakeTrainingPlan(p) {
     }
     if (week.club.includes(day)) {
       streak++;
-      return { day, focus: "Club training", icon: "👕", club: true, minutes: 0,
+      return { day, focus: "Club training", icon: "", club: true, minutes: 0,
         why: day === week.preGame ? "Club training the day before your game – go easy on extra work today." : "Your club session counts as training – no extra session today.",
         drills: [
           { name: "Club training", detail: "Train with your team and give it your best", minutes: 0 },
@@ -1716,7 +1745,7 @@ function fakeTrainingPlan(p) {
     const info = FOCUS_INFO[cat];
     const { minutes, why } = sessionLength(info.type, available, p.ageGroup);
     const label = cat === "position" ? `${p.position} Skills` : info.label;
-    const icon = cat === "position" && p.position === "Goalkeeper" ? "🧤" : info.icon;
+    const icon = cat === "position" && p.position === "Goalkeeper" ? "" : info.icon;
 
     // Warm-up and cool-down scale with the session length.
     const warm = cat === "light" ? 0 : cat === "sharpen" ? 4 : minutes <= 20 ? 5 : minutes <= 45 ? 8 : 10;
@@ -1761,25 +1790,25 @@ function fakeTrainingPlan(p) {
 }
 
 const COACH_ANSWERS = [
-  { keys: ["weak foot", "left foot", "right foot", "other foot"], reply: "Great question! To improve your weaker foot:\n\n1. Do 100 wall passes with ONLY your weak foot every day.\n2. Juggle using just that foot.\n3. In training games, challenge yourself to use it at least 5 times.\n\nIt feels awkward at first, but after 3–4 weeks you'll notice a big difference! 💪" },
-  { keys: ["faster", "speed", "pace", "quick"], reply: "To get faster:\n\n• Short sprints (10–20 m) with full rest between them\n• Ladder drills for quick feet\n• Work on your first 3 steps – that's where games are won\n• Sleep well – your body gets faster while you rest!\n\nTry 2 speed sessions a week. 🏃" },
-  { keys: ["shoot", "shot", "finish", "score", "goal"], reply: "Better shooting tips:\n\n1. Plant your non-kicking foot next to the ball, pointing at the target.\n2. Keep your head down and body over the ball to keep it low.\n3. Strike with your laces for power, inside of the foot for accuracy.\n4. Aim for the corners – keepers hate them!\n\nPractise 20 shots, 3 times a week. ⚽" },
-  { keys: ["stamina", "fitness", "tired", "run more", "endurance"], reply: "To build stamina:\n\n• Interval runs: 1 min fast, 1 min jog, repeat 8 times\n• Play small-sided games – they're fitness in disguise\n• Drink water and eat carbs (pasta, rice) before training\n\nBuild it up slowly over a few weeks. 🔋" },
-  { keys: ["dribbl", "skill", "trick"], reply: "Dribbling tips:\n\n• Keep the ball close – lots of small touches\n• Use both the inside and outside of your feet\n• Look up between touches to see space\n• Learn 2 moves really well (like a step-over and a drag-back) before adding more\n\nSet up cones and dribble through them every day! 🌀" },
-  { keys: ["pass", "passing"], reply: "For better passing:\n\n• Use the inside of your foot for short, accurate passes\n• Point your standing foot where you want the ball to go\n• Check your shoulder BEFORE the ball arrives so you know where to pass\n• Pass to your teammate's stronger foot\n\nWall passing is the best way to practise alone. 🎯" },
-  { keys: ["first touch", "control", "touch"], reply: "First touch is everything! Try this:\n\n• Kick the ball against a wall and control it with different parts of your foot\n• Cushion the ball – relax your foot as it arrives\n• Take your first touch AWAY from pressure, into space\n\n10 minutes a day will make a huge difference. 👟" },
-  { keys: ["nervous", "confidence", "scared", "pressure", "mental"], reply: "Feeling nervous is normal – even pros feel it!\n\n• Breathe slowly: in for 4 seconds, out for 4\n• Focus on your first simple action (a short pass or a tackle)\n• Remember: mistakes are how you learn\n• Picture yourself playing well the night before\n\nYou've got this! 🙌" },
-  { keys: ["eat", "food", "diet", "drink", "water", "nutrition"], reply: "Fuel like a pro:\n\n• 2–3 hours before: pasta, rice or a sandwich\n• Drink water all day, not just during games\n• After: some protein (chicken, eggs, yoghurt) + fruit\n• Avoid lots of sweets and fizzy drinks before matches 🍝💧" },
-  { keys: ["header", "heading"], reply: "Heading tips:\n\n• Use your forehead, not the top of your head\n• Keep your eyes open and mouth closed\n• Attack the ball – don't let it hit you\n• Use your arms for balance when you jump\n\nYounger players should practise with a soft/light ball. 🧠" },
-  { keys: ["goalkeeper", "keeper", "save", "diving"], reply: "Goalkeeper tips:\n\n• Stay on your toes in the 'ready' position\n• Make your hands into a 'W' shape to catch\n• Narrow the angle by stepping off your line\n• Communicate loudly with your defenders!\n\nPractise diving on soft grass first. 🧤" },
-  { keys: ["defend", "tackl", "defender"], reply: "Defending tips:\n\n• Stand side-on so you can turn quickly\n• Stay patient – don't dive in!\n• Watch the ball, not the player's tricks\n• Show the attacker onto their weaker foot or towards the sideline\n\nGood defenders are patient defenders. 🛡️" },
-  { keys: ["injur", "hurt", "pain", "sore"], reply: "If something hurts, stop and rest – and tell a parent, coach or doctor, especially if the pain lasts more than a couple of days. For small knocks, rest and ice can help. Always warm up properly to help prevent injuries. 🩹" }
+  { keys: ["weak foot", "left foot", "right foot", "other foot"], reply: "Great question! To improve your weaker foot:\n\n1. Do 100 wall passes with ONLY your weak foot every day.\n2. Juggle using just that foot.\n3. In training games, challenge yourself to use it at least 5 times.\n\nIt feels awkward at first, but after 3–4 weeks you'll notice a big difference!" },
+  { keys: ["faster", "speed", "pace", "quick"], reply: "To get faster:\n\n• Short sprints (10–20 m) with full rest between them\n• Ladder drills for quick feet\n• Work on your first 3 steps – that's where games are won\n• Sleep well – your body gets faster while you rest!\n\nTry 2 speed sessions a week." },
+  { keys: ["shoot", "shot", "finish", "score", "goal"], reply: "Better shooting tips:\n\n1. Plant your non-kicking foot next to the ball, pointing at the target.\n2. Keep your head down and body over the ball to keep it low.\n3. Strike with your laces for power, inside of the foot for accuracy.\n4. Aim for the corners – keepers hate them!\n\nPractise 20 shots, 3 times a week." },
+  { keys: ["stamina", "fitness", "tired", "run more", "endurance"], reply: "To build stamina:\n\n• Interval runs: 1 min fast, 1 min jog, repeat 8 times\n• Play small-sided games – they're fitness in disguise\n• Drink water and eat carbs (pasta, rice) before training\n\nBuild it up slowly over a few weeks." },
+  { keys: ["dribbl", "skill", "trick"], reply: "Dribbling tips:\n\n• Keep the ball close – lots of small touches\n• Use both the inside and outside of your feet\n• Look up between touches to see space\n• Learn 2 moves really well (like a step-over and a drag-back) before adding more\n\nSet up cones and dribble through them every day!" },
+  { keys: ["pass", "passing"], reply: "For better passing:\n\n• Use the inside of your foot for short, accurate passes\n• Point your standing foot where you want the ball to go\n• Check your shoulder BEFORE the ball arrives so you know where to pass\n• Pass to your teammate's stronger foot\n\nWall passing is the best way to practise alone." },
+  { keys: ["first touch", "control", "touch"], reply: "First touch is everything! Try this:\n\n• Kick the ball against a wall and control it with different parts of your foot\n• Cushion the ball – relax your foot as it arrives\n• Take your first touch AWAY from pressure, into space\n\n10 minutes a day will make a huge difference." },
+  { keys: ["nervous", "confidence", "scared", "pressure", "mental"], reply: "Feeling nervous is normal – even pros feel it!\n\n• Breathe slowly: in for 4 seconds, out for 4\n• Focus on your first simple action (a short pass or a tackle)\n• Remember: mistakes are how you learn\n• Picture yourself playing well the night before\n\nYou've got this!" },
+  { keys: ["eat", "food", "diet", "drink", "water", "nutrition"], reply: "Fuel like a pro:\n\n• 2–3 hours before: pasta, rice or a sandwich\n• Drink water all day, not just during games\n• After: some protein (chicken, eggs, yoghurt) + fruit\n• Avoid lots of sweets and fizzy drinks before matches" },
+  { keys: ["header", "heading"], reply: "Heading tips:\n\n• Use your forehead, not the top of your head\n• Keep your eyes open and mouth closed\n• Attack the ball – don't let it hit you\n• Use your arms for balance when you jump\n\nYounger players should practise with a soft/light ball." },
+  { keys: ["goalkeeper", "keeper", "save", "diving"], reply: "Goalkeeper tips:\n\n• Stay on your toes in the 'ready' position\n• Make your hands into a 'W' shape to catch\n• Narrow the angle by stepping off your line\n• Communicate loudly with your defenders!\n\nPractise diving on soft grass first." },
+  { keys: ["defend", "tackl", "defender"], reply: "Defending tips:\n\n• Stand side-on so you can turn quickly\n• Stay patient – don't dive in!\n• Watch the ball, not the player's tricks\n• Show the attacker onto their weaker foot or towards the sideline\n\nGood defenders are patient defenders." },
+  { keys: ["injur", "hurt", "pain", "sore"], reply: "If something hurts, stop and rest – and tell a parent, coach or doctor, especially if the pain lasts more than a couple of days. For small knocks, rest and ice can help. Always warm up properly to help prevent injuries." }
 ];
 
 // Used only when no AI is connected (e.g. a copy of the page with no server).
 function offlineCoachReply(question) {
   const tip = COACH_ANSWERS.find(a => a.keys.some(k => question.toLowerCase().includes(k)));
-  return "📴 The AI coach isn't connected in this copy of the app, so I can't answer your exact question here. " +
+  return "The AI coach isn't connected in this copy of the app, so I can't answer your exact question here. " +
     "On the Pitchside Coaching AI website every answer comes from the real AI coach (Claude by Anthropic)." +
     (tip ? "\n\nIn the meantime, here's a saved tip on that topic:\n\n" + tip.reply : "");
 }
@@ -1916,7 +1945,7 @@ function scrollToBottom(container) {
 function addMessage(container, sender, text) {
   const msg = document.createElement("div");
   msg.className = "fc-msg " + sender;
-  msg.innerHTML = `<div class="fc-avatar">${sender === "user" ? "You" : "⚽"}</div><div class="fc-bubble"></div>`;
+  msg.innerHTML = `<div class="fc-avatar">${sender === "user" ? "You" : ""}</div><div class="fc-bubble"></div>`;
   msg.querySelector(".fc-bubble").textContent = text;
   container.appendChild(msg);
   scrollToBottom(container);
@@ -1938,7 +1967,7 @@ function addActionMessage(container, text, actions, kind = "bot") {
 function showTyping(container) {
   const msg = document.createElement("div");
   msg.className = "fc-msg bot";
-  msg.innerHTML = `<div class="fc-avatar">⚽</div><div class="fc-bubble fc-typing"><span></span><span></span><span></span></div>`;
+  msg.innerHTML = `<div class="fc-avatar"></div><div class="fc-bubble fc-typing"><span></span><span></span><span></span></div>`;
   container.appendChild(msg);
   scrollToBottom(container);
   return () => msg.remove();
@@ -1997,7 +2026,7 @@ function showScreen(name) {
   window.scrollTo(0, 0);
 }
 
-const upgradeButton = (label = "⭐ Upgrade") => ({ label, primary: true, onClick: openPlans });
+const upgradeButton = (label = "Upgrade") => ({ label, primary: true, onClick: openPlans });
 function openPlans() {
   renderPlansPage(true);
   showScreen("plans");
@@ -2058,7 +2087,7 @@ async function submitAuth() {
       const user = await AuthService.updatePassword(details.password);
       $("auth-password").value = "";
       startSession(user);
-      return toast("Password updated – you're logged in. ✅");
+      return toast("Password updated – you're logged in.");
     }
     const user = authMode === "signup" ? await AuthService.signUp(details) : await AuthService.logIn(details);
     $("auth-password").value = "";
@@ -2066,7 +2095,7 @@ async function submitAuth() {
       startSession(user, { showPlans: true });
     } else {
       startSession(user);
-      toast(`Welcome back, ${user.name}! ⚽`);
+      toast(`Welcome back, ${user.name}!`);
     }
   } catch (err) {
     showAuthMessage(err.message, Boolean(err.info));
@@ -2153,7 +2182,7 @@ document.querySelectorAll("[data-choose-plan]").forEach(button => {
       $("pay-modal").hidden = true;
       enterApp();
       if (!waitingForAnswer) startPlanner(); // refresh the planner with the new allowance
-      toast(plan === "free" ? "You're on the Free plan." : `You're on ${PLANS[plan].name}${billingInterval === "year" ? " (yearly)" : ""}! 🎉 New features unlocked.`);
+      toast(plan === "free" ? "You're on the Free plan." : `You're on ${PLANS[plan].name}${billingInterval === "year" ? " (yearly)" : ""}! New features unlocked.`);
     } catch (err) {
       $("pay-modal").hidden = true;
       toast(err.message || "That didn't go through. Please try again.");
@@ -2181,7 +2210,7 @@ async function handleCheckoutReturn() {
       currentUser = fresh;
       enterApp();
       if (!waitingForAnswer) startPlanner();
-      return toast(`You're on ${PLANS[fresh.plan].name}! 🎉 New features unlocked.`);
+      return toast(`You're on ${PLANS[fresh.plan].name}! New features unlocked.`);
     }
   }
   toast("Payment received – your plan will update in a moment. Refresh if it doesn't.");
@@ -2220,15 +2249,118 @@ function renderHeader() {
   renderUsage();
 }
 
+// The row under Today: this week's load, what's left on the plan, and progress so far.
 function renderUsage() {
   const plans = Limits.plansLeft(currentUser, userData);
   const questions = Limits.questionsLeft(currentUser, userData);
   const plan = planOf(currentUser);
-  const pill = (label, left, total, extra = "") =>
-    `<span class="usage-pill ${left === 0 ? "out" : ""}">${label}: <strong>${left === Infinity ? "Unlimited" : `${left} of ${total} left`}</strong>${extra}</span>`;
+  const cell = (label, value, note = "", { out = false, used = null } = {}) => `
+    <div class="stat-cell ${out ? "out" : ""}"><dt>${label}</dt><dd>${value}${note ? `<small>${note}</small>` : ""}</dd>
+      ${used === null ? "" : `<div class="stat-bar" aria-hidden="true"><span style="width:${Math.round(Math.min(1, used) * 100)}%"></span></div>`}</div>`;
+  const allowance = (left, total) => (left === Infinity ? "Unlimited" : `${left}<small style="display:inline;margin:0"> of ${total} left</small>`);
+  const usedShare = (left, total) => (left === Infinity ? null : (total - left) / total);
+
+  const latest = userData.latest;
+  const week = latest ? latest.plan.filter(isSoloSession) : [];
+  const weekMinutes = week.reduce((t, d) => t + (parseInt(d.minutes, 10) || 0), 0);
+  const team = latest ? latest.plan.filter(d => d.club || d.match).length : 0;
+  const built = Math.max(userData.savedPlans.length, latest ? 1 : 0);
+  const checkins = userData.checkins || [];
+
   $("usage-strip").innerHTML =
-    pill("📅 Training plans", plans, plan.plansAllowed, plans === 0 ? ` · next on ${escapeHTML(niceDate(Limits.nextPlanDate(currentUser)))}` : ` ${plan.plansAllowed === Infinity ? "" : "this " + plan.planPeriod}`) +
-    pill("💬 Coach questions", questions, plan.questionsPerDay, questions === Infinity ? "" : " today");
+    cell("This week", latest ? `${week.length} sessions` : "No plan yet",
+      latest ? `${formatMinutes(weekMinutes)} of training${team ? ` + ${team} club & game day${team > 1 ? "s" : ""}` : ""}` : "Build one in the planner") +
+    cell("Training plans", allowance(plans, plan.plansAllowed),
+      plans === 0 ? `Next on ${escapeHTML(niceDate(Limits.nextPlanDate(currentUser)))}` : plan.plansAllowed === Infinity ? "Rebuild any time" : `This ${plan.planPeriod}`,
+      { out: plans === 0, used: usedShare(plans, plan.plansAllowed) }) +
+    cell("Coach questions", allowance(questions, plan.questionsPerDay), questions === Infinity ? "Ask as much as you like" : "Today",
+      { out: questions === 0, used: usedShare(questions, plan.questionsPerDay) }) +
+    (hasFeature(currentUser, "premium")
+      ? cell("Check-ins", String(checkins.length), checkins.length ? `Last on ${escapeHTML(niceDate(new Date(checkins[checkins.length - 1].date)))}` : "Do one at the end of the week")
+      : cell("Plans built", String(built), built ? "Keep building week by week" : "Your first is a few taps away"));
+  renderToday();
+}
+
+/* ---------- Today: what to do now, and the week at a glance ---------- */
+const dayKind = d => (d.match ? "match" : d.club ? "club" : d.rest ? "rest" : "training");
+const kitLabel = keys => (keys || []).map(k => (EQUIPMENT.find(e => e.key === k) || {}).label).filter(Boolean).join(", ");
+
+function renderToday() {
+  const el = $("today-panel");
+  if (!el || !currentUser) return;
+  const latest = userData.latest;
+  const eyebrow = `Today · ${escapeHTML(niceDate(new Date()))}`;
+  if (!latest) {
+    el.innerHTML = `
+      <div class="today-main">
+        <span class="eyebrow">${eyebrow}</span>
+        <h2 class="today-title">Build your training week</h2>
+        <p class="today-first">Answer a few quick questions and get a 7-day plan built around your position, kit, club training and games.</p>
+        <div class="today-actions"><button type="button" class="btn btn-primary" data-today="start">Start the planner</button></div>
+      </div>
+      <div class="today-week"><span class="eyebrow">This week</span><p class="today-empty">Your week appears here once you've made a plan.</p></div>`;
+    el.querySelector("[data-today=start]").addEventListener("click", () => { openTab("planner"); $("panel-planner").scrollIntoView({ behavior: "smooth", block: "start" }); plannerInput.focus({ preventScroll: true }); });
+    return;
+  }
+  const name = todayName();
+  const today = latest.plan.find(d => d.day === name) || latest.plan[0];
+  const kind = dayKind(today);
+  const order = DAY_NAMES.indexOf(name);
+  const next = [1, 2, 3, 4, 5, 6].map(i => latest.plan.find(d => d.day === DAY_NAMES[(order + i) % 7])).find(d => d && isSoloSession(d));
+  const main = today.drills.find(d => !/warm-up|cool-down/i.test(d.name)) || today.drills[0];
+  const title = { training: today.focus, club: "Club training", match: "Game day", rest: today.focus }[kind];
+  const kit = kitLabel(main && main.needs);
+  const meta = kind === "training"
+    ? [`<strong>${escapeHTML(today.minutes)} min</strong>`, `${today.drills.length} drills`, kit ? `Needs ${escapeHTML(kit)}` : ""]
+    : [kind === "match" ? "Fuel up, warm up properly and enjoy it" : kind === "club" ? "Train with your team today" : "No session today. Recovery is part of the plan.",
+       next ? `Next session: <strong>${escapeHTML(next.day)}</strong>, ${escapeHTML(next.focus)}` : ""];
+  const first = kind === "training" && main
+    ? `<p class="today-first">First up: ${escapeHTML(main.name)}${main.detail && hasFeature(currentUser, "drillSteps") ? ` <span>· ${escapeHTML(main.detail)}</span>` : ""}</p>`
+    : today.why ? `<p class="today-first"><span>${escapeHTML(today.why)}</span></p>` : "";
+  const premium = hasFeature(currentUser, "premium");
+  const game = latest.plan.find(d => d.match);
+  const club = latest.plan.filter(d => d.club);
+  const cellText = d => ({ training: `${d.minutes}`, club: "Club", match: "Game", rest: "–" }[dayKind(d)]);
+  el.innerHTML = `
+    <div class="today-main">
+      <span class="eyebrow">${eyebrow}</span>
+      <h2 class="today-title">${escapeHTML(title)}</h2>
+      <p class="today-meta">${meta.filter(Boolean).map(m => `<span>${m}</span>`).join("")}</p>
+      ${first}
+      <div class="today-actions">
+        <button type="button" class="btn ${kind === "training" ? "btn-primary" : "btn-ghost"}" data-today="open">${kind === "training" ? "Open today's session" : "View this week"}</button>
+        ${premium && kind !== "rest" ? `<button type="button" class="btn btn-ghost" data-today="meals">Today's meals</button>` : ""}
+      </div>
+    </div>
+    <div class="today-week">
+      <span class="eyebrow">This week</span>
+      <div class="mini-week">
+        ${latest.plan.map(d => `<button type="button" class="mini-day ${dayKind(d)}${d.day === name ? " today" : ""}" data-today-day="${escapeHTML(d.day)}" aria-label="${escapeHTML(d.day)}: ${escapeHTML(d.focus)}">
+          <b>${escapeHTML(d.day.slice(0, 3))}</b><i>${escapeHTML(cellText(d))}</i></button>`).join("")}
+      </div>
+      <p class="mini-legend"><span>Numbers are minutes</span><span>Tap a day to open it</span></p>
+      <dl class="today-next">
+        ${next && kind === "training" ? `<div><dt>Next session</dt><dd>${escapeHTML(next.day)} · ${escapeHTML(next.focus)} · ${escapeHTML(next.minutes)} min</dd></div>` : ""}
+        ${game ? `<div><dt>Next game</dt><dd>${game.day === name ? "Today" : escapeHTML(game.day)}</dd></div>` : ""}
+        ${club.length ? `<div><dt>Club training</dt><dd>${escapeHTML(club.map(d => d.day.slice(0, 3)).join(", "))}</dd></div>` : ""}
+      </dl>
+    </div>`;
+  el.querySelector("[data-today=open]").addEventListener("click", () => openSession(kind === "training" ? name : null));
+  const meals = el.querySelector("[data-today=meals]");
+  if (meals) meals.addEventListener("click", () => openMealsFor(name));
+  el.querySelectorAll("[data-today-day]").forEach(b => b.addEventListener("click", () => openSession(b.dataset.todayDay)));
+}
+
+// Shows the current plan in the planner and scrolls to a day (or the top of the plan).
+function openSession(day) {
+  const latest = userData.latest;
+  if (!latest) return;
+  openTab("planner");
+  let wrap = [...plannerMsgs.querySelectorAll(".fc-plan")].reverse().find(w => w._plan === latest.plan);
+  if (!wrap) wrap = renderPlan(plannerMsgs, latest.plan, latest.answers, { scroll: false });
+  const target = (day && wrap.querySelector(`[data-day-row="${day}"]`)) || wrap;
+  $("panel-planner").scrollIntoView({ behavior: "smooth", block: "start" });
+  plannerMsgs.scrollTop += target.getBoundingClientRect().top - plannerMsgs.getBoundingClientRect().top - 12;
 }
 
 $("plan-badge").addEventListener("click", openPlans);
@@ -2248,19 +2380,19 @@ const openTab = name => document.querySelector(`.fc-tab[data-tab="${name}"]`).cl
 const NUMBER_WORDS = { once: 1, one: 1, twice: 2, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, daily: 7, everyday: 7, "every day": 7 };
 
 const QUESTIONS = [
-  { key: "position", text: "First up – what position do you play? ⚽", options: ["Goalkeeper", "Defender", "Midfielder", "Winger", "Striker"] },
+  { key: "position", text: "First up – what position do you play?", options: ["Goalkeeper", "Defender", "Midfielder", "Winger", "Striker"] },
   { key: "ageGroup", text: "Nice! What is your age group?", options: ["Under 10", "10-13", "14-17", "18+"] },
-  { key: "foot", text: "Which is your strong foot? 👟", options: ["Left", "Right", "Both"] },
-  { key: "equipment", multi: true, text: "What do you have access to when you train? Tap everything that applies, then hit Done ✅",
+  { key: "foot", text: "Which is your strong foot?", options: ["Left", "Right", "Both"] },
+  { key: "equipment", multi: true, text: "What do you have access to when you train? Tap everything that applies, then hit Done",
     options: EQUIPMENT, parseMulti: parseEquipment, labelMulti: equipmentLabel,
     multiPlaceholder: "Tap all that apply, or type e.g. \"a ball and a wall\"",
     multiHelp: "Tap the things you have (ball, cones, goal, wall, a friend, a pitch or park), then Done." },
-  { key: "clubDays", multi: true, text: "Do you train with a club or team? Tap the days you have club training, then hit Done 👕",
-    options: DAY_NAMES.map(d => ({ key: d, label: d.slice(0, 3) })), noneChip: "🚫 No club training",
+  { key: "clubDays", multi: true, text: "Do you train with a club or team? Tap the days you have club training, then hit Done",
+    options: DAY_NAMES.map(d => ({ key: d, label: d.slice(0, 3) })), noneChip: "No club training",
     parseMulti: parseDays, labelMulti: clubDaysLabel,
     multiPlaceholder: "Tap your club days, or type e.g. \"Tuesday and Thursday\"",
     multiHelp: "Tap the days you train with your club (or \"No club training\"), then Done." },
-  { key: "gameDay", text: "When is your game day? 🏟️", options: ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "No regular game"],
+  { key: "gameDay", text: "When is your game day?", options: ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "No regular game"],
     parse: text => {
       const lower = text.toLowerCase();
       if (/\b(no|none|not|don'?t|never)\b/.test(lower)) return "No regular game";
@@ -2268,8 +2400,8 @@ const QUESTIONS = [
     } },
   { key: "daysPerWeek", options: ["1 day", "2 days", "3 days", "4 days", "5 days", "6 days"],
     text: () => (profile.clubDays || []).length || DAY_NAMES.includes(profile.gameDay)
-      ? "On top of that, how many days a week can you train on your own? 📅 I'll fit them around your club and games."
-      : "How many days a week can you train? 📅",
+      ? "On top of that, how many days a week can you train on your own? I'll fit them around your club and games."
+      : "How many days a week can you train?",
     parse: text => {
       const lower = text.toLowerCase();
       const word = Object.keys(NUMBER_WORDS).find(w => lower.includes(w));
@@ -2278,7 +2410,7 @@ const QUESTIONS = [
       const days = Math.min(6, Math.max(1, n)); // always keep at least one rest day
       return days + (days === 1 ? " day" : " days");
     } },
-  { key: "sessionTime", text: "How much time do you usually have for each session? ⏱", options: ["15 min", "30 min", "45 min", "60 min", "90 min"],
+  { key: "sessionTime", text: "How much time do you usually have for each session?", options: ["15 min", "30 min", "45 min", "60 min", "90 min"],
     parse: text => {
       const lower = text.toLowerCase();
       let mins;
@@ -2293,8 +2425,8 @@ const QUESTIONS = [
       const snap = [15, 30, 45, 60, 90].reduce((a, b) => Math.abs(b - mins) < Math.abs(a - mins) ? b : a);
       return snap + " min";
     } },
-  { key: "weaknesses", text: "What are your weaknesses? Be honest – that's how we improve! 💪", placeholder: "e.g. my left foot, I get tired quickly...", skipChip: "🤷 Nothing specific" },
-  { key: "goal", text: "Last one! What do you want to work on most? 🎯", placeholder: "e.g. scoring more goals, getting faster...", skipChip: "🔄 Mix it up for me" }
+  { key: "weaknesses", text: "What are your weaknesses? Be honest – that's how we improve!", placeholder: "e.g. my left foot, I get tired quickly...", skipChip: "Nothing specific" },
+  { key: "goal", text: "Last one! What do you want to work on most?", placeholder: "e.g. scoring more goals, getting faster...", skipChip: "Mix it up for me" }
 ];
 
 const plannerMsgs = document.getElementById("planner-messages");
@@ -2335,7 +2467,7 @@ async function askQuestion() {
       plannerOptions.appendChild(chip);
     });
     // Keep answers in the options' order (e.g. Mon before Thu).
-    plannerOptions.appendChild(makeChip("✅ Done", () => handleAnswer(q.options.map(o => o.key).filter(k => selected.has(k))), true));
+    plannerOptions.appendChild(makeChip("Done", () => handleAnswer(q.options.map(o => o.key).filter(k => selected.has(k))), true));
     plannerInput.placeholder = q.multiPlaceholder;
   } else if (q.options) {
     q.options.forEach(opt => plannerOptions.appendChild(makeChip(opt, () => handleAnswer(opt))));
@@ -2417,7 +2549,7 @@ onSend(plannerInput, plannerSend, text => {
     handleAnswer(text);
   } else if (step >= QUESTIONS.length) {
     addMessage(plannerMsgs, "user", text);
-    addMessage(plannerMsgs, "bot", "Your plan is ready above! 👆 Tap \"Make a new plan\" to start again, or switch to \"Ask a Coach\" for questions.");
+    addMessage(plannerMsgs, "bot", "Your plan is ready above! Tap \"Make a new plan\" to start again, or switch to \"Ask a Coach\" for questions.");
   }
 });
 
@@ -2428,8 +2560,8 @@ async function buildPlan() {
   if (Limits.plansLeft(currentUser, userData) === 0) return showPlanLimit();
   profile.focusMode = hasSpecificFocus(profile) ? "targeted" : "rotating";
   await botSay(plannerMsgs, profile.focusMode === "rotating"
-    ? "No problem! I'll build you an all-round week where every training day has a different main focus. 🔄"
-    : "Brilliant! Give me a second to build your personal 7-day plan... 📝");
+    ? "No problem! I'll build you an all-round week where every training day has a different main focus."
+    : "Brilliant! Give me a second to build your personal 7-day plan...");
   const stop = showTyping(plannerMsgs);
   let result;
   try {
@@ -2469,90 +2601,115 @@ const isSoloSession = d => !d.rest && !d.club && !d.match;
 // Club days and game day, e.g. "Club: Tue, Thu · Game: Saturday".
 function teamWeekLabel(answers) {
   const parts = [];
-  if ((answers.clubDays || []).length) parts.push("👕 Club: " + clubDaysLabel(answers.clubDays));
-  if (DAY_NAMES.includes(answers.gameDay)) parts.push("🏟️ Game: " + answers.gameDay);
+  if ((answers.clubDays || []).length) parts.push("Club: " + clubDaysLabel(answers.clubDays));
+  if (DAY_NAMES.includes(answers.gameDay)) parts.push("Game: " + answers.gameDay);
   return parts.join(" · ");
 }
 
-// Draws a plan into `container`. What's shown depends on the player's plan:
-// Free = drill names only, Pro = step-by-step instructions, Premium = + PDF download.
+const KIND_LABEL = { training: "Training", club: "Club training", match: "Match day", rest: "Rest" };
+
+// Draws a plan into `container` as a training schedule: the week at a glance, then each day.
+// What's shown depends on the player's plan: Free = drill names only,
+// Pro = step-by-step instructions and kit, Premium = + PDF download and meal links.
 function renderPlan(container, plan, answers, { scroll = true } = {}) {
   const steps = hasFeature(currentUser, "drillSteps");
   const premium = hasFeature(currentUser, "premium");
+  const today = todayName();
   const wrap = document.createElement("div");
   wrap.className = "fc-plan";
-  const tags = [answers.position, answers.ageGroup, answers.foot + " foot"].map(t => `<span class="fc-tag">${escapeHTML(t)}</span>`).join("");
+  wrap._plan = plan;
+  const tags = [answers.position, answers.ageGroup, answers.foot && answers.foot + " foot"].filter(Boolean).map(t => `<span class="fc-tag">${escapeHTML(t)}</span>`).join("");
   const sessions = plan.filter(isSoloSession);
   const teamDays = plan.filter(d => d.club || d.match).length;
   const totalMinutes = sessions.reduce((s, d) => s + (parseInt(d.minutes, 10) || 0), 0);
   const stats = [
-    ["📅", teamDays ? "Your sessions" : "Sessions", sessions.length],
-    ...(teamDays ? [["👕", "Club & games", teamDays]] : []),
-    ["⏱", "Total time", formatMinutes(totalMinutes)],
-    ["🧰", "Kit", equipmentLabel(answers.equipment || [])]
-  ].map(([icon, label, value]) => `
-    <div class="fc-stat"><span class="fc-stat-label">${icon} ${label}</span><strong>${escapeHTML(value)}</strong></div>`).join("");
+    [teamDays ? "Your sessions" : "Sessions", sessions.length],
+    ...(teamDays ? [["Club & games", teamDays]] : []),
+    ["Total time", formatMinutes(totalMinutes)],
+    ["Kit", equipmentLabel(answers.equipment || []), "kit"]
+  ].map(([label, value, cls]) => `
+    <div class="fc-stat ${cls || ""}"><span class="fc-stat-label">${label}</span><strong>${escapeHTML(value)}</strong></div>`).join("");
 
-  const rotationDays = plan.filter(d => d.rotating && isSoloSession(d));
-  const rotationSection = rotationDays.length ? `
-    <div class="fc-rotation">
-      <div class="fc-rotation-head">
-        <h4>🔄 Rotating Focus Week</h4>
-        <p>You didn't pick one thing to work on, so each training day switches to a different main focus. That way you improve all-round.</p>
-      </div>
-      <div class="fc-rotation-steps">
-        ${rotationDays.map(d => `
-          <div class="fc-rotation-step">
-            <span class="fc-rotation-day">${escapeHTML(d.day.slice(0, 3))}</span>
-            <span class="fc-rotation-icon">${escapeHTML(d.icon || "⚽")}</span>
-            <span class="fc-rotation-name">${escapeHTML(d.focus)}</span>
-          </div>`).join("")}
-      </div>
-    </div>` : "";
+  const rotating = plan.some(d => d.rotating && isSoloSession(d));
+  const isRecovery = d => d.rest && /recover/i.test(d.focus || "");
 
-  const drillHTML = (dr, rest) => {
-    const top = `<div class="fc-drill-top"><strong>${escapeHTML(dr.name)}</strong>${dr.minutes ? `<em>${escapeHTML(dr.minutes)} min</em>` : ""}</div>`;
-    if (rest) return `<li>${top}<span>${escapeHTML(dr.detail)}</span></li>`;
-    if (!steps) return `<li>${top}</li>`;
-    return `<li>${top}<span>${escapeHTML(dr.detail)}</span>
-      <details><summary>How to do it</summary><ol>${drillSteps(dr).map(s => `<li>${escapeHTML(s)}</li>`).join("")}</ol></details></li>`;
+  // The week at a glance – tap a day to jump to it.
+  const board = plan.map(d => {
+    const kind = dayKind(d);
+    const focus = kind === "club" ? "With your team" : kind === "match" ? "Game" : d.focus;
+    return `<li><button type="button" class="wb-day ${kind}${d.day === today ? " today" : ""}" data-goto="${escapeHTML(d.day)}">
+      <span class="wb-name">${escapeHTML(d.day.slice(0, 3))}${d.day === today ? "<em>Today</em>" : ""}</span>
+      <span class="wb-kind">${isRecovery(d) ? "Recovery" : KIND_LABEL[kind]}</span>
+      <span class="wb-focus">${escapeHTML(focus)}</span>
+      <span class="wb-min">${kind === "training" ? `${escapeHTML(d.minutes)}<small> min</small>` : ""}</span>
+    </button></li>`;
+  }).join("");
+
+  const drillHTML = dr => {
+    const kit = steps ? kitLabel(dr.needs) : "";
+    return `<li><div>
+      <div class="fc-drill-top"><strong>${escapeHTML(dr.name)}</strong>${dr.minutes ? `<em>${escapeHTML(dr.minutes)} min</em>` : ""}</div>
+      ${steps && dr.detail ? `<span class="drill-detail">${escapeHTML(dr.detail)}</span>` : ""}
+      ${kit ? `<span class="drill-kit"><b>Kit</b>${escapeHTML(kit)}</span>` : ""}
+      ${steps ? `<details><summary>How to do it</summary><ol>${drillSteps(dr).map(t => `<li>${escapeHTML(t)}</li>`).join("")}</ol></details>` : ""}
+    </div></li>`;
   };
+  const noteHTML = dr => `<li><strong>${escapeHTML(dr.name)}.</strong> ${escapeHTML(dr.detail || "")}</li>`;
+
+  const days = plan.map(d => {
+    const kind = dayKind(d);
+    const solo = isSoloSession(d);
+    const time = { training: `${escapeHTML(d.minutes)} min`, club: "Club", match: "Game", rest: "Rest" }[kind];
+    return `
+      <section class="fc-day ${kind}${d.day === today ? " today" : ""}" data-day-row="${escapeHTML(d.day)}">
+        <div class="fc-day-top">
+          <span class="fc-day-name">${escapeHTML(d.day)}</span>
+          ${d.day === today ? `<span class="day-tag">Today</span>` : ""}
+          <span class="fc-day-time">${time}</span>
+        </div>
+        <div class="fc-day-body">
+          ${kind === "rest" ? "" : `<span class="day-kind">${KIND_LABEL[kind]}</span>`}
+          <h4 class="fc-day-focus">${escapeHTML(kind === "match" ? "Game day" : d.focus)}</h4>
+          ${d.why && (steps || !solo) ? `<p class="fc-day-why">${escapeHTML(d.why)}</p>` : ""}
+          ${solo ? `<ol class="drills">${d.drills.map(drillHTML).join("")}</ol>` : `<ul class="notes">${d.drills.map(noteHTML).join("")}</ul>`}
+          ${premium && !d.rest ? `<button type="button" class="fuel-link ${d.match ? "match" : ""}" data-fuel-day="${escapeHTML(d.day)}">
+            <span class="fuel-text">${escapeHTML(fuelLinkText(d))}</span> <strong>See ${d.day === today ? "today's" : escapeHTML(d.day) + "'s"} meals</strong></button>` : ""}
+        </div>
+      </section>`;
+  }).join("");
+
+  const notes = [
+    rotating ? `<p><strong>All-round week.</strong> You didn't pick one thing to work on, so each training day has a different main focus.</p>`
+      : `<p>Main goal: <strong>${escapeHTML(answers.goal || "")}</strong>. Working on: <strong>${escapeHTML(answers.weaknesses || "")}</strong>.</p>`,
+    teamWeekLabel(answers) ? `<p>${escapeHTML(teamWeekLabel(answers))}. Your sessions are planned around these, with a light day before the game and recovery after it.</p>` : "",
+    teamDays && sessions.length < (parseInt(answers.daysPerWeek, 10) || 0) ? `<p>I fitted in ${sessions.length} of your ${parseInt(answers.daysPerWeek, 10)} own sessions so you still get proper rest around your club training and games.</p>` : "",
+    `<p>Rest days are part of the plan: that's when your body gets stronger. Always warm up, drink water and stop if anything hurts.</p>`
+  ].join("");
 
   wrap.innerHTML = `
     <div class="fc-plan-head">
-      <h3>🏆 Your 7-Day Training Plan</h3>
+      <div>
+        <span class="eyebrow">Week plan</span>
+        <h3>Your 7-day training plan</h3>
+      </div>
       <div class="fc-tags">${tags}</div>
       <div class="fc-stats">${stats}</div>
     </div>
-    ${rotationSection}
-    <div class="fc-days">
-      ${plan.map(d => `
-        <div class="fc-day ${d.rest ? "rest" : d.match ? "match" : d.club ? "club" : ""}">
-          <div class="fc-day-top">
-            <span class="fc-day-name">${escapeHTML(d.day)}</span>
-            <span class="fc-day-time">${d.rest ? "😴 Rest" : d.match ? "🏟️ Game" : d.club ? "👕 Club" : "⏱ " + escapeHTML(d.minutes) + " min"}</span>
-          </div>
-          <span class="fc-day-focus">${d.icon ? escapeHTML(d.icon) + " " : ""}${escapeHTML(d.focus)}</span>
-          ${d.why && (steps || d.club || d.match) ? `<p class="fc-day-why">💡 ${escapeHTML(d.why)}</p>` : ""}
-          <ul>${d.drills.map(dr => drillHTML(dr, !isSoloSession(d))).join("")}</ul>
-          ${premium && !d.rest ? `<button type="button" class="fuel-link ${d.match ? "match" : ""}" data-fuel-day="${escapeHTML(d.day)}">
-            <span class="fuel-text">${escapeHTML(fuelLinkText(d))}</span> <strong>Click here for ${d.day === todayName() ? "today's" : escapeHTML(d.day) + "'s"} meals →</strong></button>` : ""}
-        </div>`).join("")}
-    </div>
-    ${steps ? "" : `<div class="plan-lock-note"><span>🔒 <strong>Want to know how to do each drill?</strong> Pro shows step-by-step instructions for every drill.</span></div>`}
+    <ol class="week-board" aria-label="The week at a glance">${board}</ol>
+    ${rotating ? `<div class="fc-rotation"><strong>Rotating focus.</strong> Each training day switches to a different main focus, so you improve all-round.</div>` : ""}
+    <div class="fc-days">${days}</div>
+    ${steps ? "" : `<div class="plan-lock-note"><span><strong>Want to know how to do each drill?</strong> Pro shows step-by-step instructions for every drill.</span></div>`}
     <div class="plan-actions"></div>
-    <div class="fc-plan-note">
-      ${rotationDays.length ? `🔄 Mode: <strong>All-round – main focus changes every training day</strong><br>`
-        : `🎯 Main goal: <strong>${escapeHTML(answers.goal)}</strong><br>💪 Working on: <strong>${escapeHTML(answers.weaknesses)}</strong><br>`}
-      ${teamWeekLabel(answers) ? `${escapeHTML(teamWeekLabel(answers))} – your sessions are planned around these, with a light day before the game and recovery after it.<br>` : ""}
-      ${teamDays && sessions.length < (parseInt(answers.daysPerWeek, 10) || 0) ? `📅 I fitted in ${sessions.length} of your ${parseInt(answers.daysPerWeek, 10)} own sessions so you still get proper rest around your club training and games.<br>` : ""}
-      Rest days are part of the plan – that's when your body actually gets stronger. Always warm up, drink water and stop if anything hurts.
-    </div>`;
+    <div class="fc-plan-note">${notes}</div>`;
 
-  if (!steps) wrap.querySelector(".plan-lock-note").appendChild(makeChip("⭐ Upgrade", openPlans, true));
+  if (!steps) wrap.querySelector(".plan-lock-note").appendChild(makeChip("Upgrade", openPlans, true));
   wrap.querySelectorAll("[data-fuel-day]").forEach(b => b.addEventListener("click", () => openMealsFor(b.dataset.fuelDay)));
+  wrap.querySelectorAll("[data-goto]").forEach(b => b.addEventListener("click", () => {
+    const row = wrap.querySelector(`[data-day-row="${b.dataset.goto}"]`);
+    if (row) row.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
   const actions = wrap.querySelector(".plan-actions");
-  actions.appendChild(makeChip(premium ? "📄 Download PDF" : "🔒 Download PDF", () => {
+  actions.appendChild(makeChip(premium ? "Download PDF" : "Download PDF (Premium)", () => {
     if (!premium) return lockedMessage(container, "Downloading your plan as a PDF is part of Premium.");
     downloadPlanPDF(plan, answers);
   }, premium));
@@ -2564,7 +2721,7 @@ function renderPlan(container, plan, answers, { scroll = true } = {}) {
 
 // Friendly "this is locked" message with an Upgrade button.
 function lockedMessage(container, text) {
-  addActionMessage(container, `🔒 ${text}`, [upgradeButton(), { label: "Not now", onClick: e => e.target.closest(".fc-msg").remove() }], "lock");
+  addActionMessage(container, `${text}`, [upgradeButton(), { label: "Not now", onClick: e => e.target.closest(".fc-msg").remove() }], "lock");
 }
 
 // Shows a server message such as "limit reached" as a friendly locked message. Returns true if handled.
@@ -2593,10 +2750,10 @@ function showPlanLimit() {
   plannerInput.placeholder = "New plan locked until " + niceDate(Limits.nextPlanDate(currentUser));
   const plan = planOf(currentUser);
   const text = currentUser.plan === "free"
-    ? `You've made your free training plan for this month. 🙌 Your next free plan unlocks on ${niceDate(Limits.nextPlanDate(currentUser))}. Upgrade to Pro for a brand-new plan every week.`
-    : `You've made this week's plan already. 🙌 Your next one unlocks on ${niceDate(Limits.nextPlanDate(currentUser))}. Premium lets you rebuild your plan any time, and changes it after each weekly check-in.`;
+    ? `You've made your free training plan for this month. Your next free plan unlocks on ${niceDate(Limits.nextPlanDate(currentUser))}. Upgrade to Pro for a brand-new plan every week.`
+    : `You've made this week's plan already. Your next one unlocks on ${niceDate(Limits.nextPlanDate(currentUser))}. Premium lets you rebuild your plan any time, and changes it after each weekly check-in.`;
   const actions = [upgradeButton()];
-  if (userData.latest) actions.push({ label: "📋 View my current plan", onClick: () => renderPlan(plannerMsgs, userData.latest.plan, userData.latest.answers) });
+  if (userData.latest) actions.push({ label: "View my current plan", onClick: () => renderPlan(plannerMsgs, userData.latest.plan, userData.latest.answers) });
   addActionMessage(plannerMsgs, text, actions, "lock");
   updateProgress();
 }
@@ -2607,7 +2764,7 @@ async function shufflePlan() {
   if (shuffling) return;
   if (Limits.plansLeft(currentUser, userData) === 0) return showPlanLimit();
   shuffling = true;
-  addMessage(plannerMsgs, "user", "🔀 Shuffle my focus days");
+  addMessage(plannerMsgs, "user", "Shuffle my focus days");
   const stop = showTyping(plannerMsgs);
   try {
     const result = await getTrainingPlan(profile);
@@ -2623,9 +2780,9 @@ async function shufflePlan() {
 
 function showRestart() {
   plannerOptions.innerHTML = "";
-  plannerOptions.appendChild(makeChip("🔄 Make a new plan", startPlanner, true));
+  plannerOptions.appendChild(makeChip("Make a new plan", startPlanner, true));
   if (profile.focusMode === "rotating" && Limits.plansLeft(currentUser, userData) > 0) {
-    plannerOptions.appendChild(makeChip("🔀 Shuffle focus days", shufflePlan));
+    plannerOptions.appendChild(makeChip("Shuffle focus days", shufflePlan));
   }
 }
 
@@ -2652,11 +2809,11 @@ async function startPlanner() {
   plannerOptions.innerHTML = "";
   updateProgress();
   if (Limits.plansLeft(currentUser, userData) === 0) {
-    await botSay(plannerMsgs, `Hi ${currentUser.name}! 👋`);
+    await botSay(plannerMsgs, `Hi ${currentUser.name}!`);
     if (run !== plannerRun) return;
     return showPlanLimit();
   }
-  await botSay(plannerMsgs, `Hi ${currentUser.name}! 👋 Answer ${QUESTIONS.length} quick questions and I'll make you a training plan for the whole week!`);
+  await botSay(plannerMsgs, `Hi ${currentUser.name}! Answer ${QUESTIONS.length} quick questions and I'll make you a training plan for the whole week!`);
   if (run !== plannerRun) return;
   askQuestion();
 }
@@ -2676,8 +2833,8 @@ async function askCoach(question) {
 
   if (Limits.questionsLeft(currentUser, userData) === 0) {
     const text = currentUser.plan === "free"
-      ? `You've used your ${PLANS.free.questionsPerDay} free questions for today. They reset tomorrow – or upgrade to Pro for ${PLANS.pro.questionsPerDay} a day. ⚽`
-      : `You've used all ${PLANS.pro.questionsPerDay} of today's questions. They reset tomorrow – or go Premium for unlimited questions. ⚽`;
+      ? `You've used your ${PLANS.free.questionsPerDay} free questions for today. They reset tomorrow – or upgrade to Pro for ${PLANS.pro.questionsPerDay} a day.`
+      : `You've used all ${PLANS.pro.questionsPerDay} of today's questions. They reset tomorrow – or go Premium for unlimited questions.`;
     lockedMessage(coachMsgs, text);
     return;
   }
@@ -2716,7 +2873,7 @@ async function askCoach(question) {
 
   const left = Limits.questionsLeft(currentUser, userData);
   if (left !== Infinity && left <= 1) {
-    addMessage(coachMsgs, "bot", left === 1 ? "Heads up: you've got 1 question left today." : "That was your last question for today – see you tomorrow! 👋");
+    addMessage(coachMsgs, "bot", left === 1 ? "Heads up: you've got 1 question left today." : "That was your last question for today – see you tomorrow!");
   }
 }
 
@@ -2726,7 +2883,7 @@ function resetCoach() {
   coachHistory = [];
   coachMsgs.innerHTML = "";
   coachSuggestions.innerHTML = "";
-  addMessage(coachMsgs, "bot", "Hey! 👋 Ask me anything about getting better at football – shooting, passing, speed, fitness, confidence and more.");
+  addMessage(coachMsgs, "bot", "Hey! Ask me anything about getting better at football – shooting, passing, speed, fitness, confidence and more.");
   ["How do I get faster?", "How can I shoot better?", "How do I improve my weak foot?", "What should I eat before a game?"]
     .forEach(q => coachSuggestions.appendChild(makeChip(q, () => askCoach(q))));
 }
@@ -2734,8 +2891,9 @@ function resetCoach() {
 /* ==========================================================================
    TAB 3: MY PLANS (Pro & Premium)
    ========================================================================== */
-function upsellHTML(icon, title, text, points) {
-  return `<div class="upsell"><div class="upsell-icon">${icon}</div><h3>${title}</h3><p>${text}</p>
+// A locked feature: what it is, what you get, and the plan that unlocks it (`label`, e.g. "Pro feature").
+function upsellHTML(label, title, text, points) {
+  return `<div class="upsell"><div class="upsell-icon">${label}</div><h3>${title}</h3><p>${text}</p>
     <ul>${points.map(p => `<li>${p}</li>`).join("")}</ul><div class="upsell-cta"></div></div>`;
 }
 function addUpsellButton(root, label) {
@@ -2746,13 +2904,13 @@ function renderSaved() {
   const root = $("saved-content");
   if (!currentUser) return;
   if (!hasFeature(currentUser, "savePlans")) {
-    root.innerHTML = upsellHTML("📂", "Save and view past plans", "Keep every plan you make and look back at what you've done. Available on Pro and Premium.",
+    root.innerHTML = upsellHTML("Pro feature", "Save and view past plans", "Keep every plan you make and look back at what you've done. Available on Pro and Premium.",
       ["Every plan saved automatically", "Step-by-step instructions for every drill", "A new weekly plan every week"]);
-    addUpsellButton(root, "⭐ Upgrade to Pro");
+    addUpsellButton(root, "Upgrade to Pro");
     return;
   }
   const list = userData.savedPlans;
-  root.innerHTML = `<div class="panel-body"><h3>📂 My plans</h3>
+  root.innerHTML = `<div class="panel-body"><h3>My plans</h3>
     <p class="panel-intro">Every plan you make is saved here. Tap one to open it.</p>
     ${list.length ? `<div class="saved-list"></div>` : `<div class="empty-state">No saved plans yet.<br>Make one in the Weekly Training Planner and it'll appear here.</div>`}
     <div id="saved-view"></div></div>`;
@@ -2763,7 +2921,7 @@ function renderSaved() {
     button.className = "saved-item";
     const sessions = entry.plan.filter(isSoloSession).length;
     button.innerHTML = `<div><strong>${escapeHTML(niceDate(new Date(entry.createdAt)))}${entry.label ? " · " + escapeHTML(entry.label) : ""}</strong>
-      <span>${escapeHTML(entry.answers.position || "")} · ${sessions} sessions · ${escapeHTML(entry.answers.sessionTime || "")}</span></div><em>Open →</em>`;
+      <span>${escapeHTML(entry.answers.position || "")} · ${sessions} sessions · ${escapeHTML(entry.answers.sessionTime || "")}</span></div><em>Open</em>`;
     button.addEventListener("click", () => {
       const view = $("saved-view");
       view.innerHTML = "";
@@ -2781,15 +2939,15 @@ let premiumSection = "checkin";
 
 // The training plan's "go to meals" link speaks to the player's diet goal.
 const FUEL_LINK_TEXT = {
-  energy: "⚡ Your goal is energy for training – fuel up with carbs before you play.",
-  recover: "🔁 Your goal is recovering faster – refuel within an hour of finishing.",
-  strength: "💪 Your goal is building strength – get protein in at every meal.",
-  allround: "🌈 Your goal is healthy all-round – a rainbow of fruit and veg keeps you going."
+  energy: "Your goal is energy for training: fuel up with carbs before you play.",
+  recover: "Your goal is recovering faster: refuel within an hour of finishing.",
+  strength: "Your goal is building strength: get protein in at every meal.",
+  allround: "Your goal is healthy all-round: a rainbow of fruit and veg keeps you going."
 };
 function fuelLinkText(day) {
   const goal = userData.diet && userData.diet.prefs && userData.diet.prefs.goal;
-  const text = FUEL_LINK_TEXT[goal] || "🍽️ On training and match days we must fuel our bodies.";
-  return day.match ? "🏟️ Game day needs maximum energy! " + text.replace(/^\S+ /, "") : text;
+  const text = FUEL_LINK_TEXT[goal] || "On training and match days we must fuel our bodies.";
+  return day.match ? "Game day needs maximum energy. " + text : text;
 }
 
 // Premium: jump from a day in the training plan to that day's meals in the diet tracker.
@@ -2807,19 +2965,19 @@ function renderPremium() {
   const root = $("premium-content");
   if (!currentUser) return;
   if (!hasFeature(currentUser, "premium")) {
-    root.innerHTML = upsellHTML("⭐", "Premium tools for rising stars", "Get a coach that adapts to you week by week.",
+    root.innerHTML = upsellHTML("Premium", "Premium tools for rising stars", "Get a coach that adapts to you week by week.",
       ["Weekly check-ins that change next week's plan", "AI diet plan & daily food tracker", "Match-day warm-up plans", "Fitness tips and food tips", "Unlimited Ask a Coach questions", "Download your plan as a PDF"]);
-    addUpsellButton(root, "⭐ Go Premium");
+    addUpsellButton(root, "Go Premium");
     return;
   }
   const answers = (userData.latest && userData.latest.answers) || {};
   root.innerHTML = `<div class="panel-body">
     <div class="sub-tabs" role="tablist">
-      <button type="button" class="sub-tab" data-section="checkin">📝 Weekly check-in</button>
-      <button type="button" class="sub-tab" data-section="diet">🥗 Diet tracker</button>
-      <button type="button" class="sub-tab" data-section="matchday">🏟️ Match-day warm-up</button>
-      <button type="button" class="sub-tab" data-section="fitness">💪 Fitness tips</button>
-      <button type="button" class="sub-tab" data-section="food">🍝 Food tips</button>
+      <button type="button" class="sub-tab" data-section="checkin">Weekly check-in</button>
+      <button type="button" class="sub-tab" data-section="diet">Diet tracker</button>
+      <button type="button" class="sub-tab" data-section="matchday">Match-day warm-up</button>
+      <button type="button" class="sub-tab" data-section="fitness">Fitness</button>
+      <button type="button" class="sub-tab" data-section="food">Food tips</button>
     </div>
     <div class="premium-section" id="premium-section"></div></div>`;
   root.querySelectorAll(".sub-tab").forEach(b => {
@@ -2830,15 +2988,15 @@ function renderPremium() {
   const tipList = items => `<ul class="tip-list">${items.map(([t, d]) => `<li><strong>${escapeHTML(t)}</strong>${escapeHTML(d)}</li>`).join("")}</ul>`;
 
   if (premiumSection === "matchday") {
-    section.innerHTML = `<h3>🏟️ Match-day warm-up (25 min)</h3>
+    section.innerHTML = `<h3>Match-day warm-up (25 min)</h3>
       <p class="panel-intro">${answers.position === "Goalkeeper" ? "Goalkeeper version – " : ""}Start about 30 minutes before kick-off.</p>
       <ol class="timeline">${matchDayWarmup(answers).map(([t, name, d]) => `<li><time>${t}</time><div><strong>${escapeHTML(name)}</strong><span>${escapeHTML(d)}</span></div></li>`).join("")}</ol>`;
   } else if (premiumSection === "fitness") {
-    section.innerHTML = `<h3>💪 Fitness tips</h3>${tipList(fitnessTips(answers))}`;
+    section.innerHTML = `<h3>Fitness tips</h3>${tipList(fitnessTips(answers))}`;
   } else if (premiumSection === "diet") {
     renderDiet(section);
   } else if (premiumSection === "food") {
-    section.innerHTML = `<h3>🍝 Food tips for training & matches</h3>${tipList(foodTips(answers))}`;
+    section.innerHTML = `<h3>Food tips for training and matches</h3>${tipList(foodTips(answers))}`;
   } else {
     renderCheckin(section);
   }
@@ -2954,7 +3112,7 @@ const DAY_SLOTS = {
              ["Warm-up & half-time", "sips of water + fruit", "halfTime"], ["Recovery snack", "within 30–60 min after", "recovery"], ["Recovery dinner", "evening", "dinner"]],
   recovery: [["Breakfast", "8:00", "breakfast"], ["Morning snack", "10:30", "recovery"], ["Lunch", "12:30", "lunch"], ["Afternoon snack", "15:30", "snack"], ["Dinner", "18:30", "dinner"]]
 };
-const DAY_TYPES = { training: "⚽ Training day", fuel: "🍝 Fuel-up day", match: "🏟️ Game day", recovery: "🔁 Recovery day", rest: "😴 Rest day" };
+const DAY_TYPES = { training: "Training day", fuel: "Fuel-up day", match: "Game day", recovery: "Recovery day", rest: "Rest day" };
 const DAY_TYPE_NOTES = {
   training: "Carbs at every meal and a snack 1–2 h before you train.",
   fuel: "Day before the game – top up your energy stores with a carb-rich dinner and an early night.",
@@ -3037,7 +3195,7 @@ function fakeDietPlan({ diet, avoid, goal, ageGroup, seed = 0, week }) {
 // Pretend AI feedback from the last 7 days of logs.
 function fakeDietFeedback({ logs, waterTarget, diet }) {
   const days = Object.values(logs);
-  if (days.length < 2) return ["Track at least 2 days and I'll spot patterns in your eating and energy. 📋"];
+  if (days.length < 2) return ["Track at least 2 days and I'll spot patterns in your eating and energy."];
   const avg = f => days.reduce((s, d) => s + f(d), 0) / days.length;
   const water = avg(d => d.water || 0);
   const target = Math.round(avg(d => waterTarget + (d.dayType === "rest" ? 0 : 2))); // +2 glasses on training & match days
@@ -3047,17 +3205,17 @@ function fakeDietFeedback({ logs, waterTarget, diet }) {
   const mealRate = avg(d => { const m = d.meals || {}; const total = d.totalMeals || 4; return Object.values(m).filter(Boolean).length / total; });
   const energy = days.filter(d => d.energy).map(d => d.energy);
   const tips = [];
-  if (mealRate >= 0.8) tips.push(`Great consistency – you've hit about ${Math.round(mealRate * 100)}% of your planned meals. That's what fuels good training. 💪`);
+  if (mealRate >= 0.8) tips.push(`Great consistency – you've hit about ${Math.round(mealRate * 100)}% of your planned meals. That's what fuels good training.`);
   else tips.push(`You're hitting about ${Math.round(mealRate * 100)}% of your planned meals. Try packing a snack the night before so you don't miss the pre-training one.`);
   if (breakfastRate < 0.8) tips.push(`You've skipped breakfast on some days. Even something quick like ${quickBreakfast} makes a big difference to morning energy.`);
   if (water < target) tips.push(`You're averaging ${water.toFixed(1)} glasses of water – your target is about ${target}. Keep a bottle in your bag and sip through the day.`);
-  else tips.push(`Brilliant hydration – ${water.toFixed(1)} glasses a day on average. 💧`);
+  else tips.push(`Brilliant hydration – ${water.toFixed(1)} glasses a day on average.`);
   if (veg < VEG_TARGET) tips.push(`About ${veg.toFixed(1)} portions of fruit & veg a day. Add one to lunch and one to dinner to reach ${VEG_TARGET}.`);
   if (energy.length >= 2) {
     const low = days.filter(d => d.energy && d.energy <= 2);
     const lowSkipped = low.filter(d => !(d.meals && d.meals.Breakfast)).length;
     if (low.length && lowSkipped >= Math.ceil(low.length / 2)) tips.push("Your low-energy days line up with skipped breakfasts – a good reason not to miss it!");
-    else if (energy.reduce((a, b) => a + b, 0) / energy.length >= 4) tips.push("Your energy scores are high – whatever you're doing, keep it up. ⚡");
+    else if (energy.reduce((a, b) => a + b, 0) / energy.length >= 4) tips.push("Your energy scores are high – whatever you're doing, keep it up.");
   }
   return tips.slice(0, 5);
 }
@@ -3140,12 +3298,12 @@ function renderDiet(section) {
   }).join("");
 
   section.innerHTML = `
-    <div class="diet-head"><h3>🥗 AI Diet Plan &amp; Tracker</h3><span class="premium-chip">⭐ Premium</span></div>
+    <div class="diet-head"><h3>AI Diet Plan &amp; Tracker</h3><span class="premium-chip">Premium</span></div>
     <p class="panel-intro">Your weekly fuel plan for ${escapeHTML(DIET_LABELS[data.prefs.diet])} eating${data.prefs.avoid ? `, avoiding ${escapeHTML(data.prefs.avoid)}` : ""}, built around your training week. Tick things off as you go.</p>
-    ${weekChanged ? `<div class="plan-lock-note diet-update"><span>📅 <strong>Your training week has changed.</strong> Update your menu so it matches your new training and game days.</span><button type="button" class="btn btn-primary btn-sm" id="diet-update-week">Update my menu</button></div>` : ""}
+    ${weekChanged ? `<div class="plan-lock-note diet-update"><span><strong>Your training week has changed.</strong> Update your menu so it matches your new training and game days.</span><button type="button" class="btn btn-primary btn-sm" id="diet-update-week">Update my menu</button></div>` : ""}
 
     <div class="diet-card">
-      <div class="diet-card-top"><strong>📅 This week's menu</strong><small class="muted">tap a day</small></div>
+      <div class="diet-card-top"><strong>This week's menu</strong><small class="muted">tap a day</small></div>
       <div class="diet-week" role="tablist" aria-label="Days of the week">
         ${plan.week.map(w => `<button type="button" role="tab" class="diet-day ${w.type}${w.day === shown.day ? " active" : ""}${w.day === todayName() ? " today" : ""}" data-diet-day="${escapeHTML(w.day)}" aria-selected="${w.day === shown.day}">
           <strong>${escapeHTML(w.day.slice(0, 3))}</strong><span>${escapeHTML(DAY_TYPES[w.type].split(" ")[0])}</span></button>`).join("")}
@@ -3157,7 +3315,7 @@ function renderDiet(section) {
       </div>
     </div>
 
-    <div class="diet-card">
+    <div class="diet-card today-log">
       <div class="diet-card-top">
         <strong>Today · ${escapeHTML(niceDate(new Date()))}</strong>
         <span class="score-pill ${score >= 80 ? "good" : ""}">${score}% on track</span>
@@ -3171,14 +3329,14 @@ function renderDiet(section) {
           <span><strong>${escapeHTML(m.slot)}</strong> <small>${escapeHTML(m.time)}</small><br>${escapeHTML(m.food)}</span></label></li>`).join("")}
       </ul>
       <div class="counters">
-        <div class="counter"><span>💧 Water <small>target ${waterTarget} glasses</small></span>
+        <div class="counter"><span>Water <small>target ${waterTarget} glasses</small></span>
           <div><button type="button" class="count-btn" data-count="water" data-step="-1" aria-label="One less glass">−</button><strong>${log.water}</strong><button type="button" class="count-btn" data-count="water" data-step="1" aria-label="One more glass">+</button></div></div>
-        <div class="counter"><span>🍎 Fruit &amp; veg <small>target ${VEG_TARGET} portions</small></span>
+        <div class="counter"><span>Fruit &amp; veg <small>target ${VEG_TARGET} portions</small></span>
           <div><button type="button" class="count-btn" data-count="veg" data-step="-1" aria-label="One less portion">−</button><strong>${log.veg}</strong><button type="button" class="count-btn" data-count="veg" data-step="1" aria-label="One more portion">+</button></div></div>
       </div>
-      <div><span class="fieldset-label">⚡ How was your energy today?</span>
+      <div><span class="fieldset-label">How was your energy today? (1 low, 5 high)</span>
         <div class="choice-row" role="group" aria-label="Energy">
-          ${[[1, "😴"], [2, "😕"], [3, "🙂"], [4, "😀"], [5, "🔥"]].map(([v, e]) => `<label><input type="radio" name="energy" value="${v}" ${log.energy === v ? "checked" : ""}><span>${e} ${v}</span></label>`).join("")}
+          ${[1, 2, 3, 4, 5].map(v => `<label><input type="radio" name="energy" value="${v}" ${log.energy === v ? "checked" : ""}><span>${v}</span></label>`).join("")}
         </div></div>
     </div>
 
@@ -3188,7 +3346,7 @@ function renderDiet(section) {
     </div>
 
     <div class="diet-card">
-      <div class="diet-card-top"><strong>🤖 AI coach feedback</strong></div>
+      <div class="diet-card-top"><strong>AI coach feedback</strong></div>
       <div id="diet-feedback">${data.feedback
         ? `<ul class="tip-list">${data.feedback.tips.map(t => `<li>${escapeHTML(t)}</li>`).join("")}</ul><p class="muted small">Updated ${escapeHTML(niceDate(new Date(data.feedback.date)))}</p>`
         : `<p class="muted">Track a few days, then ask your AI coach how you're doing.</p>`}</div>
@@ -3197,8 +3355,8 @@ function renderDiet(section) {
 
     <div class="diet-card">
       <div class="plan-actions" style="padding:0">
-        <button type="button" class="btn btn-ghost btn-sm" id="diet-rebuild">🔄 New meal ideas</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="diet-prefs">⚙️ Change preferences</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="diet-rebuild">New meal ideas</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="diet-prefs">Change preferences</button>
       </div>
     </div>`;
 
@@ -3207,7 +3365,7 @@ function renderDiet(section) {
   if (weekChanged) $("diet-update-week").addEventListener("click", async () => {
     try {
       await buildDietPlan(section, "Updating your menu for your new training week…");
-      toast("Your menu now matches your training week. 🥗");
+      toast("Your menu now matches your training week.");
     } catch (err) {
       toast(err.message || "Couldn't update your menu. Please try again.");
     }
@@ -3236,7 +3394,7 @@ function renderDiet(section) {
     data.seed = (data.seed || 0) + 1;
     try {
       await buildDietPlan(section, "Finding new meal ideas…");
-      toast("New meal ideas ready. 🥗");
+      toast("New meal ideas ready.");
     } catch (err) {
       toast(err.message || "Couldn't get new meal ideas. Please try again.");
     }
@@ -3254,7 +3412,7 @@ function renderDietSetup(section, prefs = {}) {
   const radios = (name, options, current) => `<div class="choice-row">${options.map(([v, label], i) =>
     `<label><input type="radio" name="${name}" value="${v}" ${(current ? current === v : i === 0) ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
   section.innerHTML = `
-    <div class="diet-head"><h3>🥗 AI Diet Plan &amp; Tracker</h3><span class="premium-chip">⭐ Premium</span></div>
+    <div class="diet-head"><h3>AI Diet Plan &amp; Tracker</h3><span class="premium-chip">Premium</span></div>
     <p class="panel-intro">Answer a few questions and your AI coach builds a full week of meals around your training – with a maximum-energy menu for game day. Then track your meals, water and energy every day.</p>
     <div class="checkin-form" id="diet-form" role="form">
       <div><span class="fieldset-label">How do you eat?</span>
@@ -3262,11 +3420,11 @@ function renderDietSetup(section, prefs = {}) {
       <label class="field"><span>Foods to avoid or allergies <small>(optional)</small></span>
         <input type="text" id="diet-avoid" value="${escapeHTML(prefs.avoid || "")}" placeholder="e.g. nuts, mushrooms"></label>
       <div><span class="fieldset-label">What's your main goal?</span>
-        ${radios("goal", [["energy", "⚡ Energy for training"], ["recover", "🔁 Recover faster"], ["strength", "💪 Build strength"], ["allround", "🌈 Healthy all-round"]], prefs.goal)}</div>
+        ${radios("goal", [["energy", "Energy for training"], ["recover", "Recover faster"], ["strength", "Build strength"], ["allround", "Healthy all-round"]], prefs.goal)}</div>
       <label class="field"><span>Age group</span>
         <select id="diet-age">${["Under 10", "10-13", "14-17", "18+"].map(a => `<option ${(prefs.ageGroup || answers.ageGroup || "14-17") === a ? "selected" : ""}>${a}</option>`).join("")}</select></label>
       ${planGame
-        ? `<p class="muted small">🏟️ Game day: <strong>${escapeHTML(planGame)}</strong> (from your training plan). Your menu follows your training week.</p>`
+        ? `<p class="muted small">Game day: <strong>${escapeHTML(planGame)}</strong> (from your training plan). Your menu follows your training week.</p>`
         : `<label class="field"><span>Game day</span>
         <select id="diet-game">${[...DAY_NAMES, "No regular game"].map(d => `<option ${gameDefault === d ? "selected" : ""}>${d}</option>`).join("")}</select></label>`}
       <button type="button" class="btn btn-primary" data-submit>${prefs.diet ? "Update my diet plan" : "Create my diet plan"}</button>
@@ -3282,7 +3440,7 @@ function renderDietSetup(section, prefs = {}) {
     try {
       await buildDietPlan(section, "Your AI coach is building your weekly menu…");
       renderDiet(section);
-      toast("Your diet plan is ready! 🥗");
+      toast("Your diet plan is ready!");
     } catch (err) {
       renderDietSetup(section, data.prefs);
       toast("Couldn't build your diet plan. Please try again.");
@@ -3293,13 +3451,13 @@ function renderDietSetup(section, prefs = {}) {
 function renderCheckin(section) {
   const latest = userData.latest;
   if (!latest) {
-    section.innerHTML = `<h3>📝 Weekly check-in</h3><div class="empty-state">Make your first plan in the Weekly Training Planner.<br>At the end of the week, check in here and I'll adapt next week's plan.</div>`;
+    section.innerHTML = `<h3>Weekly check-in</h3><div class="empty-state">Make your first plan in the Weekly Training Planner.<br>At the end of the week, check in here and I'll adapt next week's plan.</div>`;
     return;
   }
   const planned = latest.plan.filter(isSoloSession).length;
   const radios = (name, options) => `<div class="choice-row">${options.map(([v, label], i) =>
     `<label><input type="radio" name="${name}" value="${v}" ${i === 0 ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
-  section.innerHTML = `<h3>📝 Weekly check-in</h3>
+  section.innerHTML = `<h3>Weekly check-in</h3>
     <p class="panel-intro">Tell me how this week went and I'll build next week's plan around it.</p>
     <div class="checkin-form" id="checkin-form" role="form">
       <div><span class="fieldset-label">How many of your ${planned} sessions did you do?</span>
@@ -3367,10 +3525,10 @@ async function runCheckin(c) {
     if (!showAiError(result, err)) result.innerHTML = `<p class="muted">Couldn't build next week's plan right now. Please try again.</p>`;
     return;
   }
-  result.innerHTML = `<h3>✅ Next week's plan is ready</h3><ul class="changes">${changes.map(t => `<li>${escapeHTML(t)}</li>`).join("")}</ul>`;
+  result.innerHTML = `<h3>Next week's plan is ready</h3><ul class="changes">${changes.map(t => `<li>${escapeHTML(t)}</li>`).join("")}</ul>`;
   renderPlan(result, plan, next, { scroll: false });
   result.scrollIntoView({ behavior: "smooth", block: "start" });
-  toast("Next week's plan is saved in My Plans. 📂");
+  toast("Next week's plan is saved in My Plans.");
 }
 
 /* ==========================================================================
@@ -3416,7 +3574,7 @@ async function downloadPlanPDF(plan, answers) {
     line("Always warm up, drink water and stop if anything hurts.", 9, "italic", [95, 112, 104]);
     const t = sydneyDay();
     doc.save(`pitchside-plan-${t.y}-${String(t.m).padStart(2, "0")}-${String(t.d).padStart(2, "0")}.pdf`);
-    toast("Your plan PDF is downloading. 📄");
+    toast("Your plan PDF is downloading.");
   } catch (err) {
     console.error(err);
     toast("Couldn't create the PDF – check your internet connection and try again.");
