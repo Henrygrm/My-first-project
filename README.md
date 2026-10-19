@@ -81,9 +81,21 @@ scripts/smoke-test.mjs   end-to-end test against a mock Claude API (npm test)
 
 `npm test` generates sample footage, starts the app against a local mock of the Claude API (`scripts/mock-anthropic.mjs`), and runs the whole workflow through the API: upload, auto-edit, AI edit, re-render, marketing, setup errors and the fallback retry. It checks that every output is a real 1080×1920 MP4 with audio. It makes no paid API calls.
 
+## Troubleshooting
+
+| What you see | What to do |
+|---|---|
+| Red banner "FFmpeg is not installed" | Install FFmpeg (table above), then restart `npm start`. |
+| "Claude is not connected yet" | Add `ANTHROPIC_API_KEY` to `.env` and restart. Auto-edit works meanwhile. |
+| "Your ANTHROPIC_API_KEY was rejected" | The key is wrong or was revoked. Copy it again from the Anthropic console. |
+| "Lost connection to the Cutline server" | The Terminal running `npm start` was closed. Start it again; unfinished clips show a **Render clip** button. |
+| iPhone video won't preview in Chrome | Normal for HEVC footage. It still edits fine, and the output MP4s play everywhere. |
+| Clips shorter than the length you picked | There wasn't enough strong footage. Dead, dark and silent parts are left out rather than used as filler. |
+
 ## Limitations
 
 - No music is added (licensing). Clips keep the original audio, or you can pick a silent track and add a trending sound inside TikTok or Instagram.
 - Emoji are stripped from burned-in text because FFmpeg's subtitle renderer can't draw colour emoji. Post captions keep them.
 - Claude sees sampled frames (about 40 per generation by default, `AI_MAX_FRAMES`), not every frame, so very fast moments between samples can be missed.
-- One job runs at a time. Rendering speed depends on your CPU; a 30-second clip usually takes 5–20 seconds.
+- One job runs at a time. Rendering is mostly limited by decoding your footage: 4K/60fps HEVC from an iPhone is the slowest. On a 4-core test machine a 20-second clip from 4K sources took about a minute; Apple Silicon Macs are considerably faster.
+- iPhone HDR footage is tone-mapped to standard video so it doesn't look washed out (needs an FFmpeg build with `zscale`; without it HDR clips still render, just with flatter colours).

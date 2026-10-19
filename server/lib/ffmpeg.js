@@ -76,6 +76,10 @@ export async function probe(file) {
   const [n, d] = String(v.avg_frame_rate || v.r_frame_rate || '30/1').split('/').map(Number);
   const fps = d ? n / d : n || 30;
 
+  // iPhones (and many Androids) record HDR by default. Without tone mapping it
+  // looks grey and washed out once converted to normal (SDR) video.
+  const hdr = ['arib-std-b67', 'smpte2084'].includes(v.color_transfer);
+
   return {
     duration: Math.round(duration * 1000) / 1000,
     width,
@@ -84,20 +88,40 @@ export async function probe(file) {
     hasAudio: Boolean(a),
     codec: v.codec_name,
     orientation: width > height * 1.05 ? 'landscape' : height > width * 1.05 ? 'portrait' : 'square',
+    hdr,
   };
 }
 
-export async function thumbnail(file, out, at = 0.5) {
-  await run(FFMPEG, ['-y', '-v', 'error', '-ss', String(Math.max(0, at)), '-i', file, '-frames:v', '1', '-vf', 'scale=360:-2', '-q:v', '4', out]);
+let toneMapSupported = null;
+
+/** Filter chain converting HDR to SDR, or '' when not needed or not supported. */
+export async function toneMap(meta) {
+  if (!meta?.hdr) return '';
+  if (toneMapSupported === null) {
+    try {
+      const { stdout } = await run(FFMPEG, ['-hide_banner', '-filters']);
+      toneMapSupported = /\bzscale\b/.test(stdout) && /\btonemap\b/.test(stdout);
+    } catch {
+      toneMapSupported = false;
+    }
+  }
+  return toneMapSupported
+    ? 'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p'
+    : '';
+}
+
+const withToneMap = (tm, rest) => (tm ? `${tm},${rest}` : rest);
+
+export async function thumbnail(file, out, at = 0.5, meta = null) {
+  const vf = withToneMap(await toneMap(meta), 'scale=360:-2');
+  await run(FFMPEG, ['-y', '-v', 'error', '-ss', String(Math.max(0, at)), '-i', file, '-frames:v', '1', '-vf', vf, '-q:v', '4', out]);
   return out;
 }
 
 /** Extract a single small JPEG frame at time `t` for AI review. */
-export async function frameAt(file, t, out, size = 512) {
-  await run(FFMPEG, [
-    '-y', '-v', 'error', '-ss', t.toFixed(2), '-i', file, '-frames:v', '1',
-    '-vf', `scale='if(gt(iw,ih),${size},-2)':'if(gt(iw,ih),-2,${size})'`, '-q:v', '5', out,
-  ]);
+export async function frameAt(file, t, out, size = 512, meta = null) {
+  const vf = withToneMap(await toneMap(meta), `scale='if(gt(iw,ih),${size},-2)':'if(gt(iw,ih),-2,${size})'`);
+  await run(FFMPEG, ['-y', '-v', 'error', '-ss', t.toFixed(2), '-i', file, '-frames:v', '1', '-vf', vf, '-q:v', '5', out]);
   return out;
 }
 
@@ -126,8 +150,10 @@ function parseMetadataFile(text, key) {
       continue;
     }
     if (t !== null && line.startsWith(key + '=')) {
-      const val = Number(line.slice(key.length + 1));
-      if (Number.isFinite(val)) out.push([t, val]);
+      const raw = line.slice(key.length + 1).trim();
+      // Digital silence is reported as "-inf" dB.
+      const val = /^-inf/i.test(raw) ? -Infinity : Number(raw);
+      if (Number.isFinite(val) || val === -Infinity) out.push([t, val]);
     }
   }
   return out;
@@ -153,13 +179,23 @@ export async function analyzeSignals(file, meta, workDir) {
   await fs.mkdir(workDir, { recursive: true });
   const sceneFile = path.join(workDir, 'scene.txt');
   const lumaFile = path.join(workDir, 'luma.txt');
+  const diffFile = path.join(workDir, 'diff.txt');
   const rmsFile = path.join(workDir, 'rms.txt');
 
-  // Filter args are passed straight to the process (no shell), and cwd is the
-  // work dir so the metadata file names need no escaping.
+  // One decode pass at 4 samples/second on a tiny 8-bit copy:
+  //  - scene score  → hard camera cuts
+  //  - YAVG         → brightness (0–255, also for 10-bit HDR sources)
+  //  - YAVG of the frame-to-frame difference → how much is actually moving
+  // Filter args go straight to the process (no shell) and cwd is the work
+  // dir, so the metadata file names need no escaping.
   await run(FFMPEG, [
-    '-v', 'error', '-i', file, '-an',
-    '-vf', `fps=4,scale=160:-2,select='gte(scene\\,0)',metadata=print:key=lavfi.scene_score:file=scene.txt,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=luma.txt`,
+    '-v', 'error', '-skip_frame', 'noref', '-i', file, '-an',
+    '-vf', [
+      'fps=4', 'scale=160:-2', 'format=yuv420p',
+      `select='gte(scene\\,0)'`, 'metadata=print:key=lavfi.scene_score:file=scene.txt',
+      'signalstats', 'metadata=print:key=lavfi.signalstats.YAVG:file=luma.txt',
+      'tblend=all_mode=difference', 'signalstats', 'metadata=print:key=lavfi.signalstats.YAVG:file=diff.txt',
+    ].join(','),
     '-f', 'null', '-',
   ], { cwd: workDir });
 
@@ -180,14 +216,18 @@ export async function analyzeSignals(file, meta, workDir) {
 
   const scene = parseMetadataFile(await fs.readFile(sceneFile, 'utf8'), 'lavfi.scene_score');
   const luma = parseMetadataFile(await fs.readFile(lumaFile, 'utf8'), 'lavfi.signalstats.YAVG');
+  // Ignore the diff spike at a hard cut; that's a cut, not movement.
+  const cutTimes = new Set(scene.filter(([, v]) => v > 0.35).map(([t]) => t.toFixed(2)));
+  const diff = parseMetadataFile(await fs.readFile(diffFile, 'utf8'), 'lavfi.signalstats.YAVG')
+    .filter(([t]) => !cutTimes.has(t.toFixed(2)));
 
-  const motion = bucket(scene, meta.duration).map((v) => (v === null ? 0 : Math.round(v * 1000) / 1000));
+  const motion = bucket(diff, meta.duration).map((v) => (v === null ? 0 : Math.round(v * 100) / 100));
   const brightness = bucket(luma, meta.duration).map((v) => (v === null ? null : Math.round(v)));
   const loudness = bucket(rms, meta.duration).map((v) => (v === null ? null : Math.round(v)));
   const cuts = scene.filter(([t, v]) => v > 0.35 && t > 0.3).map(([t]) => Math.round(t * 10) / 10);
 
-  await Promise.all([sceneFile, lumaFile, rmsFile].map((f) => fs.rm(f, { force: true })));
-  return { motion, brightness, loudness, cuts };
+  await Promise.all([sceneFile, lumaFile, diffFile, rmsFile].map((f) => fs.rm(f, { force: true })));
+  return { version: 2, motion, brightness, loudness, cuts };
 }
 
 /** Extract mono 16 kHz audio for speech transcription. */

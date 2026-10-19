@@ -303,6 +303,12 @@ function renderVideos() {
 function previewVideo(src, title) {
   $('#video-dialog-title').textContent = title;
   const player = $('#video-dialog-player');
+  $('#video-dialog-note').hidden = true;
+  player.hidden = false;
+  player.onerror = () => {
+    player.hidden = true;
+    $('#video-dialog-note').hidden = false;
+  };
   player.src = src;
   $('#video-dialog').showModal();
   player.play().catch(() => {});
@@ -401,14 +407,27 @@ async function pollJob(jobId) {
   updateGenerateState();
   renderResults();
 
+  let misses = 0;
   while (state.job?.id === jobId) {
     let job;
     try {
       job = await api(`/api/jobs/${jobId}`);
+      misses = 0;
     } catch (err) {
+      if (err.status === 404) {
+        // The server restarted and forgot the job; show whatever was saved.
+        state.job = null;
+        box.hidden = true;
+        toast('The server restarted. Anything not finished shows a Render button.', { error: true });
+        break;
+      }
+      if (!err.status && ++misses <= 15) {
+        $('#job-stage').textContent = 'Lost connection to the Cutline server, retrying…';
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
       state.job = null;
-      if (err.status === 404) box.hidden = true;
-      else showJobError(err.message);
+      showJobError(err.status ? err.message : 'The Cutline server stopped. Check the Terminal window: run npm start again, then reload this page.');
       break;
     }
     $('#job-stage').textContent = job.stage;

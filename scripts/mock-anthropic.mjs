@@ -20,7 +20,8 @@ function planFor(text) {
         const start = Math.min(v.dur - 1, step * j + k * 0.5);
         segments.push({
           video: v.n, start, end: Math.min(v.dur, start + 2.2),
-          role: segments.length === 0 ? 'hook' : vi === videos.length - 1 && j === 1 ? 'payoff' : 'process',
+          // 'Transition' is outside the requested label set on purpose: the app must map it, not fail.
+          role: segments.length === 0 ? 'hook' : vi === videos.length - 1 && j === 1 ? 'payoff' : j === 1 ? 'Transition' : 'process',
           caption: segments.length === 0 ? '' : `Step ${segments.length} 🔥`,
           speed: j === 1 ? 1.5 : 1, focus_x: 0.4, why: 'Mock: strongest motion in this range.',
         });
@@ -36,7 +37,7 @@ function planFor(text) {
   });
   return {
     summary: `Mock plan over ${videos.length} videos.`,
-    footage_review: videos.map((v) => ({ video: v.n, start: 0, end: Math.min(2, v.dur), description: 'Opening shot', quality: 'usable' })),
+    footage_review: videos.map((v) => ({ video: v.n, start: 0, end: Math.min(2, v.dur), description: 'Opening shot', quality: 'Excellent / strong' })),
     clips,
     cut_sections: [{ video: 1, start: 0, end: 0.5, reason: 'Camera wobble' }],
     reshoot_tips: ['Hold the phone steady.'],

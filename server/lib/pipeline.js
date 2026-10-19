@@ -5,10 +5,11 @@ import { getBusiness, getPlatform } from './businesses.js';
 import { analyzeSignals, frameAt, pool } from './ffmpeg.js';
 import { autoPlan, normalizeAiPlan, sanitizeClip } from './planner.js';
 import { renderClip } from './render.js';
-import { loadProject, projectDir, saveProject } from './store.js';
+import { loadProject, projectDir, updateProject } from './store.js';
 import { transcribe, transcriptionConfigured } from './transcribe.js';
 
-const MAX_FRAMES = Number(process.env.AI_MAX_FRAMES || 40);
+// Claude accepts at most 100 images per request; stay well under it.
+const MAX_FRAMES = Math.min(90, Number(process.env.AI_MAX_FRAMES || 40));
 
 function videoCtx(project) {
   const dir = projectDir(project.id);
@@ -30,7 +31,7 @@ async function readJson(file) {
 async function ensureSignals(v) {
   const cache = path.join(v.work, 'signals.json');
   const cached = await readJson(cache);
-  if (cached) return cached;
+  if (cached?.version === 2) return cached;
   const signals = await analyzeSignals(v.path, v.meta, v.work);
   await fs.writeFile(cache, JSON.stringify(signals));
   return signals;
@@ -48,10 +49,11 @@ async function ensureTranscript(v) {
 /** Spread the frame budget across videos in proportion to their length. */
 function frameTimes(videos) {
   const total = videos.reduce((s, v) => s + v.meta.duration, 0) || 1;
+  const minEach = Math.max(1, Math.min(3, Math.floor(MAX_FRAMES / videos.length)));
   return videos.map((v) => {
     const d = v.meta.duration;
     const share = Math.round((MAX_FRAMES * d) / total);
-    const n = Math.max(3, Math.min(share, Math.floor(d / 1.0)));
+    const n = Math.max(minEach, Math.min(share, Math.floor(d / 1.0)));
     return Array.from({ length: Math.max(1, n) }, (_, j) => Math.round(((j + 0.5) * d * 10) / n) / 10);
   });
 }
@@ -65,13 +67,12 @@ function renderOptions(opts) {
   };
 }
 
-async function renderAll(project, videos, plan, indexes, ropts, transcripts, ctx, base = 0.55) {
-  const outDir = path.join(projectDir(project.id), 'output');
+async function renderAll(projectId, videos, plan, indexes, ropts, transcripts, ctx, base = 0.55) {
+  const outDir = path.join(projectDir(projectId), 'output');
   const span = 1 - base;
   for (const [n, idx] of indexes.entries()) {
     const clip = plan.clips[idx];
     ctx.stage(`Rendering clip ${n + 1} of ${indexes.length}: "${clip.title}"`, base + (span * n) / indexes.length);
-    const old = project.clips[idx];
     const result = await renderClip(clip, videos, {
       outDir,
       baseName: `clip-${idx + 1}-${Date.now().toString(36)}`,
@@ -79,19 +80,20 @@ async function renderAll(project, videos, plan, indexes, ropts, transcripts, ctx
       transcripts: ropts.speechSubtitles ? transcripts : null,
       onProgress: (p) => ctx.progress(base + (span * (n + p)) / indexes.length),
     });
-    project.clips[idx] = { ...result, renderedAt: new Date().toISOString(), options: ropts };
-    // Remove the previous render of this clip.
-    if (old) {
-      for (const f of [old.file, old.srt, old.thumb, old.file?.replace(/\.mp4$/, '.ass')]) {
-        if (f) await fs.rm(path.join(outDir, f), { force: true });
-      }
+    await updateProject(projectId, (p) => {
+      p.clips[idx] = { ...result, renderedAt: new Date().toISOString(), options: ropts };
+    });
+    // Remove earlier renders of this clip, including half-written files left
+    // behind if the server was stopped mid-render.
+    const keep = path.parse(result.file).name;
+    for (const f of await fs.readdir(outDir)) {
+      if (f.startsWith(`clip-${idx + 1}-`) && path.parse(f).name !== keep) await fs.rm(path.join(outDir, f), { force: true });
     }
-    await saveProject(project);
   }
 }
 
 export async function generate(projectId, opts, ctx) {
-  let project = await loadProject(projectId);
+  const project = await loadProject(projectId);
   if (!project) throw new Error('Project not found');
   if (!project.videos.length) throw new Error('Upload at least one video first.');
 
@@ -145,7 +147,7 @@ export async function generate(projectId, opts, ctx) {
     ctx.stage(`Sampling ${totalFrames} frames for Claude to review`, 0.28);
     await pool(videos.flatMap((v, vi) => times[vi].map((t) => ({ v, t }))), 4, async ({ v, t }) => {
       const out = path.join(v.work, `frame-${t.toFixed(1)}.jpg`);
-      await fs.access(out).catch(() => frameAt(v.path, t, out));
+      await fs.access(out).catch(() => frameAt(v.path, t, out, 512, v.meta));
     });
     videos.forEach((v, vi) => {
       v.frames = times[vi].map((t) => ({ t, path: path.join(v.work, `frame-${t.toFixed(1)}.jpg`) }));
@@ -174,22 +176,23 @@ export async function generate(projectId, opts, ctx) {
   plan.platform = platform.id;
   plan.targetSeconds = targetSeconds;
 
-  project = await loadProject(projectId);
-  project.plan = plan;
-  project.business = business.id;
-  project.businessCustom = opts.businessCustom || '';
-  project.platform = platform.id;
-  project.instructions = opts.instructions || '';
-  project.settings = { ...ropts, clipCount, targetSeconds, mode };
   // Old renders no longer match the new plan.
-  const outDir = path.join(projectDir(project.id), 'output');
-  await fs.rm(outDir, { recursive: true, force: true });
-  project.clips = [];
-  await saveProject(project);
+  await fs.rm(path.join(projectDir(projectId), 'output'), { recursive: true, force: true });
+  await updateProject(projectId, (p) => {
+    Object.assign(p, {
+      plan,
+      clips: [],
+      business: business.id,
+      businessCustom: opts.businessCustom || '',
+      platform: platform.id,
+      instructions: opts.instructions || '',
+      settings: { ...ropts, clipCount, targetSeconds, mode },
+    });
+  });
 
   // 4. Render.
   if (opts.render !== false) {
-    await renderAll(project, videos, plan, plan.clips.map((_, i) => i), ropts, transcripts, ctx);
+    await renderAll(projectId, videos, plan, plan.clips.map((_, i) => i), ropts, transcripts, ctx);
   }
   return { projectId };
 }
@@ -206,8 +209,6 @@ export async function rerender(projectId, clipIndex, editedClip, opts, ctx) {
   const merged = { ...project.plan.clips[idx], ...editedClip };
   const clip = sanitizeClip(merged, videos, platform.maxSeconds);
   if (!clip.segments.length) throw new Error('This clip has no segments left to render.');
-  project.plan.clips[idx] = clip;
-
   const ropts = renderOptions({ ...project.settings, ...opts });
   const transcripts = {};
   if (ropts.speechSubtitles) {
@@ -216,7 +217,10 @@ export async function rerender(projectId, clipIndex, editedClip, opts, ctx) {
       if (t) transcripts[i] = t;
     }
   }
-  await saveProject(project);
-  await renderAll(project, videos, project.plan, [idx], ropts, transcripts, ctx, 0.05);
+  const saved = await updateProject(projectId, (p) => {
+    if (!p.plan?.clips[idx]) throw new Error('Clip not found');
+    p.plan.clips[idx] = clip;
+  });
+  await renderAll(projectId, videos, saved.plan, [idx], ropts, transcripts, ctx, 0.05);
   return { projectId };
 }

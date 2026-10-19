@@ -146,6 +146,9 @@ async function main() {
   assert.equal(p.plan.source, 'ai');
   assert.ok(p.plan.clips.every((c) => c.segments.every((s) => s.video >= 0 && s.video < 2)), 'invalid video indexes dropped');
   assert.ok(!p.plan.clips[0].hook_text.includes('😮'), 'emoji stripped from on-screen text');
+  const roles = new Set(p.plan.clips.flatMap((c) => c.segments.map((s) => s.role)));
+  assert.ok([...roles].every((r) => ['hook', 'setup', 'process', 'reveal', 'payoff', 'cta'].includes(r)), `unexpected labels normalised: ${[...roles]}`);
+  assert.ok(p.plan.footage_review.every((r) => r.quality === 'strong'), 'quality label normalised');
   await checkClips(base, dataDir, p);
   const planReq = requests.at(-1);
   const images = planReq.body.messages[0].content.filter((x) => x.type === 'image').length;

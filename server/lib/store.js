@@ -39,6 +39,28 @@ export async function saveProject(project) {
   return project;
 }
 
+// Serialise read-modify-write per project so a long render and, say, a
+// marketing request finishing at the same time can't overwrite each other.
+const locks = new Map();
+
+export async function updateProject(id, mutate) {
+  const prev = locks.get(id) || Promise.resolve();
+  let release;
+  const mine = new Promise((r) => (release = r));
+  const chain = prev.then(() => mine);
+  locks.set(id, chain);
+  await prev;
+  try {
+    const project = await loadProject(id);
+    if (!project) throw Object.assign(new Error('Project not found'), { status: 404 });
+    const result = await mutate(project);
+    return result === false ? project : await saveProject(project);
+  } finally {
+    release();
+    if (locks.get(id) === chain) locks.delete(id);
+  }
+}
+
 export async function createProject(name) {
   const project = {
     id: newId('p'),

@@ -10,7 +10,7 @@ import { checkFfmpeg, probe, thumbnail } from './lib/ffmpeg.js';
 import { generate, rerender } from './lib/pipeline.js';
 import {
   activeJobFor, createProject, deleteProject, enqueueJob, getJob, listProjects,
-  loadProject, newId, projectDir, PROJECTS_DIR, saveProject,
+  loadProject, newId, projectDir, PROJECTS_DIR, updateProject,
 } from './lib/store.js';
 import { transcriptionConfigured } from './lib/transcribe.js';
 
@@ -62,14 +62,15 @@ app.get('/api/projects/:id', wrap(async (req, res) => {
 }));
 
 app.patch('/api/projects/:id', wrap(async (req, res) => {
-  const project = await requireProject(req);
+  await requireProject(req);
   const { name, business, businessCustom, platform, marketing } = req.body || {};
-  if (typeof name === 'string' && name.trim()) project.name = name.trim().slice(0, 80);
-  if (typeof business === 'string') project.business = business;
-  if (typeof businessCustom === 'string') project.businessCustom = businessCustom.slice(0, 80);
-  if (typeof platform === 'string' && PLATFORMS[platform]) project.platform = platform;
-  if (marketing && typeof marketing === 'object') project.marketing = marketing;
-  res.json(await saveProject(project));
+  res.json(await updateProject(req.params.id, (project) => {
+    if (typeof name === 'string' && name.trim()) project.name = name.trim().slice(0, 80);
+    if (typeof business === 'string') project.business = business;
+    if (typeof businessCustom === 'string') project.businessCustom = businessCustom.slice(0, 80);
+    if (typeof platform === 'string' && PLATFORMS[platform]) project.platform = platform;
+    if (marketing && typeof marketing === 'object') project.marketing = marketing;
+  }));
 }));
 
 app.delete('/api/projects/:id', wrap(async (req, res) => {
@@ -107,6 +108,7 @@ const upload = multer({
 
 app.post('/api/projects/:id/videos', wrap(async (req, res, next) => {
   await requireProject(req);
+  if (activeJobFor(req.params.id)) throw Object.assign(new Error('Wait for the current job to finish before adding videos.'), { status: 409 });
   upload.array('videos', 20)(req, res, async (err) => {
     if (err) return next(Object.assign(err, { status: err.status || 400 }));
     try {
@@ -118,7 +120,7 @@ app.post('/api/projects/:id/videos', wrap(async (req, res, next) => {
           if (meta.duration < 1) throw new Error('Video is shorter than 1 second.');
           const id = path.basename(f.filename, path.extname(f.filename));
           const thumb = `${id}.jpg`;
-          await thumbnail(f.path, path.join(path.dirname(f.path), thumb), Math.min(1, meta.duration / 3));
+          await thumbnail(f.path, path.join(path.dirname(f.path), thumb), Math.min(1, meta.duration / 3), meta);
           added.push({ id, name: f.originalname, file: f.filename, size: f.size, thumb, meta, uploadedAt: new Date().toISOString() });
         } catch (e) {
           await fs.rm(f.path, { force: true });
@@ -126,9 +128,9 @@ app.post('/api/projects/:id/videos', wrap(async (req, res, next) => {
         }
       }
       // Re-load after the (possibly slow) upload so we don't clobber other edits.
-      const project = await loadProject(req.params.id);
-      project.videos.push(...added);
-      await saveProject(project);
+      const project = await updateProject(req.params.id, (p) => {
+        p.videos.push(...added);
+      });
       res.json({ added, failed, videos: project.videos });
     } catch (e) {
       next(e);
@@ -137,18 +139,21 @@ app.post('/api/projects/:id/videos', wrap(async (req, res, next) => {
 }));
 
 app.delete('/api/projects/:id/videos/:videoId', wrap(async (req, res) => {
-  const project = await requireProject(req);
-  if (activeJobFor(project.id)) throw Object.assign(new Error('Wait for the current job to finish first.'), { status: 409 });
-  const idx = project.videos.findIndex((v) => v.id === req.params.videoId);
-  if (idx === -1) throw Object.assign(new Error('Video not found'), { status: 404 });
-  const [v] = project.videos.splice(idx, 1);
-  const dir = projectDir(project.id);
-  await fs.rm(path.join(dir, 'videos', v.file), { force: true });
-  await fs.rm(path.join(dir, 'videos', v.thumb), { force: true });
-  await fs.rm(path.join(dir, 'work', v.id), { recursive: true, force: true });
-  // Segment indexes in the old plan point at the old video order.
-  if (project.plan) project.plan.stale = true;
-  res.json(await saveProject(project));
+  const { id } = await requireProject(req);
+  if (activeJobFor(id)) throw Object.assign(new Error('Wait for the current job to finish first.'), { status: 409 });
+  let removed;
+  const project = await updateProject(id, (p) => {
+    const idx = p.videos.findIndex((v) => v.id === req.params.videoId);
+    if (idx === -1) throw Object.assign(new Error('Video not found'), { status: 404 });
+    [removed] = p.videos.splice(idx, 1);
+    // Segment indexes in the old plan point at the old video order.
+    if (p.plan) p.plan.stale = true;
+  });
+  const dir = projectDir(id);
+  await fs.rm(path.join(dir, 'videos', removed.file), { force: true });
+  await fs.rm(path.join(dir, 'videos', removed.thumb), { force: true });
+  await fs.rm(path.join(dir, 'work', removed.id), { recursive: true, force: true });
+  res.json(project);
 }));
 
 // --- generation -----------------------------------------------------------
@@ -192,12 +197,10 @@ app.post('/api/marketing', wrap(async (req, res) => {
 
   // Keep the latest marketing pack with the project so it reopens later.
   if (projectId) {
-    const project = await loadProject(projectId).catch(() => null);
-    if (project) {
+    await updateProject(projectId, (project) => {
       const data = section ? { ...(project.marketing?.data || {}), ...result.data } : result.data;
       project.marketing = { profile, data, updatedAt: new Date().toISOString() };
-      await saveProject(project);
-    }
+    }).catch(() => null);
   }
   res.json({ data: result.data });
 }));
@@ -210,7 +213,7 @@ app.use((err, req, res, next) => {
   const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 413 : err.code === 'SETUP_REQUIRED' ? 400 : 500);
   if (status >= 500) console.error(err);
   if (res.headersSent) return next(err);
-  if (req.path.startsWith('/media')) return res.status(status).end();
+  if (req.originalUrl.startsWith('/media')) return res.status(status).end();
   res.status(status).json({ error: err.message || 'Something went wrong', code: err.code || null });
 });
 

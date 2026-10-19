@@ -4,6 +4,15 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const round2 = (v) => Math.round(v * 100) / 100;
 
+const ROLES = ['hook', 'setup', 'process', 'reveal', 'payoff', 'cta'];
+const QUALITIES = ['strong', 'usable', 'weak'];
+// Claude is asked for these labels but they aren't schema-enforced, so map
+// anything unexpected onto the closest known value instead of failing.
+const oneOf = (value, allowed, fallback) => {
+  const v = String(value || '').toLowerCase().trim();
+  return allowed.find((a) => v === a) || allowed.find((a) => v.includes(a)) || fallback;
+};
+
 export function clipDuration(clip) {
   return clip.segments.reduce((s, seg) => s + (seg.end - seg.start) / (seg.speed || 1), 0);
 }
@@ -27,7 +36,7 @@ export function sanitizeClip(clip, videos, maxSeconds) {
       video: vi,
       start: round2(start),
       end: round2(end),
-      role: raw.role || 'process',
+      role: oneOf(raw.role, ROLES, 'process'),
       caption: cleanOnScreenText(raw.caption).slice(0, 60),
       speed: round2(clamp(num(raw.speed, 1), 0.5, 2)),
       focus_x: round2(clamp(num(raw.focus_x, 0.5), 0, 1)),
@@ -64,7 +73,8 @@ export function normalizeAiPlan(raw, videos, platform) {
   return {
     source: 'ai',
     summary: raw.summary || '',
-    footage_review: (raw.footage_review || []).map(toZero).filter((r) => videos[r.video]),
+    footage_review: (raw.footage_review || []).map(toZero).filter((r) => videos[r.video])
+      .map((r) => ({ ...r, quality: oneOf(r.quality, QUALITIES, 'usable') })),
     cut_sections: (raw.cut_sections || []).map(toZero).filter((r) => videos[r.video]),
     reshoot_tips: raw.reshoot_tips || [],
     clips,
@@ -82,17 +92,24 @@ function percentile(values, p) {
 }
 
 function secondScores(videos) {
+  // motion = average frame-to-frame pixel change (0–255); relative to the
+  // busiest footage uploaded, so it adapts to each shoot.
   const allMotion = videos.flatMap((v) => v.signals.motion);
-  const motionRef = Math.max(0.01, percentile(allMotion, 0.9));
+  const motionRef = Math.max(1, percentile(allMotion, 0.9));
   return videos.map((v) => {
     const { motion, loudness, brightness } = v.signals;
     const hasAudio = loudness.some((x) => x !== null);
     return motion.map((m, i) => {
-      // Moderate-to-high motion is "something is happening"; extreme values
-      // are usually camera shake, so they are capped.
-      let s = Math.min(1.2, m / motionRef);
-      if (hasAudio && loudness[i] !== null) s += 0.35 * clamp((loudness[i] + 60) / 50, 0, 1);
-      if (brightness[i] !== null && brightness[i] < 40) s -= 0.6;
+      // Square root so moderately busy footage isn't drowned out by the single
+      // busiest clip; extreme values are usually camera shake, so they're capped.
+      let s = Math.min(1.2, Math.sqrt(m / motionRef));
+      if (m < motionRef * 0.08) s -= 0.4; // nothing is happening
+      if (hasAudio && loudness[i] !== null) {
+        s += 0.35 * clamp((loudness[i] + 60) / 50, 0, 1);
+        if (loudness[i] < -50) s -= 0.15; // dead air
+      }
+      if (brightness[i] !== null && brightness[i] < 35) s -= 0.8;
+      else if (brightness[i] !== null && brightness[i] < 55) s -= 0.25;
       if (i === 0 || i >= motion.length - 1) s -= 0.35; // start/stop recording wobble
       return s;
     });
@@ -100,15 +117,14 @@ function secondScores(videos) {
 }
 
 function windowScore(scores, start, len) {
-  let sum = 0;
-  let n = 0;
+  const vals = [];
   for (let t = Math.floor(start); t < Math.ceil(start + len); t++) {
-    if (scores[t] !== undefined) {
-      sum += scores[t];
-      n++;
-    }
+    if (scores[t] !== undefined) vals.push(scores[t]);
   }
-  return n ? sum / n : -1;
+  if (!vals.length) return -1;
+  // Blend mean and worst second so a window can't hide a dead patch.
+  const mean = vals.reduce((x, y) => x + y, 0) / vals.length;
+  return 0.5 * mean + 0.5 * Math.min(...vals);
 }
 
 const overlaps = (a, b, pad = 0.3) => a.video === b.video && a.start < b.end + pad && b.start < a.end + pad;
@@ -130,24 +146,35 @@ export function autoPlan({ videos, business, platform, clipCount, targetSeconds 
   });
   candidates.sort((a, b) => b.score - a.score);
 
-  const used = [];
-  const clips = [];
-  for (let k = 0; k < clipCount; k++) {
+  // Only use footage that is reasonably good. A tight 15s clip beats a 30s
+  // clip padded with dead time, so clips may come out shorter than the target.
+  const best = candidates[0]?.score ?? 0;
+  const minLen = Math.min(target, 6);
+
+  const pick = (bar, used) => {
     const picked = [];
     let total = 0;
-    // Prefer windows not used by earlier clips; fall back to reuse if footage is short.
+    // Prefer windows not used by earlier clips; then allow reuse of good ones.
     for (const pass of [0, 1]) {
       for (const c of candidates) {
-        if (total >= target) break;
+        if (total >= target || c.score < bar) break;
         if (picked.some((p) => overlaps(p, c))) continue;
         if (pass === 0 && used.some((u) => overlaps(u, c, 0))) continue;
         // Spread picks out: avoid stacking many windows next to each other.
-        if (pass === 0 && picked.filter((p) => p.video === c.video && Math.abs(p.start - c.start) < segLen * 2.5).length >= 1) continue;
+        if (pass === 0 && picked.some((p) => p.video === c.video && Math.abs(p.start - c.start) < segLen * 2.5)) continue;
         picked.push(c);
         total += c.end - c.start;
       }
       if (total >= target) break;
     }
+    return { picked, total };
+  };
+
+  const used = [];
+  const clips = [];
+  for (let k = 0; k < clipCount; k++) {
+    let { picked, total } = pick(Math.max(0.25, best * 0.42), used);
+    if (total < minLen) ({ picked, total } = pick(best * 0.2, used)); // footage is weak overall
     if (!picked.length) break;
     used.push(...picked);
 
@@ -200,9 +227,14 @@ export function autoPlan({ videos, business, platform, clipCount, targetSeconds 
 
   if (!clips.length) throw new Error('The footage is too short to build a clip from.');
 
+  const shortest = Math.min(...clips.map(clipDuration));
+  const shortNote = shortest < target * 0.8
+    ? ` Clips are shorter than the ${target}s target because there wasn't enough strong footage; static, dark and silent parts were left out rather than used as filler.`
+    : '';
+
   return {
     source: 'auto',
-    summary: `Auto-edit (no AI) chose the most active moments from ${Math.round(totalFootage)}s of footage using measured motion, audio and brightness, and cut them to ${business.label.toLowerCase()} pacing. Hook and caption text are industry templates. Edit them below and re-render, or connect Claude for footage-aware editing.`,
+    summary: `Auto-edit (no AI) chose the most active moments from ${Math.round(totalFootage)}s of footage using measured motion, audio and brightness, and cut them to ${business.label.toLowerCase()} pacing.${shortNote} Hook and caption text are industry templates. Edit them below and re-render, or connect Claude for footage-aware editing.`,
     footage_review: [],
     cut_sections: [],
     reshoot_tips: [

@@ -87,10 +87,10 @@ async function structuredCall({ system, content, schema, effort = 'medium', maxT
 // ---------------------------------------------------------------------------
 
 const SegmentSchema = z.object({
-  video: z.number().int().describe('1-based video number this segment is taken from'),
+  video: z.number().describe('1-based video number this segment is taken from'),
   start: z.number().describe('Start time in the SOURCE video, seconds'),
   end: z.number().describe('End time in the SOURCE video, seconds'),
-  role: z.enum(['hook', 'setup', 'process', 'reveal', 'payoff', 'cta']),
+  role: z.string().describe('One of: hook, setup, process, reveal, payoff, cta'),
   caption: z.string().describe('On-screen text shown during this segment: max 6 words, no emoji, or empty string for none'),
   speed: z.number().describe('Playback speed between 0.5 and 2. Use 1 normally; 1.5–2 to compress repetitive work; 0.5–0.8 for a slow-motion money shot'),
   focus_x: z.number().describe('Horizontal position of the main subject in the frame, 0 = left edge, 0.5 = centre, 1 = right edge. Used to crop landscape footage to 9:16'),
@@ -113,15 +113,15 @@ const ClipSchema = z.object({
 const PlanSchema = z.object({
   summary: z.string().describe('2–3 sentences: what the footage contains and the editing approach'),
   footage_review: z.array(z.object({
-    video: z.number().int(),
+    video: z.number().describe('1-based video number'),
     start: z.number(),
     end: z.number(),
     description: z.string(),
-    quality: z.enum(['strong', 'usable', 'weak']),
+    quality: z.string().describe('One of: strong, usable, weak'),
   })).describe('Notable moments across all videos, in time order'),
   clips: z.array(ClipSchema),
   cut_sections: z.array(z.object({
-    video: z.number().int(),
+    video: z.number().describe('1-based video number'),
     start: z.number(),
     end: z.number(),
     reason: z.string(),

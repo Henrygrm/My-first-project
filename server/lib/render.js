@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FFMPEG, run, thumbnail } from './ffmpeg.js';
+import { FFMPEG, run, thumbnail, toneMap } from './ffmpeg.js';
 import { buildSubtitles, chunkWords, mapTranscript } from './subtitles.js';
 
 const FONTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../assets/fonts');
@@ -18,21 +18,23 @@ function frameMode(meta, reframe) {
   return aspect <= 0.8 ? 'fill' : 'fit';
 }
 
-function videoChain(inLabel, outLabel, seg, meta, reframe) {
+function videoChain(inLabel, outLabel, seg, meta, reframe, tm) {
   const speed = seg.speed && seg.speed !== 1 ? `,setpts=PTS/${seg.speed.toFixed(3)}` : '';
-  const pre = `[${inLabel}]setpts=PTS-STARTPTS${speed}`;
+  // Drop to 30fps and shrink 4K to roughly output size before anything heavy
+  // (HDR tone mapping, blur), so big phone files render several times faster.
+  const pre = `[${inLabel}]setpts=PTS-STARTPTS${speed},fps=${FPS},scale=${OUT_W}:${OUT_H}:force_original_aspect_ratio=increase${tm ? ',' + tm : ''}`;
   const mode = frameMode(meta, reframe);
   if (mode === 'fill') {
     // Crop to 9:16, positioned on the subject the AI identified (focus_x).
     const fx = clamp(seg.focus_x ?? 0.5, 0, 1).toFixed(3);
-    return `${pre},scale=${OUT_W}:${OUT_H}:force_original_aspect_ratio=increase,crop=${OUT_W}:${OUT_H}:(iw-${OUT_W})*${fx}:(ih-${OUT_H})/2,fps=${FPS},setsar=1,format=yuv420p[${outLabel}]`;
+    return `${pre},scale=${OUT_W}:${OUT_H}:force_original_aspect_ratio=increase,crop=${OUT_W}:${OUT_H}:(iw-${OUT_W})*${fx}:(ih-${OUT_H})/2,setsar=1,format=yuv420p[${outLabel}]`;
   }
   // Fit the whole frame and fill the rest with a blurred, darkened copy.
   // The blur runs at quarter resolution to keep renders quick.
   return `${pre},split=2[${outLabel}bgsrc][${outLabel}fgsrc];` +
     `[${outLabel}bgsrc]scale=${OUT_W / 4}:${OUT_H / 4}:force_original_aspect_ratio=increase,crop=${OUT_W / 4}:${OUT_H / 4},gblur=sigma=10,eq=brightness=-0.12:saturation=1.15,scale=${OUT_W}:${OUT_H}[${outLabel}bg];` +
     `[${outLabel}fgsrc]scale=${OUT_W}:${OUT_H}:force_original_aspect_ratio=decrease[${outLabel}fg];` +
-    `[${outLabel}bg][${outLabel}fg]overlay=(W-w)/2:(H-h)/2,fps=${FPS},setsar=1,format=yuv420p[${outLabel}]`;
+    `[${outLabel}bg][${outLabel}fg]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[${outLabel}]`;
 }
 
 function atempoChain(speed) {
@@ -56,6 +58,8 @@ export async function renderClip(clip, videos, opts) {
   let inputIdx = 0;
   let outT = 0;
 
+  const toneMaps = await Promise.all(videos.map((v) => toneMap(v.meta)));
+
   clip.segments.forEach((seg, i) => {
     const v = videos[seg.video];
     const srcDur = seg.end - seg.start;
@@ -64,7 +68,7 @@ export async function renderClip(clip, videos, opts) {
 
     args.push('-ss', seg.start.toFixed(3), '-t', srcDur.toFixed(3), '-i', v.path);
     const vIdx = inputIdx++;
-    filters.push(videoChain(`${vIdx}:v`, `v${i}`, seg, v.meta, reframe));
+    filters.push(videoChain(`${vIdx}:v`, `v${i}`, seg, v.meta, reframe, toneMaps[seg.video]));
 
     if (audio === 'original' && v.meta.hasAudio) {
       filters.push(`[${vIdx}:a]asetpts=PTS-STARTPTS,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo${atempoChain(speed)},apad,atrim=0:${outDur.toFixed(3)}[a${i}]`);
@@ -112,7 +116,11 @@ export async function renderClip(clip, videos, opts) {
   args.push(
     '-filter_complex', filters.join(';'),
     '-map', '[vout]', '-map', '[aout]',
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-r', String(FPS),
+    // CRF keeps quality consistent; the cap keeps files a sensible size for
+    // uploading (TikTok/Reels re-encode anything above ~10–15 Mbps anyway).
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-maxrate', '10M', '-bufsize', '20M',
+    '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-r', String(FPS),
+    '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709',
     '-c:a', 'aac', '-b:a', '160k', '-ar', '44100',
     '-movflags', '+faststart',
     mp4Name,
