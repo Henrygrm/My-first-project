@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cutline — Social clips & marketing for local businesses</title>
+  <meta name="description" content="Turn raw business footage into edited 9:16 clips, captions and a week of marketing content." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 17v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8m0-4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16m0 4v-4h-4"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+      <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18M17 3v18M3 8h4m10 0h4M3 16h4m10 0h4M3 12h18"/></symbol>
+      <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+      <symbol id="i-utensils" viewBox="0 0 24 24"><path d="M7 3v8m-3-8v5a3 3 0 0 0 6 0V3M7 11v10M17 21V3c-2.2 0-4 2.7-4 6s1.8 4 4 4"/></symbol>
+      <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 17H3v-5l2-5h14l2 5v5h-2M5 12h14"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/></symbol>
+      <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 6.3-6.3a4 4 0 0 1-5-5L9.7 5.3 3 12"/></symbol>
+      <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></symbol>
+      <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></symbol>
+      <symbol id="i-store" viewBox="0 0 24 24"><path d="M4 9.5V20h16V9.5M3 5h18l-1 4.5a2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0zM10 20v-5h4v5"/></symbol>
+    </defs>
+  </svg>
+
+  <header class="nav" id="top">
+    <div class="container nav-inner">
+      <a class="brand" href="#top" aria-label="Cutline home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><rect x="3" y="3" width="26" height="26" rx="8" fill="url(#bm)"/><path d="M12 10.5v11l9-5.5z" fill="#14100a"/><path d="M9 23.5 23 8.5" stroke="#14100a" stroke-width="2.2" stroke-linecap="round"/><defs><linearGradient id="bm" x1="3" y1="3" x2="29" y2="29"><stop stop-color="#ffc35c"/><stop offset="1" stop-color="#ff6a3d"/></linearGradient></defs></svg>
+        </span>
+        <span class="brand-name">Cutline</span>
+      </a>
+      <nav class="nav-links" aria-label="Main">
+        <a href="#how">How it works</a>
+        <a href="#workspace" data-goto-tab="editor">Video editor</a>
+        <a href="#workspace" data-goto-tab="marketing">Marketing</a>
+      </nav>
+      <div class="nav-right">
+        <span class="status-pill" id="status-pill" title="Connection status"><span class="dot"></span><span class="label">Checking…</span></span>
+        <a href="#workspace" class="btn btn-primary btn-sm" data-start>Start Creating</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">For restaurants, detailers, tradies &amp; every local business</p>
+          <h1>Raw footage in.<br /><span class="grad">Scroll-stopping clips</span> out.</h1>
+          <p class="lede">Pick the business, drop in the clips you shot on the job, and Cutline finds the best moments, cuts them to 9:16 with hooks and captions burned in, then writes a week of posts to go with them.</p>
+          <div class="hero-cta">
+            <a href="#workspace" class="btn btn-primary btn-lg" data-start>Start Creating <svg class="ic"><use href="#i-arrow"/></svg></a>
+            <a href="#how" class="btn btn-ghost btn-lg">How it works</a>
+          </div>
+          <ul class="hero-facts">
+            <li><svg class="ic"><use href="#i-check"/></svg> Real MP4 renders, 1080×1920</li>
+            <li><svg class="ic"><use href="#i-check"/></svg> TikTok, Reels &amp; Shorts</li>
+            <li><svg class="ic"><use href="#i-check"/></svg> Runs on your machine</li>
+          </ul>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="phone">
+            <div class="phone-screen">
+              <div class="scene s1"><span class="scene-hook">Wait for the reveal</span><span class="scene-cap">Snow foam time</span></div>
+              <div class="scene s2"><span class="scene-hook">Made fresh, every order</span><span class="scene-cap">Into the pan</span></div>
+              <div class="scene s3"><span class="scene-hook">Start to finish in 30s</span><span class="scene-cap">Done properly</span></div>
+              <div class="phone-ui"><span></span><span></span><span></span></div>
+              <div class="phone-progress"><i></i></div>
+            </div>
+          </div>
+          <div class="float-card fc-plan">
+            <div class="fc-title"><svg class="ic"><use href="#i-sparkle"/></svg> Edit plan</div>
+            <div class="fc-row"><b>Hook</b> 0:00 – 0:02 · dirtiest panel</div>
+            <div class="fc-row"><b>Cut</b> 0:14 – 0:41 · setup &amp; walking</div>
+            <div class="fc-row"><b>Speed</b> 1.8× on polishing passes</div>
+          </div>
+          <div class="float-card fc-timeline">
+            <div class="tl">
+              <span class="tl-seg hook" style="flex:1.2">Hook</span>
+              <span class="tl-seg process" style="flex:3">Process</span>
+              <span class="tl-seg reveal" style="flex:2">Reveal</span>
+              <span class="tl-seg cta" style="flex:1">CTA</span>
+              <i class="tl-head"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="section" id="how">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">How it works</p>
+          <h2>One dashboard, from camera roll to posted.</h2>
+        </div>
+        <ol class="steps">
+          <li><span class="step-n">1</span><h3>Pick the business</h3><p>Restaurant, detailer, tradie, barber, gym, or describe your own. Editing and copy adapt to it.</p></li>
+          <li><span class="step-n">2</span><h3>Drop in raw footage</h3><p>Upload the clips straight off your phone. Long, shaky or messy is fine.</p></li>
+          <li><span class="step-n">3</span><h3>Generate clips</h3><p>Best moments are found, dead time is cut, and a hook, captions and a CTA are burned into vertical video.</p></li>
+          <li><span class="step-n">4</span><h3>Post with copy that fits</h3><p>Captions, hashtags, hooks and a 7-day plan, ready to copy. Download the MP4s and go.</p></li>
+        </ol>
+
+        <div class="feature-grid">
+          <article class="feature">
+            <div class="feature-icon"><svg class="ic"><use href="#i-film"/></svg></div>
+            <h3>AI video editing</h3>
+            <p>Claude reviews frames from your footage alongside measured motion, audio and lighting, then writes an exact edit list. FFmpeg renders it.</p>
+            <ul>
+              <li>Finds the money shots: sizzle, foam, the finished job</li>
+              <li>Cuts setup, walking around and dark or shaky bits</li>
+              <li>Opening hook, captions and CTA in platform-safe zones</li>
+              <li>Smart 9:16 crop, or a blurred fill for landscape footage</li>
+            </ul>
+          </article>
+          <article class="feature">
+            <div class="feature-icon"><svg class="ic"><use href="#i-megaphone"/></svg></div>
+            <h3>AI marketing</h3>
+            <p>Tell it the business name, suburb, services and tone. Get copy that sounds like the business, not a template.</p>
+            <ul>
+              <li>Captions, hooks and calls to action</li>
+              <li>Broad, niche and local hashtags</li>
+              <li>Video concepts with shot lists</li>
+              <li>7-day content plan and promo posts</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- WORKSPACE -->
+    <section class="section workspace" id="workspace">
+      <div class="container">
+        <div class="ws-head">
+          <div class="ws-title">
+            <p class="eyebrow">Workspace</p>
+            <div class="project-name-row">
+              <input id="project-name" class="project-name" value="Untitled project" aria-label="Project name" maxlength="80" />
+              <span class="saved-hint" id="saved-hint"></span>
+            </div>
+          </div>
+          <div class="ws-actions">
+            <button class="btn btn-ghost btn-sm" id="btn-projects"><svg class="ic"><use href="#i-folder"/></svg> Projects</button>
+            <button class="btn btn-ghost btn-sm" id="btn-new-project"><svg class="ic"><use href="#i-plus"/></svg> New</button>
+          </div>
+        </div>
+
+        <div id="setup-banner"></div>
+
+        <div class="card biz-card">
+          <div class="card-head">
+            <h3><span class="num">1</span> Business type</h3>
+            <p class="muted" id="biz-tagline"></p>
+          </div>
+          <div class="biz-grid" id="biz-grid" role="radiogroup" aria-label="Business type"></div>
+          <div class="biz-custom" id="biz-custom-wrap" hidden>
+            <label for="biz-custom">Describe the business</label>
+            <input id="biz-custom" placeholder="e.g. Dog groomer, florist, tattoo studio, landscaper" maxlength="80" />
+          </div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Workspace">
+          <button role="tab" class="tab" id="tab-btn-editor" aria-selected="true" aria-controls="tab-editor" data-tab="editor"><svg class="ic"><use href="#i-film"/></svg> Video editor</button>
+          <button role="tab" class="tab" id="tab-btn-marketing" aria-selected="false" aria-controls="tab-marketing" data-tab="marketing"><svg class="ic"><use href="#i-megaphone"/></svg> Marketing</button>
+        </div>
+
+        <!-- VIDEO EDITOR -->
+        <div class="tabpanel" id="tab-editor" role="tabpanel" aria-labelledby="tab-btn-editor">
+          <div class="ws-grid">
+            <div class="ws-controls">
+              <div class="card">
+                <div class="card-head"><h3><span class="num">2</span> Footage</h3><span class="muted small" id="footage-total"></span></div>
+                <label class="dropzone" id="dropzone">
+                  <input type="file" id="file-input" accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" multiple hidden />
+                  <svg class="ic ic-lg"><use href="#i-upload"/></svg>
+                  <span class="dz-title">Drop raw videos here or <u>browse</u></span>
+                  <span class="dz-sub">MP4, MOV, WebM · several files at once is fine</span>
+                  <span class="dz-progress" hidden><i></i><em>Uploading…</em></span>
+                </label>
+                <ul class="video-list" id="video-list"></ul>
+              </div>
+
+              <div class="card">
+                <div class="card-head"><h3><span class="num">3</span> Direction</h3></div>
+
+                <div class="field">
+                  <span class="label">Platform</span>
+                  <div class="seg" id="platform-seg" role="radiogroup" aria-label="Platform"></div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field">
+                    <span class="label">Clips</span>
+                    <div class="seg seg-sm" id="clips-seg" role="radiogroup" aria-label="Number of clips"></div>
+                  </div>
+                  <div class="field">
+                    <span class="label">Length</span>
+                    <div class="seg seg-sm" id="length-seg" role="radiogroup" aria-label="Target length"></div>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <span class="label">Editing engine</span>
+                  <div class="engine" id="engine">
+                    <label class="engine-opt">
+                      <input type="radio" name="mode" value="ai" />
+                      <span class="engine-body">
+                        <b><svg class="ic"><use href="#i-sparkle"/></svg> Claude AI</b>
+                        <small>Watches your footage and writes the edit</small>
+                      </span>
+                    </label>
+                    <label class="engine-opt">
+                      <input type="radio" name="mode" value="auto" />
+                      <span class="engine-body">
+                        <b>Auto-edit</b>
+                        <small>No AI. Picks moments by motion &amp; sound</small>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <label class="label" for="instructions">Instructions <span class="muted">(optional)</span></label>
+                  <textarea id="instructions" rows="3" maxlength="2000"></textarea>
+                </div>
+
+                <details class="advanced">
+                  <summary>Output options</summary>
+                  <div class="field">
+                    <span class="label">Framing</span>
+                    <div class="seg seg-sm" id="reframe-seg" role="radiogroup" aria-label="Framing"></div>
+                  </div>
+                  <div class="field">
+                    <span class="label">Audio</span>
+                    <div class="seg seg-sm" id="audio-seg" role="radiogroup" aria-label="Audio"></div>
+                  </div>
+                  <label class="toggle"><input type="checkbox" id="opt-text" checked /><span></span> Burn in hook, captions &amp; CTA</label>
+                  <label class="toggle"><input type="checkbox" id="opt-speech" /><span></span> Spoken subtitles <small class="muted" id="speech-note"></small></label>
+                </details>
+
+                <button class="btn btn-primary btn-block btn-lg" id="btn-generate"><svg class="ic"><use href="#i-sparkle"/></svg> Generate Content</button>
+                <p class="gen-hint muted small" id="gen-hint"></p>
+
+                <div class="job" id="job" hidden>
+                  <div class="job-top"><span class="job-stage" id="job-stage">Starting…</span><span class="job-pct" id="job-pct">0%</span></div>
+                  <div class="bar"><i id="job-bar"></i></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="ws-results">
+              <div class="card results-card">
+                <div class="results-head">
+                  <div class="subtabs" role="tablist">
+                    <button class="subtab active" data-subtab="clips">Clips <span class="count" id="clips-count"></span></button>
+                    <button class="subtab" data-subtab="plan">Edit plan</button>
+                  </div>
+                  <span class="plan-badge" id="plan-badge"></span>
+                </div>
+                <div class="subpanel" id="sub-clips"></div>
+                <div class="subpanel" id="sub-plan" hidden></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MARKETING -->
+        <div class="tabpanel" id="tab-marketing" role="tabpanel" aria-labelledby="tab-btn-marketing" hidden>
+          <div class="ws-grid">
+            <div class="ws-controls">
+              <form class="card" id="mk-form" autocomplete="off">
+                <div class="card-head"><h3><span class="num">2</span> Business details</h3></div>
+                <div class="field"><label class="label" for="mk-name">Business name</label><input id="mk-name" name="name" placeholder="e.g. Gloss Boss Detailing" /></div>
+                <div class="field"><label class="label" for="mk-location">Location</label><input id="mk-location" name="location" placeholder="e.g. Parramatta, Sydney" /></div>
+                <div class="field"><label class="label" for="mk-services">Services or products</label><textarea id="mk-services" name="services" rows="2" placeholder="e.g. Full details, ceramic coating, interior steam clean"></textarea></div>
+                <div class="field"><label class="label" for="mk-audience">Target audience</label><input id="mk-audience" name="audience" placeholder="e.g. Busy parents, car enthusiasts, local fleets" /></div>
+                <div class="field">
+                  <label class="label" for="mk-tone">Tone of voice</label>
+                  <select id="mk-tone" name="tone">
+                    <option>Friendly and local</option>
+                    <option>Bold and energetic</option>
+                    <option>Premium and polished</option>
+                    <option>Funny and casual</option>
+                    <option>Professional and trustworthy</option>
+                    <option value="custom">Custom…</option>
+                  </select>
+                  <input id="mk-tone-custom" name="toneCustom" placeholder="Describe the tone" hidden />
+                </div>
+                <div class="field"><label class="label" for="mk-extra">Anything else <span class="muted">(optional)</span></label><textarea id="mk-extra" name="extra" rows="2" placeholder="Current offer, opening hours, what makes them different…"></textarea></div>
+                <label class="toggle" id="mk-context-wrap"><input type="checkbox" id="mk-context" checked /><span></span> Use my edited clips as context</label>
+                <button class="btn btn-primary btn-block btn-lg" id="btn-marketing" type="submit"><svg class="ic"><use href="#i-sparkle"/></svg> Generate Marketing</button>
+              </form>
+            </div>
+            <div class="ws-results">
+              <div class="mk-results" id="mk-results"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <span class="brand-name small">Cutline</span>
+      <span class="muted small">Personal content studio · Claude for planning &amp; copy · FFmpeg for rendering</span>
+    </div>
+  </footer>
+
+  <dialog class="dialog" id="projects-dialog">
+    <div class="dialog-head"><h3>Projects</h3><button class="icon-btn" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="dialog-body"><ul class="project-list" id="project-list"></ul></div>
+  </dialog>
+
+  <dialog class="dialog dialog-video" id="video-dialog">
+    <div class="dialog-head"><h3 id="video-dialog-title">Preview</h3><button class="icon-btn" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="dialog-body"><video id="video-dialog-player" controls playsinline></video></div>
+  </dialog>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
