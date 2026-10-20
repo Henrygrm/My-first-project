@@ -3,3 +3,5 @@
 try {
   process.loadEnvFile();
 } catch {}
+
+console.log('\n  Starting Cutline…');

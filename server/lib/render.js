@@ -2,7 +2,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FFMPEG, h264Args, hasFilter, run, thumbnail, toneMap } from './ffmpeg.js';
-import { renderTextPng } from './textOverlay.js';
 import { buildSubtitles, chunkWords, mapTranscript } from './subtitles.js';
 
 const FONTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../assets/fonts');
@@ -119,6 +118,8 @@ export async function renderClip(clip, videos, opts) {
     videoOut = 'vt';
   } else if (subs.hasEvents) {
     for (const [i, ev] of subs.events.entries()) {
+      // Loaded only when needed so a problem with the drawing library can't stop the app starting.
+      const { renderTextPng } = await import('./textOverlay.js');
       const png = await renderTextPng(ev.text, ev.style, path.join(outDir, `${baseName}-text${i}.png`));
       if (!png) continue;
       tempPngs.push(png.file);

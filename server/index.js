@@ -217,10 +217,20 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: err.message || 'Something went wrong', code: err.code || null });
 });
 
-app.listen(PORT, HOST, async () => {
-  const ff = await checkFfmpeg();
+const server = app.listen(PORT, HOST, async () => {
   console.log(`\n  Cutline is running → http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}\n`);
+  const ff = await checkFfmpeg();
   console.log(`  FFmpeg:        ${ff.available ? `ok (${ff.version})` : 'NOT FOUND — install FFmpeg to edit videos'}`);
   console.log(`  Claude AI:     ${aiConfigured() ? `ok (${MODEL})` : 'not configured — add ANTHROPIC_API_KEY to .env'}`);
   console.log(`  Transcription: ${transcriptionConfigured() ? 'ok (Whisper)' : 'off — optional, add OPENAI_API_KEY for spoken subtitles'}\n`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n  Port ${PORT} is already in use — Cutline is probably already running in another Terminal window.`);
+    console.error(`  Open http://127.0.0.1:${PORT} in your browser, or close the other window and run npm start again.\n`);
+  } else {
+    console.error('\n  Cutline could not start:', err.message, '\n');
+  }
+  process.exit(1);
 });
