@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FFMPEG, run, thumbnail, toneMap } from './ffmpeg.js';
+import { FFMPEG, h264Args, hasFilter, run, thumbnail, toneMap } from './ffmpeg.js';
+import { renderTextPng } from './textOverlay.js';
 import { buildSubtitles, chunkWords, mapTranscript } from './subtitles.js';
 
 const FONTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../assets/fonts');
@@ -107,19 +108,35 @@ export async function renderClip(clip, videos, opts) {
   const fadeOut = Math.max(0, total - 0.35).toFixed(3);
   // The ASS file is referenced relative to cwd (outDir) so no path escaping
   // is needed inside the filter graph, which matters on Windows.
-  const fontsDir = path.relative(outDir, FONTS_DIR).split(path.sep).join('/') || '.';
-  const subFilter = subs.hasEvents ? `subtitles=filename=${assName}:fontsdir=${fontsDir},` : '';
-  filters.push(`[vc]${subFilter}fade=t=out:st=${fadeOut}:d=0.35[vout]`);
+  // Burn in the text. libass (`subtitles` filter) when this FFmpeg has it;
+  // otherwise draw each line as a PNG and overlay it for its time range.
+  const textMode = process.env.CUTLINE_TEXT_RENDERER || ((await hasFilter('subtitles')) ? 'ass' : 'png');
+  const tempPngs = [];
+  let videoOut = 'vc';
+  if (subs.hasEvents && textMode === 'ass') {
+    const fontsDir = path.relative(outDir, FONTS_DIR).split(path.sep).join('/') || '.';
+    filters.push(`[vc]subtitles=filename=${assName}:fontsdir=${fontsDir}[vt]`);
+    videoOut = 'vt';
+  } else if (subs.hasEvents) {
+    for (const [i, ev] of subs.events.entries()) {
+      const png = await renderTextPng(ev.text, ev.style, path.join(outDir, `${baseName}-text${i}.png`));
+      if (!png) continue;
+      tempPngs.push(png.file);
+      args.push('-i', path.basename(png.file));
+      const enable = `between(t\\,${ev.start.toFixed(3)}\\,${ev.end.toFixed(3)})`;
+      filters.push(`[${videoOut}][${inputIdx++}:v]overlay=${png.x}:${png.y}:enable=${enable}[vt${i}]`);
+      videoOut = `vt${i}`;
+    }
+  }
+  filters.push(`[${videoOut}]fade=t=out:st=${fadeOut}:d=0.35[vout]`);
   filters.push(`[ac]afade=t=out:st=${fadeOut}:d=0.35[aout]`);
 
   const mp4Name = `${baseName}.mp4`;
   args.push(
     '-filter_complex', filters.join(';'),
     '-map', '[vout]', '-map', '[aout]',
-    // CRF keeps quality consistent; the cap keeps files a sensible size for
-    // uploading (TikTok/Reels re-encode anything above ~10–15 Mbps anyway).
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-maxrate', '10M', '-bufsize', '20M',
-    '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-r', String(FPS),
+    ...(await h264Args()),
+    '-pix_fmt', 'yuv420p', '-r', String(FPS),
     '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709',
     '-c:a', 'aac', '-b:a', '160k', '-ar', '44100',
     '-movflags', '+faststart',
@@ -136,6 +153,8 @@ export async function renderClip(clip, videos, opts) {
       }
     },
   });
+
+  await Promise.all(tempPngs.map((f) => fs.rm(f, { force: true })));
 
   const thumbName = `${baseName}.jpg`;
   await thumbnail(path.join(outDir, mp4Name), path.join(outDir, thumbName), Math.min(0.8, total / 3));

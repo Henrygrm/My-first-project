@@ -92,20 +92,50 @@ export async function probe(file) {
   };
 }
 
-let toneMapSupported = null;
+let filterList = null;
+
+/** Whether this FFmpeg build includes a filter (builds differ, e.g. Homebrew's has no libass). */
+export async function hasFilter(name) {
+  if (filterList === null) {
+    try {
+      filterList = (await run(FFMPEG, ['-hide_banner', '-filters'])).stdout;
+    } catch {
+      filterList = '';
+    }
+  }
+  return new RegExp(`^\\s*\\S+\\s+${name}\\s`, 'm').test(filterList);
+}
+
+let encoderList = null;
+
+export async function hasEncoder(name) {
+  if (encoderList === null) {
+    try {
+      encoderList = (await run(FFMPEG, ['-hide_banner', '-encoders'])).stdout;
+    } catch {
+      encoderList = '';
+    }
+  }
+  return new RegExp(`^\\s*\\S+\\s+${name}\\s`, 'm').test(encoderList);
+}
+
+/** H.264 encoder args: libx264 when available, else the Mac's hardware encoder. */
+export async function h264Args() {
+  if (await hasEncoder('libx264')) {
+    // CRF keeps quality consistent; the cap keeps files a sensible size for
+    // uploading (TikTok/Reels re-encode anything above ~10–15 Mbps anyway).
+    return ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-maxrate', '10M', '-bufsize', '20M', '-profile:v', 'high'];
+  }
+  if (await hasEncoder('h264_videotoolbox')) {
+    return ['-c:v', 'h264_videotoolbox', '-b:v', '8M', '-maxrate', '10M', '-profile:v', 'high'];
+  }
+  throw new Error('Your FFmpeg cannot encode H.264 video. Reinstall it with: brew reinstall ffmpeg');
+}
 
 /** Filter chain converting HDR to SDR, or '' when not needed or not supported. */
 export async function toneMap(meta) {
   if (!meta?.hdr) return '';
-  if (toneMapSupported === null) {
-    try {
-      const { stdout } = await run(FFMPEG, ['-hide_banner', '-filters']);
-      toneMapSupported = /\bzscale\b/.test(stdout) && /\btonemap\b/.test(stdout);
-    } catch {
-      toneMapSupported = false;
-    }
-  }
-  return toneMapSupported
+  return (await hasFilter('zscale')) && (await hasFilter('tonemap'))
     ? 'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p'
     : '';
 }

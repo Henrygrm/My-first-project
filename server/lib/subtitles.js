@@ -144,5 +144,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     .map((e, i) => `${i + 1}\n${srtTime(e.start)} --> ${srtTime(e.end)}\n${e.text}\n`)
     .join('\n');
 
-  return { ass: header + lines.join('\n') + '\n', srt: srtText, hasEvents: lines.length > 0 };
+  return {
+    ass: header + lines.join('\n') + '\n',
+    srt: srtText,
+    hasEvents: lines.length > 0,
+    events: events.filter((e) => cleanOnScreenText(e.text)).map(({ start, end, style, text }) => ({ start, end, style, text })),
+  };
 }
