@@ -1,6 +1,6 @@
 {
   "name": "cutline",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Personal AI video editing and marketing dashboard for local businesses",
   "main": "server/index.js",
   "scripts": {

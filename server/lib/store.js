@@ -40,7 +40,7 @@ export async function saveProject(project) {
 }
 
 // Serialise read-modify-write per project so a long render and, say, a
-// marketing request finishing at the same time can't overwrite each other.
+// change request finishing at the same time can't overwrite each other.
 const locks = new Map();
 
 export async function updateProject(id, mutate) {
@@ -72,7 +72,7 @@ export async function createProject(name) {
     videos: [],
     plan: null,
     clips: [],
-    marketing: null,
+    chat: [],
   };
   return saveProject(project);
 }

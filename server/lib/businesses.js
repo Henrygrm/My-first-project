@@ -1,5 +1,5 @@
 // Business-type profiles. These drive the AI editing brief, the no-AI
-// auto-edit heuristics, and the marketing prompts, so every part of the app
+// auto-edit heuristics and templates, so every part of the app
 // adapts to the selected industry from one place.
 
 export const BUSINESSES = {

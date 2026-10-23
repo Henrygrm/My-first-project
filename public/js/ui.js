@@ -1,4 +1,4 @@
-// Small DOM + API helpers shared by the editor and marketing modules.
+// Small DOM + API helpers.
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];

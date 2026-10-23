@@ -277,6 +277,7 @@ export function normalizeAiPlan(raw, videos, platform, styles) {
   if (!clips.length) throw new Error('The AI plan did not contain any usable segments. Try again or add instructions.');
   return {
     source: 'ai',
+    strategy: raw.strategy || '',
     summary: raw.summary || '',
     footage_review: (raw.footage_review || []).map(toZero).filter((r) => videos[r.video])
       .map((r) => ({ ...r, quality: oneOf(r.quality, QUALITIES, 'usable') })),
@@ -336,15 +337,33 @@ const overlaps = (a, b, pad = 0.3) => a.video === b.video && a.start < b.end + p
 const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
 
 const STYLE_HOOKS = {
-  listicle: (b) => ['3 reasons locals choose us', '3 things we never skip', '3 details that make the difference', `3 signs of a great ${b.short.toLowerCase()} job`],
-  promo: (b) => ['Book this week, thank us later', `Need a ${b.short.toLowerCase()} pro you can trust?`, 'Spots are filling fast', b.promo[0]],
+  listicle: (b) => ['3 reasons locals choose us', '3 things we never skip', '3 details that make the difference', "Here's what you're paying for"],
+  promo: (b) => ['Book this week, thank us later', 'Spots are filling fast', b.promo[0], b.hooks[2] || b.hooks[0]],
   satisfying: (b) => ['Turn the sound on', 'Oddly satisfying', 'Watch till the end', b.hooks[0]],
-  story: (b) => [`A day in the life at our ${b.short.toLowerCase()} business`, 'Come to work with us', 'Behind the scenes', b.hooks[1]],
+  story: (b) => ['A day in the life', 'Come to work with us', 'Behind the scenes', b.hooks[1]],
 };
+
+// Calls to action per industry; each clip in a batch gets a different one.
+const CTAS = {
+  restaurant: ['Book a table today', 'Visit {name} this week', 'Order now at {name}', 'Tag who you would bring'],
+  detailing: ['Book your detail today', 'Book {name} today', 'DM {name} to book', 'Link in bio to book'],
+  trades: ['Get a free quote', 'Call {name} for a quote', 'DM us for a free quote', 'Link in bio for a quote'],
+  barber: ['Book your chair', 'Book at {name}', 'DM {name} to book', 'Link in bio to book'],
+  gym: ['Claim your free session', 'Try {name} free', 'DM us to get started', 'Link in bio to join'],
+  other: ['Message us to book', 'Visit {name}', 'DM {name} to book', 'Link in bio'],
+};
+
+/** First option not used yet in this batch (random order), else any. */
+function pickFresh(options, used, rng) {
+  const list = [...new Set(options.filter(Boolean))].sort(() => rng() - 0.5);
+  const fresh = list.find((o) => !used.has(o.toLowerCase())) || list[0];
+  used.add(fresh.toLowerCase());
+  return fresh;
+}
 
 /** Arrange picked windows into a clip with the structure of the given style. */
 function buildStyledClip(styleId, picked, ctx) {
-  const { business, videos, rng, k } = ctx;
+  const { business, videos, rng, k, usedHooks } = ctx;
   const style = getStyle(styleId);
   const chrono = [...picked].sort((a, b) => a.video - b.video || a.start - b.start);
   const seg = (c, extra = {}) => ({ video: c.video, start: c.start, end: c.end, role: 'process', speed: 1, focus_x: 0.5, caption: '', ...extra });
@@ -404,7 +423,7 @@ function buildStyledClip(styleId, picked, ctx) {
     if (i === 0 && (styleId === 'montage' || styleId === 'promo')) s.transition = pickFrom(['flash', 'zoom'], rng);
   });
 
-  const hook = pickFrom(STYLE_HOOKS[styleId]?.(business) || business.hooks, rng);
+  const hook = pickFresh(STYLE_HOOKS[styleId]?.(business) || business.hooks, usedHooks, rng);
   // Don't repeat the hook as a caption.
   segments.forEach((s) => {
     if (s.caption && s.caption.toLowerCase() === hook.toLowerCase()) s.caption = '';
@@ -424,7 +443,37 @@ function buildStyledClip(styleId, picked, ctx) {
   };
 }
 
-export function autoPlan({ videos, business, platform, clipCount, targetSeconds, styles, rng = Math.random }) {
+/**
+ * Work the business's own details into template text: its name in the call
+ * to action, its offer as the promo hook, its services as promo captions.
+ */
+function personalise(clip, profile, business, rng, usedCtas) {
+  const name = (profile.name || '').trim();
+  const services = (profile.services || '').split(/[,;\n]|\band\b/).map((x) => x.trim()).filter((x) => x.length > 2 && x.length <= 40);
+  const out = { ...clip, segments: clip.segments.map((s) => ({ ...s })) };
+  const usable = name && name.length <= 24;
+  const ctas = (CTAS[business.id] || CTAS.other).filter((c) => usable || !c.includes('{name}')).map((c) => c.replace('{name}', name));
+  out.cta_text = pickFresh([business.cta, ...ctas], usedCtas, rng);
+  if (out.style === 'promo') {
+    if (profile.offer && profile.offer.length <= 60) out.hook_text = profile.offer;
+    let si = 0;
+    out.segments.forEach((s) => {
+      if (s.caption && si < services.length) s.caption = services[si++].replace(/^./, (c) => c.toUpperCase());
+    });
+  }
+  if (out.style === 'listicle' && services.length >= 3) {
+    const picks = [...services].sort(() => rng() - 0.5).slice(0, 3);
+    let n = 0;
+    out.segments.forEach((s) => {
+      const m = s.caption.match(/^(\d)\.\s/);
+      if (m && n < 3) s.caption = `${m[1]}. ${picks[n++].replace(/^./, (c) => c.toUpperCase())}`;
+    });
+  }
+  out.post_caption = `${out.hook_text} 👀\n\n${out.cta_text}.${profile.location ? ` 📍 ${profile.location}` : ''}`;
+  return out;
+}
+
+export function autoPlan({ videos, business, profile = {}, platform, clipCount, targetSeconds, styles, rng = Math.random }) {
   const scores = secondScores(videos);
   const totalFootage = videos.reduce((s, v) => s + v.meta.duration, 0);
   const target = Math.min(targetSeconds, platform.maxSeconds);
@@ -432,13 +481,15 @@ export function autoPlan({ videos, business, platform, clipCount, targetSeconds,
   const want = target * 1.15 + 1;
 
   // Candidate windows of a given length every 0.5s across all videos.
+  // A little randomness in the ranking so each run picks different (still
+  // strong) moments instead of the same shots every time.
   const candidatesFor = (len) => {
     const list = [];
     videos.forEach((v, vi) => {
       const dur = v.meta.duration;
       const l = Math.min(len, dur);
       for (let s = 0; s + l <= dur + 0.01; s += 0.5) {
-        list.push({ video: vi, start: round2(s), end: round2(Math.min(dur, s + l)), score: windowScore(scores[vi], s, l) });
+        list.push({ video: vi, start: round2(s), end: round2(Math.min(dur, s + l)), score: windowScore(scores[vi], s, l) + rng() * 0.12 });
       }
     });
     return list.sort((a, b) => b.score - a.score);
@@ -465,6 +516,8 @@ export function autoPlan({ videos, business, platform, clipCount, targetSeconds,
 
   const used = [];
   const clips = [];
+  const usedHooks = new Set();
+  const usedCtas = new Set();
   for (let k = 0; k < clipCount; k++) {
     const styleId = styles[k] || styles[0];
     const style = getStyle(styleId);
@@ -478,7 +531,7 @@ export function autoPlan({ videos, business, platform, clipCount, targetSeconds,
     if (!picked.length) ({ picked } = pick(candidates, segLen, -Infinity, used));
     if (!picked.length) break;
     used.push(...picked);
-    clips.push(sanitizeClip(buildStyledClip(styleId, picked, { business, videos, rng, k }), videos, platform.maxSeconds));
+    clips.push(sanitizeClip(personalise(buildStyledClip(styleId, picked, { business, videos, rng, k, usedHooks }), profile, business, rng, usedCtas), videos, platform.maxSeconds));
   }
 
   if (!clips.length) throw new Error('The footage is too short to build a clip from.');

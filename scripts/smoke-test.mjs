@@ -1,6 +1,7 @@
 // End-to-end smoke test: generates sample footage with FFmpeg, starts the app
 // against a mock Claude API, and runs the whole workflow through the HTTP API:
-// upload → auto-edit → AI edit → re-render → marketing → no-key setup errors.
+// upload → music → auto-edit → AI edit → re-render → ask for changes (AI and
+// rules) → settings → no-key setup errors.
 //
 //   npm test
 import assert from 'node:assert/strict';
@@ -16,6 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TMP = await fs.mkdtemp(path.join(os.tmpdir(), 'cutline-test-'));
 const MOCK_PORT = 4555;
 const children = [];
+const VERSION = JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8')).version;
 
 function log(...a) {
   console.log('  •', ...a);
@@ -39,7 +41,8 @@ function makeSamples() {
 async function startServer(port, env) {
   const child = spawn(process.execPath, ['server/index.js'], {
     cwd: ROOT,
-    env: { ...process.env, ANTHROPIC_AUTH_TOKEN: '', OPENAI_API_KEY: '', PORT: String(port), DATA_DIR: path.join(TMP, `data-${port}`), ...env },
+    // ENV_FILE keeps the Settings tests away from the real .env.
+    env: { ...process.env, ANTHROPIC_AUTH_TOKEN: '', OPENAI_API_KEY: '', CLAUDE_MODEL: '', PORT: String(port), DATA_DIR: path.join(TMP, `data-${port}`), ENV_FILE: path.join(TMP, `env-${port}`), ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   children.push(child);
@@ -95,6 +98,8 @@ async function checkClips(base, dataDir, project) {
   }
 }
 
+const planReq0 = () => requests.findLast((r) => r.body.output_config?.format?.schema?.properties?.strategy);
+
 async function main() {
   console.log('\nCutline smoke test\n');
   const { a, b, bad } = makeSamples();
@@ -111,11 +116,12 @@ async function main() {
   assert.equal(status.ai.configured, true);
   assert.equal(status.ffmpeg.available, true);
   assert.equal(status.businesses.length, 6);
+  assert.equal(status.version, VERSION, 'status reports the app version (the page uses it to spot an old server)');
   log('status ok', status.ai.model, status.ffmpeg.version);
 
   const html = await (await fetch(base + '/')).text();
-  assert.match(html, /Start Creating/);
-  log('landing page served');
+  for (const id of ['page-home', 'page-music', 'page-settings', 'ask-input', 'btn-generate']) assert.match(html, new RegExp(`id="${id}"`));
+  log('home, music and settings pages served');
 
   const project = (await call(base, '/api/projects', { method: 'POST', body: { name: 'Smoke test' } })).data;
   assert.ok(project.id);
@@ -194,8 +200,12 @@ async function main() {
   assert.ok(segsAll.some((sg) => sg.transition === 'flash') && segsAll.some((sg) => sg.effect === 'zoom_in'), 'transition/effect labels normalised');
   assert.ok(segsAll.some((sg) => sg.layout === 'split' && sg.compare_video === 0), 'split screen kept with 0-based compare video');
   assert.ok(p.plan.clips.every((c) => c.style), 'styles assigned');
+  assert.equal(new Set(p.plan.clips.map((c) => c.style)).size, 2, 'the AI chose a different style per clip');
+  assert.match(p.plan.strategy, /Mock strategy/, 'strategy kept');
+  assert.ok(p.plan.clips.every((c) => c.angle && c.why_it_works && c.target_viewer), 'angle and reasoning kept');
+  assert.match(planReq0().body.messages[0].content[0].text, /Choose the best style for each clip/);
   await checkClips(base, dataDir, p);
-  const planReq = requests.at(-1);
+  const planReq = planReq0();
   const images = planReq.body.messages[0].content.filter((x) => x.type === 'image').length;
   assert.ok(images >= 6, 'frames sent to Claude');
   assert.equal(planReq.body.fallbacks, 'default');
@@ -220,17 +230,25 @@ async function main() {
   assert.match(srt, /New hook text/);
   log('edit + re-render ok');
 
-  // Marketing
-  const profile = { name: 'Gloss Boss', businessType: 'detailing', location: 'Parramatta', services: 'Ceramic coating', audience: 'Car lovers', tone: 'Bold' };
-  const mk = await call(base, '/api/marketing', { method: 'POST', body: { profile, projectId: project.id, footageContext: 'clip context' } });
-  assert.equal(mk.status, 200, JSON.stringify(mk.data));
-  for (const k of ['captions', 'hooks', 'hashtags', 'video_concepts', 'seven_day_plan', 'promotions', 'engagement_tips', 'ctas']) assert.ok(mk.data.data[k], `section ${k}`);
-  const regen = await call(base, '/api/marketing', { method: 'POST', body: { profile, section: 'hooks', previous: mk.data.data.hooks, projectId: project.id } });
-  assert.deepEqual(Object.keys(regen.data.data), ['hooks']);
-  assert.match(requests.at(-1).body.messages[0].content[0].text, /fresh alternatives/);
-  const saved = (await call(base, `/api/projects/${project.id}`)).data;
-  assert.ok(saved.marketing.data.seven_day_plan.length === 7, 'marketing saved with project');
-  log('marketing full + single-section regenerate ok');
+  // Ask for changes (AI): only the clip asked about changes and re-renders
+  const prior = (await call(base, `/api/projects/${project.id}`)).data;
+  job = (await call(base, `/api/projects/${project.id}/revise`, { method: 'POST', body: { request: 'Punchier hook and no music please', clipIndex: 1 } })).data;
+  await waitJob(base, job.jobId);
+  const rv = (await call(base, `/api/projects/${project.id}`)).data;
+  assert.equal(rv.plan.clips[1].hook_text, 'Revised by the AI');
+  assert.equal(rv.plan.clips[1].music, null, 'music removed as asked');
+  assert.ok(Math.abs(rv.plan.clips[1].estDuration - 12) <= 0.75 || rv.plan.clips[1].lengthNote, `revised length ${rv.plan.clips[1].estDuration}`);
+  assert.notEqual(rv.clips[1].file, prior.clips[1].file, 'changed clip re-rendered');
+  assert.equal(rv.clips[0].file, prior.clips[0].file, 'other clip untouched');
+  assert.equal(rv.plan.clips[0].hook_text, prior.plan.clips[0].hook_text);
+  assert.match(rv.chat.at(-2).text, /Clip 2: Punchier hook/);
+  assert.match(rv.chat.at(-1).text, /Mock: changed clip 2/);
+  const revReq = requests.at(-1).body.messages[0].content[0].text;
+  assert.match(revReq, /THE CURRENT CLIPS/);
+  assert.match(revReq, /MUSIC LIBRARY: "beat 120"/);
+  await checkClips(base, dataDir, rv);
+  log('ask for changes (AI): clip 2 revised and re-rendered, clip 1 untouched');
+  assert.equal((await call(base, `/api/projects/${project.id}/revise`, { method: 'POST', body: { request: '  ' } })).status, 400);
 
   // Project list + delete video marks plan stale
   const list = (await call(base, '/api/projects')).data;
@@ -245,23 +263,78 @@ async function main() {
   const srv2 = await startServer(3556, { ANTHROPIC_API_KEY: '', ANTHROPIC_BASE_URL: `http://127.0.0.1:${MOCK_PORT}` });
   const st2 = (await call(srv2.base, '/api/status')).data;
   assert.equal(st2.ai.configured, false);
-  const mk2 = await call(srv2.base, '/api/marketing', { method: 'POST', body: { profile } });
-  assert.equal(mk2.status, 400);
-  assert.equal(mk2.data.code, 'SETUP_REQUIRED');
   const p3 = (await call(srv2.base, '/api/projects', { method: 'POST', body: { name: 'No key' } })).data;
   const form2 = new FormData();
   form2.append('videos', new Blob([await fs.readFile(a)]), 'a.mp4');
   await fetch(`${srv2.base}/api/projects/${p3.id}/videos`, { method: 'POST', body: form2 });
   const j2 = (await call(srv2.base, `/api/projects/${p3.id}/generate`, { method: 'POST', body: { mode: 'ai' } })).data;
-  await assert.rejects(waitJob(srv2.base, j2.jobId), /ANTHROPIC_API_KEY/);
+  await assert.rejects(waitJob(srv2.base, j2.jobId), /Claude API key/);
   log('no-key mode returns clear setup errors (no fake results)');
+
+  // Ask for changes without a key: the rule-based parser handles common requests
+  const mform2 = new FormData();
+  mform2.append('tracks', new Blob([await fs.readFile(track)]), 'beat 120.mp3');
+  await fetch(`${srv2.base}/api/music`, { method: 'POST', body: mform2 });
+  const j3 = (await call(srv2.base, `/api/projects/${p3.id}/generate`, { method: 'POST', body: { mode: 'auto', clipCount: 2, targetSeconds: 15, music: 'none' } })).data;
+  await waitJob(srv2.base, j3.jobId);
+  const ask = async (request, clipIndex) => {
+    const j = (await call(srv2.base, `/api/projects/${p3.id}/revise`, { method: 'POST', body: { request, clipIndex } })).data;
+    await waitJob(srv2.base, j.jobId);
+    return (await call(srv2.base, `/api/projects/${p3.id}`)).data;
+  };
+  let r = await ask('make clip 1 10 seconds and use the beat 120 song');
+  assert.ok(Math.abs(r.plan.clips[0].estDuration - 10) <= 0.75 || r.plan.clips[0].lengthNote, `clip 1 is ${r.plan.clips[0].estDuration}s`);
+  assert.equal(r.plan.clips[0].music?.name, 'beat 120');
+  assert.equal(r.plan.clips[1].music, null, 'clip 2 not touched');
+  assert.match(r.chat.at(-1).text, /^Done: set clip 1 to 10 seconds, switched the music to "beat 120"/);
+  r = await ask('hook: Wait for the reveal', 1);
+  assert.equal(r.plan.clips[1].hook_text, 'Wait for the reveal');
+  assert.notEqual(r.plan.clips[0].hook_text, 'Wait for the reveal', 'focused clip only');
+  r = await ask('no music');
+  assert.equal(r.plan.clips[0].music, null);
+  const files = r.clips.map((c) => c.file);
+  r = await ask('make it look like a unicorn');
+  assert.match(r.chat.at(-1).text, /couldn't work out that change/);
+  assert.deepEqual(r.clips.map((c) => c.file), files, 'nothing re-rendered for a request it could not understand');
+  await checkClips(srv2.base, path.join(TMP, 'data-3556'), r);
+  log('ask for changes without a key: length, song, hook, no music, and an honest "not understood"');
+
+  // Settings: save a key (to a temp .env), check it, remove it
+  const envFile = path.join(TMP, 'env-3556');
+  let set = (await call(srv2.base, '/api/settings')).data;
+  assert.equal(set.editable, true);
+  assert.equal(set.anthropicKey, '');
+  assert.equal((await call(srv2.base, '/api/settings/check', { method: 'POST' })).data.ok, false);
+  assert.equal((await call(srv2.base, '/api/settings', { method: 'POST', body: { anthropicKey: 'sk-ant bad' } })).status, 400, 'key with a space rejected');
+  set = (await call(srv2.base, '/api/settings', { method: 'POST', body: { anthropicKey: ' sk-ant-test-1234567890 ', model: 'claude-sonnet-5-5' } })).data;
+  assert.equal(set.anthropicKey, 'sk-ant-…7890', 'key masked');
+  assert.ok(!JSON.stringify(set).includes('test-1234567890'), 'full key never sent back');
+  assert.match(await fs.readFile(envFile, 'utf8'), /^ANTHROPIC_API_KEY=sk-ant-test-1234567890\nCLAUDE_MODEL=claude-sonnet-5-5\n$/);
+  const st3 = (await call(srv2.base, '/api/status')).data;
+  assert.equal(st3.ai.configured, true, 'key applies without a restart');
+  assert.equal(st3.ai.model, 'claude-sonnet-5-5');
+  let chk = (await call(srv2.base, '/api/settings/check', { method: 'POST' })).data;
+  assert.equal(chk.ok, true, chk.message);
+  await call(srv2.base, '/api/settings', { method: 'POST', body: { anthropicKey: 'sk-ant-bad-key' } });
+  chk = (await call(srv2.base, '/api/settings/check', { method: 'POST' })).data;
+  assert.equal(chk.ok, false);
+  assert.match(chk.message, /rejected/);
+  assert.equal((await call(srv2.base, '/api/settings', { method: 'POST', body: { model: 'gpt-4' } })).status, 400);
+  await call(srv2.base, '/api/settings', { method: 'POST', body: { anthropicKey: '', model: '' } });
+  assert.equal((await call(srv2.base, '/api/status')).data.ai.configured, false, 'key removed');
+  assert.match(await fs.readFile(envFile, 'utf8'), /# ANTHROPIC_API_KEY=\n# CLAUDE_MODEL=/);
+  log('settings: save, mask, check, reject a bad key, remove');
 
   // --- API that rejects the fallback beta: app retries without it ----------
   await startMock(MOCK_PORT + 1, { rejectFallbacks: true });
   const srv3 = await startServer(3557, { ANTHROPIC_API_KEY: 'test-key', ANTHROPIC_BASE_URL: `http://127.0.0.1:${MOCK_PORT + 1}` });
   const before = requests.length;
-  const mk3 = await call(srv3.base, '/api/marketing', { method: 'POST', body: { profile, section: 'ctas' } });
-  assert.equal(mk3.status, 200, JSON.stringify(mk3.data));
+  const p4 = (await call(srv3.base, '/api/projects', { method: 'POST', body: { name: 'Fallback' } })).data;
+  const form4 = new FormData();
+  form4.append('videos', new Blob([await fs.readFile(b)]), 'b.mov');
+  await fetch(`${srv3.base}/api/projects/${p4.id}/videos`, { method: 'POST', body: form4 });
+  const j4 = (await call(srv3.base, `/api/projects/${p4.id}/generate`, { method: 'POST', body: { mode: 'ai', clipCount: 1, render: false } })).data;
+  await waitJob(srv3.base, j4.jobId);
   assert.equal(requests.length - before, 2, 'retried once');
   assert.equal(requests.at(-1).body.fallbacks, undefined);
   log('falls back to a plain request when the fallback beta is rejected');

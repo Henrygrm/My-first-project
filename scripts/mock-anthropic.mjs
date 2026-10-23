@@ -1,7 +1,7 @@
 // A tiny stand-in for the Anthropic Messages API, used by the smoke test so
 // the full AI workflow can be exercised without an API key or spending credits.
 // It streams responses in the real SSE wire format and returns schema-shaped
-// JSON for edit plans and marketing requests.
+// JSON for edit plans and change requests.
 //
 //   node scripts/mock-anthropic.mjs 4555
 //   ANTHROPIC_API_KEY=test ANTHROPIC_BASE_URL=http://127.0.0.1:4555 npm start
@@ -10,9 +10,11 @@ import http from 'node:http';
 export const requests = [];
 
 function planFor(text) {
-  const videos = [...text.matchAll(/=== VIDEO (\d+): ".+?" — duration ([\d.]+)s/g)].map((m) => ({ n: Number(m[1]), dur: Number(m[2]) }));
+  const videos = [...text.matchAll(/=== VIDEO (\d+): ".+?", ([\d.]+)s/g)].map((m) => ({ n: Number(m[1]), dur: Number(m[2]) }));
   const clipCount = Number(text.match(/DELIVERABLE: (\d+) clip/)?.[1] || 1);
-  const assigned = [...text.matchAll(/Clip \d+: style "(\w+)"/g)].map((m) => m[1]);
+  const assigned = [...text.matchAll(/clip \d+ = "(\w+)"/g)].map((m) => m[1]);
+  // No styles given = the AI chooses; pick a different one per clip like a real plan would.
+  const own = ['transformation', 'satisfying', 'promo', 'story'];
   const clips = Array.from({ length: clipCount }, (_, k) => {
     const segments = [];
     videos.forEach((v, vi) => {
@@ -36,12 +38,16 @@ function planFor(text) {
     // An out-of-range segment the server must clamp/drop.
     segments.push({ video: 99, start: 0, end: 3, role: 'process', caption: 'bogus', speed: 1, focus_x: 0.5, why: 'invalid on purpose', transition: 'cut', effect: 'none', layout: 'full', compare_video: 0, compare_start: 0 });
     return {
-      title: `Mock clip ${k + 1}`, concept: 'Mock concept', music_mood: 'chill', style: assigned[k] || 'montage', hook_text: 'Watch this transformation 😮', hook_reason: 'Mock reason',
-      segments, cta_text: 'Book today', pacing_notes: 'Fast', music_suggestion: 'Upbeat trending audio',
+      title: `Mock clip ${k + 1}`, concept: 'Mock concept', music_mood: 'chill', style: assigned[k] || own[k % own.length],
+      angle: ['Transformation reveal', 'Satisfying process', 'Offer', 'Behind the scenes'][k % 4],
+      target_viewer: 'Locals who want their car looking new', why_it_works: 'Mock: the reveal pays off the hook.',
+      hook_text: 'Watch this transformation 😮', hook_reason: 'Mock reason',
+      segments, cta_text: 'Book today', pacing_notes: 'Fast',
       post_caption: 'Mock caption ✨', hashtags: ['#mock', '#test'],
     };
   });
   return {
+    strategy: 'Mock strategy: lead with the reveal, then build trust with the process.',
     summary: `Mock plan over ${videos.length} videos.`,
     footage_review: videos.map((v) => ({ video: v.n, start: 0, end: Math.min(2, v.dur), description: 'Opening shot', quality: 'Excellent / strong' })),
     clips,
@@ -50,16 +56,24 @@ function planFor(text) {
   };
 }
 
-const MARKETING = {
-  captions: Array.from({ length: 5 }, (_, i) => ({ style: ['Story', 'Short', 'Educational', 'Offer', 'Behind the scenes'][i], text: `Mock caption ${i + 1} ✨\nLine two.` })),
-  hooks: Array.from({ length: 8 }, (_, i) => `Mock hook ${i + 1}`),
-  hashtags: { broad: ['#local', '#smallbusiness'], niche: ['#detailing', 'ceramiccoating'], local: ['#parramatta'] },
-  video_concepts: Array.from({ length: 4 }, (_, i) => ({ title: `Concept ${i + 1}`, hook: 'Hook', description: 'Description', shot_list: ['Shot A', 'Shot B'] })),
-  seven_day_plan: Array.from({ length: 7 }, (_, i) => ({ day: `Day ${i + 1}`, theme: 'Theme', format: 'Reel', idea: 'Idea', caption_starter: 'Starter…' })),
-  promotions: Array.from({ length: 3 }, (_, i) => ({ title: `Promo ${i + 1}`, offer: '10% off', post_copy: 'Copy' })),
-  engagement_tips: Array.from({ length: 6 }, (_, i) => `Tip ${i + 1}`),
-  ctas: Array.from({ length: 6 }, (_, i) => `CTA ${i + 1}`),
-};
+// Change request: echo every clip back, changing only the one asked about.
+function revisionFor(text) {
+  const current = JSON.parse(text.match(/THE CURRENT CLIPS \(video numbers are 1-based\):\n([\s\S]+?)\n\nTHE CREATOR'S REQUEST/)[1]);
+  const focus = Number(text.match(/THE CREATOR'S REQUEST \(about clip (\d+)\)/)?.[1] || 1);
+  const request = text.match(/THE CREATOR'S REQUEST[^\n]*:\n"([\s\S]*?)"\n/)[1];
+  const clips = current.map((c) => {
+    const changed = c.clip_number === focus;
+    return {
+      clip_number: c.clip_number, changed, title: c.title, style: c.style, angle: c.angle || 'Offer',
+      target_viewer: 'Locals', why_it_works: 'Mock', music_mood: 'energetic', concept: 'Mock', hook_reason: 'Mock',
+      hook_text: changed ? 'Revised by the AI' : c.hook_text, cta_text: c.cta_text,
+      segments: (changed ? c.segments.slice(0, 3) : c.segments).map((sg) => ({ ...sg, why: 'Mock' })), pacing_notes: '', post_caption: 'Mock', hashtags: [],
+      target_seconds: changed ? 12 : c.length_seconds,
+      music_track: changed && /no music/i.test(request) ? 'none' : 'keep',
+    };
+  });
+  return { reply: `Mock: changed clip ${focus} for "${request}".`, clips };
+}
 
 function sse(res, event, data) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -70,6 +84,16 @@ export function startMock(port = 4555, { rejectFallbacks = false } = {}) {
     let raw = '';
     req.on('data', (c) => (raw += c));
     req.on('end', () => {
+      // Key check (Settings page): the model lookup succeeds unless the key is "bad-key".
+      const m = req.url.match(/^\/v1\/models\/([\w.-]+)/);
+      if (req.method === 'GET' && m) {
+        if (req.headers['x-api-key'] === 'sk-ant-bad-key') {
+          res.writeHead(401, { 'content-type': 'application/json' });
+          return res.end(JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }));
+        }
+        res.writeHead(200, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ type: 'model', id: m[1], display_name: m[1], created_at: '2026-01-01T00:00:00Z' }));
+      }
       if (req.method !== 'POST' || !req.url.startsWith('/v1/messages')) {
         res.writeHead(404, { 'content-type': 'application/json' });
         return res.end(JSON.stringify({ type: 'error', error: { type: 'not_found_error', message: 'not found' } }));
@@ -84,7 +108,7 @@ export function startMock(port = 4555, { rejectFallbacks = false } = {}) {
 
       const props = Object.keys(body.output_config?.format?.schema?.properties || {});
       const text = body.messages[0].content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-      const out = props.includes('clips') ? planFor(text) : Object.fromEntries(props.map((k) => [k, MARKETING[k]]));
+      const out = props.includes('reply') ? revisionFor(text) : planFor(text);
       const json = JSON.stringify(out);
 
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'request-id': 'req_mock' });

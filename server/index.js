@@ -4,10 +4,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import multer from 'multer';
-import { aiConfigured, generateMarketing, MARKETING_SECTIONS, MODEL } from './lib/ai.js';
+import { aiConfigured, checkKey, getModel, MODELS } from './lib/ai.js';
 import { getBusiness, PLATFORMS, publicBusinessList } from './lib/businesses.js';
 import { checkFfmpeg, probe, thumbnail } from './lib/ffmpeg.js';
-import { generate, rerender } from './lib/pipeline.js';
+import { cleanProfile, generate, rerender, revise } from './lib/pipeline.js';
+import { publicSettings, saveSettings } from './lib/settings.js';
+import { createRequire } from 'node:module';
 import { addTrack, deleteTrack, listTracks, MOODS, MUSIC_DIR, updateTrack } from './lib/music.js';
 import { publicStyleList } from './lib/styles.js';
 import {
@@ -17,6 +19,7 @@ import {
 import { transcriptionConfigured } from './lib/transcribe.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const APP_VERSION = createRequire(import.meta.url)('../package.json').version;
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '127.0.0.1';
 const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB || 2048);
@@ -43,14 +46,14 @@ app.get('/api/status', wrap(async (req, res) => {
   ffmpegStatus ??= await checkFfmpeg();
   if (!ffmpegStatus.available) ffmpegStatus = await checkFfmpeg(); // re-check until it works
   res.json({
-    ai: { configured: aiConfigured(), model: MODEL },
+    version: APP_VERSION,
+    ai: { configured: aiConfigured(), model: getModel(), models: MODELS },
     transcription: { configured: transcriptionConfigured() },
     ffmpeg: ffmpegStatus,
     businesses: publicBusinessList(),
     platforms: Object.values(PLATFORMS),
     styles: publicStyleList(),
     moods: MOODS,
-    marketingSections: Object.keys(MARKETING_SECTIONS),
   });
 }));
 
@@ -68,13 +71,13 @@ app.get('/api/projects/:id', wrap(async (req, res) => {
 
 app.patch('/api/projects/:id', wrap(async (req, res) => {
   await requireProject(req);
-  const { name, business, businessCustom, platform, marketing } = req.body || {};
+  const { name, business, businessCustom, platform, profile } = req.body || {};
   res.json(await updateProject(req.params.id, (project) => {
     if (typeof name === 'string' && name.trim()) project.name = name.trim().slice(0, 80);
     if (typeof business === 'string') project.business = business;
     if (typeof businessCustom === 'string') project.businessCustom = businessCustom.slice(0, 80);
     if (typeof platform === 'string' && PLATFORMS[platform]) project.platform = platform;
-    if (marketing && typeof marketing === 'object') project.marketing = marketing;
+    if (profile && typeof profile === 'object') project.profile = cleanProfile(profile);
   }));
 }));
 
@@ -224,28 +227,41 @@ app.get('/api/jobs/:jobId', (req, res) => {
   res.json({ id, projectId, kind, status, stage, progress, error, code });
 });
 
-// --- marketing ------------------------------------------------------------
+// --- ask for changes --------------------------------------------------------
 
-app.post('/api/marketing', wrap(async (req, res) => {
-  const { profile = {}, section, previous, footageContext, projectId } = req.body || {};
-  if (section && !MARKETING_SECTIONS[section]) throw Object.assign(new Error('Unknown section'), { status: 400 });
-  const business = getBusiness(profile.businessType, profile.businessCustom);
-  const result = await generateMarketing({
-    profile,
-    business,
-    section,
-    previous,
-    footageContext: typeof footageContext === 'string' ? footageContext.slice(0, 3000) : '',
-  });
+app.post('/api/projects/:id/revise', wrap(async (req, res) => {
+  const project = await requireProject(req);
+  if (!project.plan) throw Object.assign(new Error('Generate clips first, then ask for changes.'), { status: 400 });
+  if (activeJobFor(project.id)) throw Object.assign(new Error('Wait for the current job to finish first.'), { status: 409 });
+  const request = String(req.body?.request || '').trim();
+  if (!request) throw Object.assign(new Error('Type what you want changed.'), { status: 400 });
+  const clipIndex = Number.isInteger(req.body?.clipIndex) ? req.body.clipIndex : null;
+  const job = enqueueJob(project.id, 'revise', (ctx) => revise(project.id, { request, clipIndex }, ctx));
+  res.json({ jobId: job.id });
+}));
 
-  // Keep the latest marketing pack with the project so it reopens later.
-  if (projectId) {
-    await updateProject(projectId, (project) => {
-      const data = section ? { ...(project.marketing?.data || {}), ...result.data } : result.data;
-      project.marketing = { profile, data, updatedAt: new Date().toISOString() };
-    }).catch(() => null);
+// --- settings (this computer only) --------------------------------------------
+
+const isLocal = (req) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+
+app.get('/api/settings', (req, res) => res.json({ ...publicSettings(), editable: isLocal(req) }));
+
+app.post('/api/settings', wrap(async (req, res) => {
+  if (!isLocal(req)) throw Object.assign(new Error('Settings can only be changed on the computer running Cutline.'), { status: 403 });
+  const b = req.body || {};
+  const updates = {};
+  if (typeof b.anthropicKey === 'string') updates.ANTHROPIC_API_KEY = b.anthropicKey;
+  if (typeof b.openaiKey === 'string') updates.OPENAI_API_KEY = b.openaiKey;
+  if (typeof b.model === 'string') {
+    if (b.model && !MODELS[b.model]) throw Object.assign(new Error('Unknown model'), { status: 400 });
+    updates.CLAUDE_MODEL = b.model;
   }
-  res.json({ data: result.data });
+  res.json(await saveSettings(updates));
+}));
+
+app.post('/api/settings/check', wrap(async (req, res) => {
+  if (!aiConfigured()) return res.json({ ok: false, message: 'No Claude key saved yet.' });
+  res.json(await checkKey());
 }));
 
 // --- errors ---------------------------------------------------------------
@@ -264,7 +280,7 @@ const server = app.listen(PORT, HOST, async () => {
   console.log(`\n  Cutline is running → http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}\n`);
   const ff = await checkFfmpeg();
   console.log(`  FFmpeg:        ${ff.available ? `ok (${ff.version})` : 'NOT FOUND — install FFmpeg to edit videos'}`);
-  console.log(`  Claude AI:     ${aiConfigured() ? `ok (${MODEL})` : 'not configured — add ANTHROPIC_API_KEY to .env'}`);
+  console.log(`  Claude AI:     ${aiConfigured() ? `ok (${getModel()})` : 'off: add your key on the Settings page'}`);
   console.log(`  Transcription: ${transcriptionConfigured() ? 'ok (Whisper)' : 'off — optional, add OPENAI_API_KEY for spoken subtitles'}\n`);
 });
 
