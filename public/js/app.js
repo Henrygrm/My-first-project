@@ -512,7 +512,12 @@ function renderResults() {
     return;
   }
 
-  $('#sub-clips').replaceChildren(h('div', { class: 'clips-grid' }, plan.clips.map((clip, i) => clipCard(clip, clips[i], i))));
+  const noMusic = plan.clips.filter((c) => !c.music).length;
+  const which = noMusic === plan.clips.length ? 'These clips have' : noMusic > 1 ? `${noMusic} clips have` : '1 clip has';
+  const musicHint = state.tracks.length && noMusic
+    ? h('div', { class: 'notice' }, `${which} no music because they were made before you added songs, or with music turned off. Press Generate Content to make new clips with music, or open Edit on a clip, choose a song under Music and Re-render.`)
+    : null;
+  $('#sub-clips').replaceChildren(...[musicHint, h('div', { class: 'clips-grid' }, plan.clips.map((clip, i) => clipCard(clip, clips[i], i)))].filter(Boolean));
   $('#sub-plan').replaceChildren(planView(plan));
 }
 
@@ -720,6 +725,7 @@ async function handleMusicFiles(files) {
     const res = await upload('/api/music', 'tracks', files);
     state.tracks = res.tracks;
     renderMusic();
+    renderResults();
     for (const t of res.added) toast(`Added "${t.name}" · ${Math.round(t.bpm)} BPM`);
     for (const f of res.failed) toast(`${f.name}: ${f.error}`, { error: true });
   } catch (err) {
