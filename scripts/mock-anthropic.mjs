@@ -12,6 +12,7 @@ export const requests = [];
 function planFor(text) {
   const videos = [...text.matchAll(/=== VIDEO (\d+): ".+?" — duration ([\d.]+)s/g)].map((m) => ({ n: Number(m[1]), dur: Number(m[2]) }));
   const clipCount = Number(text.match(/DELIVERABLE: (\d+) clip/)?.[1] || 1);
+  const assigned = [...text.matchAll(/Clip \d+: style "(\w+)"/g)].map((m) => m[1]);
   const clips = Array.from({ length: clipCount }, (_, k) => {
     const segments = [];
     videos.forEach((v, vi) => {
@@ -24,13 +25,18 @@ function planFor(text) {
           role: segments.length === 0 ? 'hook' : vi === videos.length - 1 && j === 1 ? 'payoff' : j === 1 ? 'Transition' : 'process',
           caption: segments.length === 0 ? '' : `Step ${segments.length} 🔥`,
           speed: j === 1 ? 1.5 : 1, focus_x: 0.4, why: 'Mock: strongest motion in this range.',
+          // Loose casing on purpose: the app must normalise these.
+          transition: j === 0 ? 'Flash' : 'fade', effect: j === 0 ? 'Zoom-In' : 'none',
+          layout: 'full', compare_video: 0, compare_start: 0,
         });
       }
     });
+    // A before/after split screen using video 1 as the "before".
+    segments.push({ video: videos.at(-1).n, start: 0, end: 2, role: 'payoff', caption: '', speed: 1, focus_x: 0.5, why: 'comparison', transition: 'cut', effect: 'none', layout: 'split', compare_video: 1, compare_start: 0 });
     // An out-of-range segment the server must clamp/drop.
-    segments.push({ video: 99, start: 0, end: 3, role: 'process', caption: 'bogus', speed: 1, focus_x: 0.5, why: 'invalid on purpose' });
+    segments.push({ video: 99, start: 0, end: 3, role: 'process', caption: 'bogus', speed: 1, focus_x: 0.5, why: 'invalid on purpose', transition: 'cut', effect: 'none', layout: 'full', compare_video: 0, compare_start: 0 });
     return {
-      title: `Mock clip ${k + 1}`, concept: 'Mock concept', hook_text: 'Watch this transformation 😮', hook_reason: 'Mock reason',
+      title: `Mock clip ${k + 1}`, concept: 'Mock concept', music_mood: 'chill', style: assigned[k] || 'montage', hook_text: 'Watch this transformation 😮', hook_reason: 'Mock reason',
       segments, cta_text: 'Book today', pacing_notes: 'Fast', music_suggestion: 'Upbeat trending audio',
       post_caption: 'Mock caption ✨', hashtags: ['#mock', '#test'],
     };

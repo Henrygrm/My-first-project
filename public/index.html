@@ -200,12 +200,31 @@
                 <ul class="video-list" id="video-list"></ul>
               </div>
 
+              <div class="card" id="music-card">
+                <div class="card-head"><h3><span class="num">3</span> Music</h3><span class="muted small" id="music-total"></span></div>
+                <div class="field">
+                  <label class="label" for="music-choice">Music for these clips</label>
+                  <select id="music-choice"></select>
+                </div>
+                <ul class="track-list" id="track-list"></ul>
+                <label class="btn btn-sm btn-block music-add">
+                  <input type="file" id="music-input" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" multiple hidden />
+                  <svg class="ic"><use href="#i-plus"/></svg> <span id="music-add-label">Add music tracks</span>
+                </label>
+                <p class="muted small music-help">Use tracks you're allowed to post. Free options: <a href="https://pixabay.com/music/" target="_blank" rel="noopener">Pixabay Music</a>, <a href="https://studio.youtube.com/" target="_blank" rel="noopener">YouTube Audio Library</a>, <a href="https://uppbeat.io/" target="_blank" rel="noopener">Uppbeat</a>. Cuts are timed to the beat automatically.</p>
+              </div>
+
               <div class="card">
-                <div class="card-head"><h3><span class="num">3</span> Direction</h3></div>
+                <div class="card-head"><h3><span class="num">4</span> Direction</h3></div>
 
                 <div class="field">
                   <span class="label">Platform</span>
                   <div class="seg" id="platform-seg" role="radiogroup" aria-label="Platform"></div>
+                </div>
+
+                <div class="field">
+                  <span class="label">Video style</span>
+                  <div class="style-grid" id="style-grid" role="radiogroup" aria-label="Video style"></div>
                 </div>
 
                 <div class="field-row">

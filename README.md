@@ -7,6 +7,31 @@ A personal content studio for local businesses. Upload raw footage from a restau
 - **AI marketing.** Captions, hooks, hashtags (broad, niche and local), video concepts with shot lists, a 7-day plan, promo posts, engagement tips and CTAs. Every section has copy buttons and can be regenerated on its own.
 - **Projects.** Each project is a folder on disk (`data/projects/<id>/project.json` plus footage and renders). There is no database. Your last settings and marketing profile are kept in browser localStorage.
 
+## Video styles
+
+Every clip is cut in one of six styles. "Mix" (the default) gives each clip a different one that suits the business, and generating again gives you a new variation.
+
+| Style | What it looks like |
+|---|---|
+| Beat montage | Fast cuts on the beat, punch-ins, flash/zoom/whip transitions, bold all-caps text |
+| Before & after | Opens on the "before", builds through the work, slow-mo reveal, split-screen comparison |
+| Satisfying process | Longer calm shots, slow push-ins, dissolves, original sound up front, minimal text |
+| Story / day in the life | A caption on every shot telling the story, soft transitions, warm grade |
+| Top 3 list | Numbered sections with number badges and wipe transitions |
+| Promo ad | Big bold sales text, quick cuts, zoom/flash transitions, strong call to action |
+
+Each style has its own transitions, camera moves, colour grade, text design and music mood. You can switch a finished clip to another style (or another track) from its **Edit** panel and re-render it without re-planning.
+
+## Music
+
+Add tracks under **Music** in the editor (MP3, M4A, WAV and so on). Each track is analysed once for tempo and beat positions. When a clip is made:
+
+- a track is picked to match the style's mood (Energetic / Chill / Build; you can change a track's mood), or you can force one track or turn music off;
+- every cut is snapped onto the beat, and the music starts on a beat after any quiet intro;
+- the music is loudness-matched and mixed under the original sound, ducking under talking and sizzle in the calmer styles.
+
+Only use music you're allowed to post. Free sources: [Pixabay Music](https://pixabay.com/music/), the YouTube Audio Library (YouTube Studio → Audio library) and [Uppbeat](https://uppbeat.io/). Trending sounds can still be added inside TikTok or Instagram: choose **Mute original sound** and no music, then add the sound in the app.
+
 ## Setup
 
 You need **Node.js 20.12+** (22 recommended) and **FFmpeg**:
@@ -94,7 +119,7 @@ scripts/smoke-test.mjs   end-to-end test against a mock Claude API (npm test)
 
 ## Limitations
 
-- No music is added (licensing). Clips keep the original audio, or you can pick a silent track and add a trending sound inside TikTok or Instagram.
+- Cutline doesn't come with music (licensing): add your own tracks to the music library.
 - Emoji are stripped from burned-in text because FFmpeg's subtitle renderer can't draw colour emoji. Post captions keep them.
 - Claude sees sampled frames (about 40 per generation by default, `AI_MAX_FRAMES`), not every frame, so very fast moments between samples can be missed.
 - One job runs at a time. Rendering is mostly limited by decoding your footage: 4K/60fps HEVC from an iPhone is the slowest. On a 4-core test machine a 20-second clip from 4K sources took about a minute; Apple Silicon Macs are considerably faster.

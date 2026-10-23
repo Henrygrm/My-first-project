@@ -8,6 +8,8 @@ import { aiConfigured, generateMarketing, MARKETING_SECTIONS, MODEL } from './li
 import { getBusiness, PLATFORMS, publicBusinessList } from './lib/businesses.js';
 import { checkFfmpeg, probe, thumbnail } from './lib/ffmpeg.js';
 import { generate, rerender } from './lib/pipeline.js';
+import { addTrack, deleteTrack, listTracks, MOODS, MUSIC_DIR, updateTrack } from './lib/music.js';
+import { publicStyleList } from './lib/styles.js';
 import {
   activeJobFor, createProject, deleteProject, enqueueJob, getJob, listProjects,
   loadProject, newId, projectDir, PROJECTS_DIR, updateProject,
@@ -24,6 +26,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(ROOT, 'public')));
 // Uploaded footage and rendered clips (supports range requests for scrubbing).
 app.use('/media', express.static(PROJECTS_DIR, { dotfiles: 'deny', index: false, fallthrough: false }));
+app.use('/music-files', express.static(MUSIC_DIR, { dotfiles: 'deny', index: false, fallthrough: false }));
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -45,6 +48,8 @@ app.get('/api/status', wrap(async (req, res) => {
     ffmpeg: ffmpegStatus,
     businesses: publicBusinessList(),
     platforms: Object.values(PLATFORMS),
+    styles: publicStyleList(),
+    moods: MOODS,
     marketingSections: Object.keys(MARKETING_SECTIONS),
   });
 }));
@@ -156,6 +161,44 @@ app.delete('/api/projects/:id/videos/:videoId', wrap(async (req, res) => {
   res.json(project);
 }));
 
+// --- music library ----------------------------------------------------------
+
+const AUDIO_EXT = /\.(mp3|m4a|aac|wav|ogg|flac)$/i;
+const musicUpload = multer({
+  dest: path.join(MUSIC_DIR, '.incoming'),
+  limits: { fileSize: 200 * 1024 * 1024, files: 10 },
+  fileFilter: (req, file, cb) => {
+    const ok = file.mimetype.startsWith('audio/') || AUDIO_EXT.test(file.originalname);
+    cb(ok ? null : Object.assign(new Error(`"${file.originalname}" is not an audio file.`), { status: 400 }), ok);
+  },
+});
+
+app.get('/api/music', wrap(async (req, res) => res.json(await listTracks())));
+
+app.post('/api/music', (req, res, next) => {
+  musicUpload.array('tracks', 10)(req, res, async (err) => {
+    if (err) return next(Object.assign(err, { status: err.status || 400 }));
+    const added = [];
+    const failed = [];
+    for (const f of req.files || []) {
+      try {
+        added.push(await addTrack(f.path, f.originalname));
+      } catch (e) {
+        await fs.rm(f.path, { force: true });
+        failed.push({ name: f.originalname, error: /ffprobe|Invalid data/.test(e.message) ? 'Could not read this audio file.' : e.message });
+      }
+    }
+    res.json({ added, failed, tracks: await listTracks() });
+  });
+});
+
+app.patch('/api/music/:id', wrap(async (req, res) => res.json(await updateTrack(req.params.id, req.body || {}))));
+
+app.delete('/api/music/:id', wrap(async (req, res) => {
+  await deleteTrack(req.params.id);
+  res.json({ ok: true, tracks: await listTracks() });
+}));
+
 // --- generation -----------------------------------------------------------
 
 app.post('/api/projects/:id/generate', wrap(async (req, res) => {
@@ -213,7 +256,7 @@ app.use((err, req, res, next) => {
   const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 413 : err.code === 'SETUP_REQUIRED' ? 400 : 500);
   if (status >= 500) console.error(err);
   if (res.headersSent) return next(err);
-  if (req.originalUrl.startsWith('/media')) return res.status(status).end();
+  if (/^\/(media|music-files)\//.test(req.originalUrl)) return res.status(status).end();
   res.status(status).json({ error: err.message || 'Something went wrong', code: err.code || null });
 });
 

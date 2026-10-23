@@ -106,6 +106,20 @@ export async function hasFilter(name) {
   return new RegExp(`^\\s*\\S+\\s+${name}\\s`, 'm').test(filterList);
 }
 
+let hwaccelList = null;
+
+/** Hardware video decoding available to this FFmpeg (e.g. videotoolbox on Macs). */
+export async function hasHwaccel(name) {
+  if (hwaccelList === null) {
+    try {
+      hwaccelList = (await run(FFMPEG, ['-hide_banner', '-hwaccels'])).stdout;
+    } catch {
+      hwaccelList = '';
+    }
+  }
+  return new RegExp(`^\\s*${name}\\s*$`, 'm').test(hwaccelList);
+}
+
 let encoderList = null;
 
 export async function hasEncoder(name) {

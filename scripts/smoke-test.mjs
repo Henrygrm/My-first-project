@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { requests, startMock } from './mock-anthropic.mjs';
+import { computeTimeline } from '../server/lib/timeline.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TMP = await fs.mkdtemp(path.join(os.tmpdir(), 'cutline-test-'));
@@ -128,15 +129,39 @@ async function main() {
   assert.equal(up.added[1].meta.hasAudio, false);
   log('upload ok (2 videos, 1 bad file rejected)');
 
-  // Auto-edit (no AI)
-  let job = (await call(base, `/api/projects/${project.id}/generate`, { method: 'POST', body: { business: 'detailing', platform: 'tiktok', mode: 'auto', clipCount: 2, targetSeconds: 15 } })).data;
+  // Music library: a 120 BPM test track
+  const track = path.join(TMP, 'beat 120.mp3');
+  ffmpeg(['-f', 'lavfi', '-i', "aevalsrc='0.9*sin(2*PI*(50+80*exp(-30*mod(t,0.5)))*mod(t,0.5))*exp(-9*mod(t,0.5))+0.15*sin(2*PI*55*t)':s=44100:d=40", '-ac', '2', track]);
+  const mform = new FormData();
+  mform.append('tracks', new Blob([await fs.readFile(track)]), 'beat 120.mp3');
+  mform.append('tracks', new Blob([Buffer.from('not audio')]), 'notes.mp3');
+  const mus = await (await fetch(`${base}/api/music`, { method: 'POST', body: mform })).json();
+  assert.equal(mus.added.length, 1, JSON.stringify(mus));
+  assert.equal(mus.failed.length, 1, 'bad audio rejected');
+  assert.ok(Math.abs(mus.added[0].bpm - 120) < 1, `tempo detected: ${mus.added[0].bpm}`);
+  const pm = await call(base, `/api/music/${mus.added[0].id}`, { method: 'PATCH', body: { mood: 'chill' } });
+  assert.equal(pm.data.mood, 'chill');
+  assert.equal((await fetch(`${base}/music-files/${mus.added[0].file}`)).status, 200);
+  log(`music library ok (detected ${mus.added[0].bpm} BPM)`);
+
+  // Auto-edit (no AI): three clips, mixed styles, music on the beat
+  let job = (await call(base, `/api/projects/${project.id}/generate`, { method: 'POST', body: { business: 'detailing', platform: 'tiktok', mode: 'auto', clipCount: 3, targetSeconds: 15, style: 'mix', music: 'auto' } })).data;
   let t = Date.now();
   await waitJob(base, job.jobId);
   let p = (await call(base, `/api/projects/${project.id}`)).data;
   assert.equal(p.plan.source, 'auto');
-  assert.equal(p.plan.clips.length, 2);
+  assert.equal(p.plan.clips.length, 3);
+  assert.equal(new Set(p.plan.clips.map((c) => c.style)).size, 3, 'each clip has its own style');
+  assert.ok(p.plan.clips.every((c) => c.music?.bpm === mus.added[0].bpm), 'music on every clip');
+  for (const c of p.plan.clips) {
+    const beat = 60 / c.music.bpm;
+    for (const it of computeTimeline(c.segments).items.slice(0, -1)) {
+      const r = it.visEnd / beat;
+      assert.ok(Math.abs(r - Math.round(r)) * beat < 0.01, `${c.style}: cut at ${it.visEnd.toFixed(3)}s is on the beat`);
+    }
+  }
   await checkClips(base, dataDir, p);
-  log(`auto-edit rendered ${p.clips.length} clips in ${((Date.now() - t) / 1000).toFixed(1)}s:`, p.clips.map((c) => `${c.duration}s`).join(', '));
+  log(`auto-edit rendered ${p.clips.length} clips (${p.plan.clips.map((c) => c.style).join(', ')}) in ${((Date.now() - t) / 1000).toFixed(1)}s:`, p.clips.map((c) => `${c.duration}s`).join(', '));
 
   // AI edit via mock Claude
   job = (await call(base, `/api/projects/${project.id}/generate`, { method: 'POST', body: { business: 'restaurant', platform: 'reels', mode: 'ai', clipCount: 2, targetSeconds: 15, instructions: 'Open on the sizzle', reframe: 'fill' } })).data;
@@ -149,6 +174,10 @@ async function main() {
   const roles = new Set(p.plan.clips.flatMap((c) => c.segments.map((s) => s.role)));
   assert.ok([...roles].every((r) => ['hook', 'setup', 'process', 'reveal', 'payoff', 'cta'].includes(r)), `unexpected labels normalised: ${[...roles]}`);
   assert.ok(p.plan.footage_review.every((r) => r.quality === 'strong'), 'quality label normalised');
+  const segsAll = p.plan.clips.flatMap((c) => c.segments);
+  assert.ok(segsAll.some((sg) => sg.transition === 'flash') && segsAll.some((sg) => sg.effect === 'zoom_in'), 'transition/effect labels normalised');
+  assert.ok(segsAll.some((sg) => sg.layout === 'split' && sg.compare_video === 0), 'split screen kept with 0-based compare video');
+  assert.ok(p.plan.clips.every((c) => c.style), 'styles assigned');
   await checkClips(base, dataDir, p);
   const planReq = requests.at(-1);
   const images = planReq.body.messages[0].content.filter((x) => x.type === 'image').length;
@@ -161,7 +190,7 @@ async function main() {
 
   // Edit text + drop a segment, re-render clip 0
   const clip0 = p.plan.clips[0];
-  const edited = { hook_text: 'New hook text', cta_text: 'Call now', segments: clip0.segments.slice(0, 2).map((s) => ({ ...s, caption: 'Edited caption' })) };
+  const edited = { hook_text: 'New hook text', cta_text: 'Call now', style: 'promo', music: 'none', segments: clip0.segments.slice(0, 2).map((s) => ({ ...s, caption: 'Edited caption' })) };
   job = (await call(base, `/api/projects/${project.id}/clips/0/render`, { method: 'POST', body: { clip: edited } })).data;
   await waitJob(base, job.jobId);
   const p2 = (await call(base, `/api/projects/${project.id}`)).data;
@@ -169,8 +198,10 @@ async function main() {
   assert.equal(p2.plan.clips[0].segments.length, 2);
   assert.notEqual(p2.clips[0].file, p.clips[0].file, 'new file name after re-render');
   await assert.rejects(fs.access(path.join(dataDir, 'projects', project.id, 'output', p.clips[0].file)), 'old render cleaned up');
-  const ass = await fs.readFile(path.join(dataDir, 'projects', project.id, 'output', p2.clips[0].file.replace('.mp4', '.ass')), 'utf8');
-  assert.match(ass, /New hook text/);
+  assert.equal(p2.plan.clips[0].style, 'promo');
+  assert.equal(p2.plan.clips[0].music, null);
+  const srt = await fs.readFile(path.join(dataDir, 'projects', project.id, 'output', p2.clips[0].srt), 'utf8');
+  assert.match(srt, /New hook text/);
   log('edit + re-render ok');
 
   // Marketing

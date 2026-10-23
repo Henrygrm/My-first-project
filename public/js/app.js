@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS = {
   audio: 'original',
   onScreenText: true,
   speechSubtitles: false,
+  style: 'mix',
+  music: 'auto',
   instructions: '',
 };
 
@@ -32,6 +34,7 @@ export const state = {
   settings: { ...DEFAULT_SETTINGS, ...store.get('settings', {}) },
   job: null,
   subtab: 'clips',
+  tracks: [],
   drafts: {}, // clip index -> edited copy
   openEditors: new Set(),
 };
@@ -92,7 +95,7 @@ async function openProject(id) {
     instructions: p.instructions ?? state.settings.instructions,
   });
   if (p.settings) {
-    for (const k of ['clipCount', 'targetSeconds', 'mode', 'reframe', 'audio', 'onScreenText', 'speechSubtitles']) {
+    for (const k of ['clipCount', 'targetSeconds', 'mode', 'reframe', 'audio', 'onScreenText', 'speechSubtitles', 'style', 'music']) {
       if (p.settings[k] !== undefined) state.settings[k] = p.settings[k];
     }
   }
@@ -247,7 +250,18 @@ function renderControls() {
   seg($('#clips-seg'), [[1, '1'], [2, '2'], [3, '3'], [4, '4']], s.clipCount, setSetting('clipCount'));
   seg($('#length-seg'), [[15, '15s'], [30, '30s'], [45, '45s'], [60, '60s']], s.targetSeconds, setSetting('targetSeconds'));
   seg($('#reframe-seg'), [['auto', 'Auto'], ['fill', 'Crop to fill'], ['fit', 'Fit + blur']], s.reframe, setSetting('reframe'));
-  seg($('#audio-seg'), [['original', 'Original audio'], ['mute', 'Silent (add music in-app)']], s.audio, setSetting('audio'));
+  seg($('#audio-seg'), [['original', 'Keep original sound'], ['mute', 'Mute original sound']], s.audio, setSetting('audio'));
+
+  const styles = state.status?.styles || [];
+  const grid = $('#style-grid');
+  const opts = [{ id: 'mix', label: 'Mix of styles', blurb: 'Every clip gets a different style that suits the business.' }, ...styles];
+  grid.replaceChildren(...opts.map((st) => h('button', {
+    type: 'button', class: `style-opt${st.id === 'mix' ? ' mix' : ''}`, role: 'radio', 'aria-checked': String(st.id === s.style), title: st.blurb,
+    onclick: () => {
+      setSetting('style')(st.id);
+      $$('.style-opt', grid).forEach((b, i) => b.setAttribute('aria-checked', String(opts[i].id === st.id)));
+    },
+  }, h('b', {}, st.label), h('small', {}, st.blurb))));
 
   const aiOpt = $('input[name="mode"][value="ai"]');
   aiOpt.disabled = !aiReady();
@@ -368,7 +382,7 @@ async function generate() {
       body: {
         business: s.business, businessCustom: s.businessCustom, platform: s.platform, instructions: s.instructions,
         clipCount: s.clipCount, targetSeconds: s.targetSeconds, mode: s.mode, reframe: s.reframe, audio: s.audio,
-        onScreenText: s.onScreenText, speechSubtitles: s.speechSubtitles,
+        onScreenText: s.onScreenText, speechSubtitles: s.speechSubtitles, style: s.style, music: s.music,
       },
     });
     state.subtab = 'clips';
@@ -381,6 +395,7 @@ async function generate() {
 async function renderOne(index) {
   const draft = state.drafts[index];
   const clip = draft ? { ...draft, segments: draft.segments.filter((sg) => !sg.removed) } : undefined;
+  if (draft) state.drafts[index] = null;
   if (clip && !clip.segments.length) return toast('Keep at least one segment.', { error: true });
   try {
     const { jobId } = await api(`/api/projects/${state.project.id}/clips/${index}/render`, { method: 'POST', body: { clip } });
@@ -463,7 +478,7 @@ async function pollJob(jobId) {
 // ---------------------------------------------------------------------------
 
 function clipLength(clip) {
-  return clip.segments.reduce((s, sg) => s + (sg.end - sg.start) / (sg.speed || 1), 0);
+  return clip.estDuration ?? clip.segments.reduce((s, sg) => s + (sg.end - sg.start) / (sg.speed || 1), 0);
 }
 
 function renderResults() {
@@ -518,7 +533,10 @@ function clipCard(clip, rendered, i) {
   const editing = state.openEditors.has(i);
   const card = h('article', { class: 'clip' }, media,
     h('div', { class: 'clip-body' },
-      h('div', {}, h('div', { class: 'clip-title' }, clip.title), h('div', { class: 'clip-concept' }, clip.concept)),
+      h('div', {}, h('div', { class: 'clip-title' }, clip.title), h('div', { class: 'clip-concept' }, clip.concept),
+        h('div', { class: 'clip-badges' },
+          h('span', { class: 'badge style' }, styleLabel(clip.style)),
+          h('span', { class: 'badge' }, clip.music ? `♪ ${clip.music.name} · ${Math.round(clip.music.bpm)} BPM` : 'Original sound'))),
       h('div', { class: 'clip-actions' },
         rendered ? h('a', { class: 'btn btn-sm btn-primary', href: `/media/${pid}/output/${rendered.file}`, download: `${base}.mp4` }, icon('download'), 'MP4') : null,
         rendered ? h('a', { class: 'btn btn-sm', href: `/media/${pid}/output/${rendered.srt}`, download: `${base}.srt`, title: 'Caption file to upload with the video' }, 'SRT') : null,
@@ -534,7 +552,12 @@ function clipCard(clip, rendered, i) {
 }
 
 function clipEditor(clip, i, busy) {
-  const draft = (state.drafts[i] ??= structuredClone({ hook_text: clip.hook_text, cta_text: clip.cta_text, segments: clip.segments }));
+  const draft = (state.drafts[i] ??= structuredClone({ hook_text: clip.hook_text, cta_text: clip.cta_text, segments: clip.segments, style: clip.style, music: clip.music?.id || 'none' }));
+  const styleSelect = h('select', { onchange: (e) => (draft.style = e.target.value) },
+    (state.status?.styles || []).map((st) => h('option', { value: st.id, selected: st.id === draft.style }, st.label)));
+  const musicSelect = h('select', { onchange: (e) => (draft.music = e.target.value) },
+    h('option', { value: 'none', selected: draft.music === 'none' }, 'No music (original sound)'),
+    state.tracks.map((t) => h('option', { value: t.id, selected: t.id === draft.music }, `${t.name} · ${Math.round(t.bpm)} BPM`)));
   const bind = (obj, key) => (e) => { obj[key] = e.target.value; };
   return h('div', { class: 'clip-edit' },
     h('label', {}, 'Hook (first 2–3s)'),
@@ -553,6 +576,10 @@ function clipEditor(clip, i, busy) {
       );
       return row;
     })),
+    h('label', {}, 'Style (look, text and transitions)'),
+    styleSelect,
+    h('label', {}, 'Music'),
+    musicSelect,
     h('label', {}, 'Call to action (last 2–3s)'),
     h('input', { value: draft.cta_text || '', maxlength: '60', oninput: bind(draft, 'cta_text') }),
     h('button', { class: 'btn btn-sm btn-primary', disabled: busy || !ffmpegReady(), onclick: () => renderOne(i) }, icon('refresh'), 'Re-render clip'),
@@ -567,13 +594,17 @@ function planView(plan) {
   const vids = state.project.videos;
   const vname = (i) => `Video ${i + 1}`;
   const wrap = h('div', {});
+  if (plan.musicNote) wrap.append(h('div', { class: 'notice' }, plan.musicNote));
   wrap.append(h('div', { class: 'plan-summary' }, plan.summary,
     h('span', { class: 'muted' }, `${plan.source === 'ai' ? `Planned by ${plan.model || 'Claude'}` : 'Auto-edit (no AI)'} · ${new Date(plan.createdAt).toLocaleString()}`)));
 
   wrap.append(h('div', { class: 'plan-section' }, h('h4', {}, 'Clips'), plan.clips.map((clip) => {
     const len = clipLength(clip);
     return h('div', { class: 'plan-clip' },
-      h('div', { class: 'plan-clip-head' }, h('b', {}, clip.title), h('span', { class: 'muted small' }, `${fmtDuration(len)} · ${clip.segments.length} cuts`)),
+      h('div', { class: 'plan-clip-head' }, h('b', {}, clip.title), h('span', { class: 'muted small' }, `${fmtDuration(len)} · ${clip.segments.length} shots`)),
+      h('div', { class: 'clip-badges' },
+        h('span', { class: 'badge style' }, styleLabel(clip.style)),
+        h('span', { class: 'badge' }, clip.music ? `♪ ${clip.music.name} · cuts on the beat` : 'Original sound')),
       clip.concept ? h('div', { class: 'muted small' }, clip.concept) : null,
       h('div', { class: 'plan-hook' }, 'Hook: ', h('q', {}, clip.hook_text), clip.hook_reason ? h('span', { class: 'muted' }, ` · ${clip.hook_reason}`) : null),
       h('div', { class: 'timeline', role: 'img', 'aria-label': 'Clip timeline' }, clip.segments.map((sg) => {
@@ -582,11 +613,12 @@ function planView(plan) {
       })),
       h('div', { class: 'timeline-legend' }, h('span', {}, '0:00'), h('span', {}, fmtDuration(len))),
       h('table', { class: 'seg-table' },
-        h('thead', {}, h('tr', {}, h('th', {}, 'Role'), h('th', {}, 'Source'), h('th', {}, 'Caption'), h('th', { class: 'why' }, 'Why'))),
+        h('thead', {}, h('tr', {}, h('th', {}, 'Role'), h('th', {}, 'Source'), h('th', {}, 'Caption'), h('th', {}, 'Move'), h('th', { class: 'why' }, 'Why'))),
         h('tbody', {}, clip.segments.map((sg) => h('tr', {},
           h('td', {}, h('span', { class: 'role-chip', style: { background: ROLE_COLORS[sg.role] || '#6aa8ff' } }, sg.role)),
           h('td', {}, `${vname(sg.video)} · ${fmtSec(sg.start)}–${fmtSec(sg.end)}${sg.speed !== 1 ? ` · ${sg.speed}×` : ''}`),
           h('td', {}, sg.caption || h('span', { class: 'muted' }, '—')),
+          h('td', { class: 'muted' }, [sg.layout === 'split' ? 'split screen' : null, sg.effect && sg.effect !== 'none' ? sg.effect.replace('_', ' ') : null, sg.transition && sg.transition !== 'cut' && sg !== clip.segments.at(-1) ? `→ ${sg.transition}` : null].filter(Boolean).join(', ') || '—'),
           h('td', { class: 'why' }, sg.why || ''),
         )))),
       h('dl', { class: 'kv' },
@@ -615,6 +647,90 @@ function planView(plan) {
 }
 
 // ---------------------------------------------------------------------------
+// Music library
+// ---------------------------------------------------------------------------
+
+const styleLabel = (id) => state.status?.styles?.find((st) => st.id === id)?.label || 'Clip';
+const preview = new Audio();
+let previewId = null;
+preview.addEventListener('ended', () => { previewId = null; renderMusic(); });
+
+async function loadTracks() {
+  try {
+    state.tracks = await api('/api/music');
+  } catch {
+    state.tracks = [];
+  }
+  renderMusic();
+}
+
+function renderMusic() {
+  const s = state.settings;
+  if (s.music !== 'auto' && s.music !== 'none' && !state.tracks.some((t) => t.id === s.music)) s.music = 'auto';
+  const select = $('#music-choice');
+  select.replaceChildren(
+    h('option', { value: 'auto', selected: s.music === 'auto' }, state.tracks.length ? 'Auto: match each clip\'s style' : 'Auto (add tracks below first)'),
+    h('option', { value: 'none', selected: s.music === 'none' }, 'No music: keep the original sound'),
+    ...state.tracks.map((t) => h('option', { value: t.id, selected: s.music === t.id }, `Always use: ${t.name}`)),
+  );
+  $('#music-total').textContent = state.tracks.length ? `${state.tracks.length} track${state.tracks.length > 1 ? 's' : ''}` : '';
+  const moods = state.status?.moods || ['energetic', 'chill', 'build'];
+  $('#track-list').replaceChildren(...state.tracks.map((t) => h('li', { class: 'track' },
+    h('button', { class: `icon-btn${previewId === t.id ? ' playing' : ''}`, type: 'button', title: previewId === t.id ? 'Stop' : 'Play preview', onclick: () => togglePreview(t) },
+      icon(previewId === t.id ? 'x' : 'play')),
+    h('div', { class: 'tmeta' }, h('b', { title: t.name }, t.name), h('small', {}, `${Math.round(t.bpm)} BPM · ${Math.round(t.duration)}s`)),
+    h('select', { title: 'Mood: decides which styles use this track', onchange: async (e) => {
+      try {
+        Object.assign(t, await api(`/api/music/${t.id}`, { method: 'PATCH', body: { mood: e.target.value } }));
+      } catch (err) {
+        toast(err.message, { error: true });
+      }
+    } }, moods.map((m) => h('option', { value: m, selected: m === t.mood }, m[0].toUpperCase() + m.slice(1)))),
+    h('button', { class: 'icon-btn', type: 'button', title: 'Remove track', 'aria-label': `Remove ${t.name}`, onclick: async () => {
+      if (!confirm(`Remove "${t.name}" from your music library?`)) return;
+      try {
+        state.tracks = (await api(`/api/music/${t.id}`, { method: 'DELETE' })).tracks;
+        renderMusic();
+      } catch (err) {
+        toast(err.message, { error: true });
+      }
+    } }, icon('trash')),
+  )));
+}
+
+function togglePreview(t) {
+  if (previewId === t.id) {
+    preview.pause();
+    previewId = null;
+  } else {
+    preview.src = `/music-files/${t.file}`;
+    preview.currentTime = 0;
+    preview.play().catch(() => toast('This browser could not play that file.', { error: true }));
+    previewId = t.id;
+  }
+  renderMusic();
+}
+
+async function handleMusicFiles(files) {
+  files = [...files].filter((f) => f.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(f.name));
+  if (!files.length) return toast('Those files are not audio files.', { error: true });
+  const label = $('#music-add-label');
+  label.textContent = `Adding ${files.length} track${files.length > 1 ? 's' : ''} and finding the beat…`;
+  try {
+    const res = await upload('/api/music', 'tracks', files);
+    state.tracks = res.tracks;
+    renderMusic();
+    for (const t of res.added) toast(`Added "${t.name}" · ${Math.round(t.bpm)} BPM`);
+    for (const f of res.failed) toast(`${f.name}: ${f.error}`, { error: true });
+  } catch (err) {
+    toast(err.message, { error: true });
+  } finally {
+    label.textContent = 'Add music tracks';
+    $('#music-input').value = '';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Wiring
 // ---------------------------------------------------------------------------
 
@@ -627,6 +743,7 @@ function switchTab(tab) {
 
 function renderAll() {
   renderStatus();
+  renderMusic();
   renderBusinesses();
   renderControls();
   renderVideos();
@@ -654,6 +771,8 @@ function wire() {
   $('#opt-speech').addEventListener('change', (e) => { state.settings.speechSubtitles = e.target.checked; saveSettings(); });
   $('#biz-custom').addEventListener('change', (e) => { state.settings.businessCustom = e.target.value.trim(); saveSettings(); patchProject({ businessCustom: state.settings.businessCustom }); });
   $('#btn-generate').addEventListener('click', generate);
+  $('#music-choice').addEventListener('change', (e) => { state.settings.music = e.target.value; saveSettings(); });
+  $('#music-input').addEventListener('change', (e) => handleMusicFiles(e.target.files));
 
   const nameInput = $('#project-name');
   nameInput.addEventListener('keydown', (e) => e.key === 'Enter' && nameInput.blur());
@@ -681,6 +800,7 @@ async function init() {
   }
   if (state.settings.mode === 'ai' && !aiReady()) state.settings.mode = 'auto';
 
+  await loadTracks();
   const ctx = { state, ensureProject, aiReady };
   initMarketing(ctx);
 

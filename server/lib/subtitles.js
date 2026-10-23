@@ -86,7 +86,9 @@ export function buildSubtitles(clip, timeline, duration, opts = {}) {
   const srt = [];
   const onScreen = opts.onScreenText !== false;
 
-  const hookEnd = Math.min(duration, Math.max(2.2, Math.min(3.2, timeline[0]?.outEnd ?? 2.5)));
+  // visStart/visEnd: when a shot is the one on screen (transition midpoints).
+  const vis = (seg) => [seg.visStart ?? seg.outStart, seg.visEnd ?? seg.outEnd];
+  const hookEnd = Math.min(duration, Math.max(2.2, Math.min(3.2, timeline[0] ? vis(timeline[0])[1] : 2.5)));
   const ctaStart = Math.max(hookEnd, duration - 2.6);
 
   if (onScreen && clip.hook_text) {
@@ -95,9 +97,14 @@ export function buildSubtitles(clip, timeline, duration, opts = {}) {
 
   if (onScreen) {
     for (const seg of timeline) {
+      if (seg.layout === 'split') {
+        const [a, b] = vis(seg);
+        events.push({ start: a, end: b, style: 'TagTop', text: 'Before', fx: '' });
+        events.push({ start: a, end: b, style: 'TagBottom', text: 'After', fx: '' });
+      }
       if (!seg.caption) continue;
-      const start = Math.max(seg.outStart, hookEnd);
-      const end = Math.min(seg.outEnd, ctaStart);
+      const start = Math.max(vis(seg)[0], hookEnd);
+      const end = Math.min(vis(seg)[1], ctaStart);
       if (end - start < 0.6) continue;
       events.push({ start, end, style: 'Caption', text: seg.caption, fx: '{\\fad(90,90)}' });
     }
@@ -131,6 +138,8 @@ Style: Hook,Inter ExtraBold,82,&H00101010,&H00101010,&H00FFFFFF,&H00FFFFFF,0,0,0
 Style: Caption,Inter ExtraBold,66,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,5,2,8,120,120,360,1
 Style: CTA,Inter ExtraBold,78,&H00101010,&H00101010,&H003DB0FF,&H003DB0FF,0,0,0,0,100,100,0,0,3,24,0,5,120,120,0,1
 Style: Speech,Inter ExtraBold,60,&H00FFFFFF,&H00FFFFFF,&H00000000,&H78000000,0,0,0,0,100,100,0,0,1,5,2,2,120,120,560,1
+Style: TagTop,Inter ExtraBold,40,&H00101010,&H00101010,&H00FFFFFF,&H00FFFFFF,0,0,0,0,100,100,0,0,3,12,0,7,60,60,260,1
+Style: TagBottom,Inter ExtraBold,40,&H00101010,&H00101010,&H0097DC3D,&H0097DC3D,0,0,0,0,100,100,0,0,3,12,0,7,60,60,1000,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

@@ -3,7 +3,9 @@ import path from 'node:path';
 import { aiConfigured, planEdit, SetupError } from './ai.js';
 import { getBusiness, getPlatform } from './businesses.js';
 import { analyzeSignals, frameAt, pool } from './ffmpeg.js';
-import { autoPlan, normalizeAiPlan, sanitizeClip } from './planner.js';
+import { autoPlan, clipDuration, makeRng, normalizeAiPlan, sanitizeClip, syncToBeats } from './planner.js';
+import { MOODS, MUSIC_DIR, getTrack, listTracks, pickTrack } from './music.js';
+import { STYLE_IDS, getStyle, stylesForClips } from './styles.js';
 import { renderClip } from './render.js';
 import { loadProject, projectDir, updateProject } from './store.js';
 import { transcribe, transcriptionConfigured } from './transcribe.js';
@@ -73,8 +75,11 @@ async function renderAll(projectId, videos, plan, indexes, ropts, transcripts, c
   for (const [n, idx] of indexes.entries()) {
     const clip = plan.clips[idx];
     ctx.stage(`Rendering clip ${n + 1} of ${indexes.length}: "${clip.title}"`, base + (span * n) / indexes.length);
+    const track = clip.music?.id ? await getTrack(clip.music.id) : null;
+    const music = track ? { path: path.join(MUSIC_DIR, track.file), startAt: track.startAt, loudness: track.loudness } : null;
     const result = await renderClip(clip, videos, {
       outDir,
+      music,
       baseName: `clip-${idx + 1}-${Date.now().toString(36)}`,
       ...ropts,
       transcripts: ropts.speechSubtitles ? transcripts : null,
@@ -103,6 +108,11 @@ export async function generate(projectId, opts, ctx) {
   const targetSeconds = Math.max(8, Math.min(platform.maxSeconds, Number(opts.targetSeconds) || 30));
   const ropts = renderOptions(opts);
   const mode = opts.mode === 'auto' ? 'auto' : 'ai';
+  const rng = makeRng();
+  const styleChoice = STYLE_IDS.includes(opts.style) ? opts.style : 'mix';
+  const styles = stylesForClips(styleChoice === 'mix' ? null : styleChoice, clipCount, business.id, rng);
+  const musicChoice = opts.music || 'auto';
+  const hasMusic = musicChoice !== 'none' && (await listTracks()).length > 0;
 
   if (mode === 'ai' && !aiConfigured()) {
     throw new SetupError('AI editing needs a Claude API key. Add ANTHROPIC_API_KEY to .env and restart, or switch to Auto-edit (no AI).');
@@ -159,16 +169,30 @@ export async function generate(projectId, opts, ctx) {
     const ticker = setInterval(() => ctx.progress((p = Math.min(0.52, p + 0.004))), 1000);
     let res;
     try {
-      res = await planEdit({ videos, business, platform, instructions: (opts.instructions || '').slice(0, 2000), clipCount, targetSeconds });
+      res = await planEdit({ videos, business, platform, instructions: (opts.instructions || '').slice(0, 2000), clipCount, targetSeconds, styles, hasMusic });
     } finally {
       clearInterval(ticker);
     }
-    plan = normalizeAiPlan(res.data, videos, platform);
+    plan = normalizeAiPlan(res.data, videos, platform, styles);
     plan.model = res.model;
+    // Respect a specific style the user picked, whatever the model wrote.
+    if (styleChoice !== 'mix') plan.clips.forEach((c) => (c.style = styleChoice));
   } else {
     ctx.stage('Choosing the best moments from motion and audio levels', 0.4);
-    plan = autoPlan({ videos, business, platform, clipCount, targetSeconds });
+    plan = autoPlan({ videos, business, platform, clipCount, targetSeconds, styles, rng });
   }
+
+  // Music: pick a track per clip (varied, matched to the style's mood) and
+  // snap every cut to its beat.
+  const usedTracks = [];
+  for (const [i, clip] of plan.clips.entries()) {
+    let track = null;
+    if (musicChoice === 'auto') track = await pickTrack(MOODS.includes(clip.music_mood) ? clip.music_mood : getStyle(clip.style).mood, usedTracks, rng);
+    else if (musicChoice !== 'none') track = await getTrack(musicChoice);
+    if (track) usedTracks.push(track.id);
+    plan.clips[i] = withMusic(clip, track, videos, platform);
+  }
+  if (musicChoice !== 'none' && !hasMusic) plan.musicNote = 'No music added: your music library is empty. Add tracks under Music, then generate again.';
 
   plan.createdAt = new Date().toISOString();
   plan.business = business.id;
@@ -186,7 +210,7 @@ export async function generate(projectId, opts, ctx) {
       businessCustom: opts.businessCustom || '',
       platform: platform.id,
       instructions: opts.instructions || '',
-      settings: { ...ropts, clipCount, targetSeconds, mode },
+      settings: { ...ropts, clipCount, targetSeconds, mode, style: styleChoice, music: musicChoice },
     });
   });
 
@@ -195,6 +219,15 @@ export async function generate(projectId, opts, ctx) {
     await renderAll(projectId, videos, plan, plan.clips.map((_, i) => i), ropts, transcripts, ctx);
   }
   return { projectId };
+}
+
+function withMusic(clip, track, videos, platform) {
+  const synced = track ? syncToBeats(clip, track, videos, platform.maxSeconds) : clip;
+  return {
+    ...synced,
+    music: track ? { id: track.id, name: track.name, bpm: track.bpm } : null,
+    estDuration: Math.round(clipDuration(synced) * 10) / 10,
+  };
 }
 
 /** Re-render a single clip after the user edited its text or segments. */
@@ -206,9 +239,13 @@ export async function rerender(projectId, clipIndex, editedClip, opts, ctx) {
 
   const videos = videoCtx(project);
   const platform = getPlatform(project.plan.platform);
-  const merged = { ...project.plan.clips[idx], ...editedClip };
-  const clip = sanitizeClip(merged, videos, platform.maxSeconds);
+  const { music: musicEdit, ...edits } = editedClip;
+  const merged = { ...project.plan.clips[idx], ...edits };
+  let clip = sanitizeClip(merged, videos, platform.maxSeconds);
   if (!clip.segments.length) throw new Error('This clip has no segments left to render.');
+  // Music can be changed per clip ('none' or a track id); re-snap cuts to its beat.
+  const trackId = musicEdit === undefined ? clip.music?.id : musicEdit === 'none' ? null : musicEdit;
+  clip = withMusic(clip, trackId ? await getTrack(trackId) : null, videos, platform);
   const ropts = renderOptions({ ...project.settings, ...opts });
   const transcripts = {};
   if (ropts.speechSubtitles) {

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
+import { STYLES } from './styles.js';
 
 export const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-5-5';
 // Server-side refusal fallback: if the model declines, the API re-runs the
@@ -94,11 +95,18 @@ const SegmentSchema = z.object({
   caption: z.string().describe('On-screen text shown during this segment: max 6 words, no emoji, or empty string for none'),
   speed: z.number().describe('Playback speed between 0.5 and 2. Use 1 normally; 1.5–2 to compress repetitive work; 0.5–0.8 for a slow-motion money shot'),
   focus_x: z.number().describe('Horizontal position of the main subject in the frame, 0 = left edge, 0.5 = centre, 1 = right edge. Used to crop landscape footage to 9:16'),
+  transition: z.string().describe('Transition INTO THE NEXT segment. One of: cut, fade, dissolve, fadeblack, flash, slide, slideup, whip, zoom, wipe, circle, blur. Ignored on the last segment'),
+  effect: z.string().describe('Camera move on this shot. One of: none, zoom_in (slow push-in), zoom_out (slow pull-out), punch (instant punch-in, great on a beat)'),
+  layout: z.string().describe('"full" normally. "split" = before/after split screen: this segment (the AFTER) on the bottom half and compare_video/compare_start (the BEFORE) on the top half'),
+  compare_video: z.number().describe('For layout "split" only: 1-based video number of the BEFORE shot; otherwise 0'),
+  compare_start: z.number().describe('For layout "split" only: start time of the BEFORE shot in that video; otherwise 0'),
   why: z.string().describe('One short sentence on why this moment was chosen'),
 });
 
 const ClipSchema = z.object({
   title: z.string().describe('Short internal name for the clip'),
+  style: z.string().describe('The style id assigned to this clip'),
+  music_mood: z.string().describe('Music for this clip. One of: energetic, chill, build'),
   concept: z.string().describe('One sentence describing the angle of this clip'),
   hook_text: z.string().describe('Bold on-screen hook for the first 2–3 seconds: max 7 words, no emoji'),
   hook_reason: z.string(),
@@ -151,7 +159,9 @@ const fmt = (t) => `${Number(t).toFixed(1)}s`;
  *   clipCount, targetSeconds
  */
 export async function planEdit(p) {
-  const { videos, business, platform, instructions, clipCount, targetSeconds } = p;
+  const { videos, business, platform, instructions, clipCount, targetSeconds, styles, hasMusic } = p;
+  const styleBriefs = [...new Set(styles)].map((id) => `- "${id}" (${STYLES[id].label}): ${STYLES[id].brief}`).join('\n');
+  const assignment = styles.map((id, i) => `Clip ${i + 1}: style "${id}"`).join('\n');
 
   const system = `You are a senior short-form video editor who makes high-performing ${platform.label} content for local businesses. You review raw phone footage and produce precise, practical edit decision lists that an automated FFmpeg pipeline renders exactly as you specify.
 
@@ -164,7 +174,10 @@ Rules for the edit:
 - Keep each clip's total playback length (sum of (end-start)/speed) close to the target and never above ${platform.maxSeconds}s.
 - Different clips should use different angles or moments where the footage allows.
 - On-screen text must be short, punchy, readable in under a second, and free of emoji (the renderer cannot draw them).
-- Captions sit in the upper part of the frame; keep them under 6 words.`;
+- Captions sit in the upper part of the frame; keep them under 6 words.
+- Make each clip feel different: its own style, hook angle, shot order and transitions. Avoid generic, interchangeable edits.
+- Choose transitions and camera moves deliberately for the style: hard cuts keep energy, flashes/zooms/whips hit big moments, fades and dissolves calm things down. Do not put a fancy transition on every cut.
+${hasMusic ? '- Music will be added and every cut will be snapped to its beat automatically, so think in rhythm: short punchy shots for energetic styles, longer shots for calm ones.' : '- No music library is set up, so the clips keep their original sound.'}`;
 
   const content = [];
   content.push({
@@ -178,6 +191,11 @@ Proven structure: ${business.structure}
 
 PLATFORM: ${platform.label} — sweet spot ${platform.sweetSpot}. ${platform.notes}
 DELIVERABLE: ${clipCount} clip${clipCount > 1 ? 's' : ''}, each about ${targetSeconds} seconds, portrait 9:16.
+
+STYLES TO USE:
+${styleBriefs}
+
+${assignment}
 ${instructions ? `\nINSTRUCTIONS FROM THE CREATOR (follow these closely):\n${instructions}\n` : ''}
 The raw footage follows. ${videos.length} video${videos.length > 1 ? 's' : ''} in total.`,
   });
