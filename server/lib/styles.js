@@ -43,7 +43,7 @@ export const STYLES = {
     text: 'bold',
     captionEvery: 4,
     mood: 'energetic',
-    mix: { original: 0.25, music: 1 },
+    mix: { original: 0.3, music: 1 },
   },
   transformation: {
     id: 'transformation',
@@ -59,7 +59,7 @@ export const STYLES = {
     captionEvery: 2,
     split: true,
     mood: 'build',
-    mix: { original: 0.45, music: 0.85 },
+    mix: { original: 0.5, music: 0.9 },
   },
   satisfying: {
     id: 'satisfying',
@@ -74,7 +74,7 @@ export const STYLES = {
     text: 'minimal',
     captionEvery: 3,
     mood: 'chill',
-    mix: { original: 1, music: 0.3 },
+    mix: { original: 0.85, music: 0.65 },
   },
   story: {
     id: 'story',
@@ -89,7 +89,7 @@ export const STYLES = {
     text: 'story',
     captionEvery: 1,
     mood: 'chill',
-    mix: { original: 0.6, music: 0.55 },
+    mix: { original: 0.7, music: 0.8 },
   },
   listicle: {
     id: 'listicle',
@@ -104,7 +104,7 @@ export const STYLES = {
     text: 'list',
     captionEvery: 1,
     mood: 'energetic',
-    mix: { original: 0.35, music: 0.9 },
+    mix: { original: 0.4, music: 0.95 },
   },
   promo: {
     id: 'promo',
@@ -119,7 +119,7 @@ export const STYLES = {
     text: 'promo',
     captionEvery: 2,
     mood: 'energetic',
-    mix: { original: 0.25, music: 1 },
+    mix: { original: 0.3, music: 1 },
   },
 };
 

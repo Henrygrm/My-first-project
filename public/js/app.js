@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
   speechSubtitles: false,
   style: 'mix',
   music: 'auto',
+  musicLevel: 'normal',
   instructions: '',
 };
 
@@ -95,7 +96,7 @@ async function openProject(id) {
     instructions: p.instructions ?? state.settings.instructions,
   });
   if (p.settings) {
-    for (const k of ['clipCount', 'targetSeconds', 'mode', 'reframe', 'audio', 'onScreenText', 'speechSubtitles', 'style', 'music']) {
+    for (const k of ['clipCount', 'targetSeconds', 'mode', 'reframe', 'audio', 'onScreenText', 'speechSubtitles', 'style', 'music', 'musicLevel']) {
       if (p.settings[k] !== undefined) state.settings[k] = p.settings[k];
     }
   }
@@ -289,6 +290,9 @@ function updateGenerateState() {
   else if (!videos) reason = 'Upload at least one video to start.';
   else if (state.job) reason = 'Working on it…';
   btn.disabled = Boolean(reason);
+  $('#instructions-note').textContent = state.settings.mode === 'ai'
+    ? ''
+    : 'Auto-edit doesn\'t read instructions. They are used when Claude AI is selected.';
   hint.textContent = reason || (state.settings.mode === 'ai'
     ? `Claude reviews your footage, then FFmpeg renders ${state.settings.clipCount} clip${state.settings.clipCount > 1 ? 's' : ''}.`
     : 'Auto-edit picks moments by motion and sound. No AI involved.');
@@ -382,7 +386,7 @@ async function generate() {
       body: {
         business: s.business, businessCustom: s.businessCustom, platform: s.platform, instructions: s.instructions,
         clipCount: s.clipCount, targetSeconds: s.targetSeconds, mode: s.mode, reframe: s.reframe, audio: s.audio,
-        onScreenText: s.onScreenText, speechSubtitles: s.speechSubtitles, style: s.style, music: s.music,
+        onScreenText: s.onScreenText, speechSubtitles: s.speechSubtitles, style: s.style, music: s.music, musicLevel: s.musicLevel,
       },
     });
     state.subtab = 'clips';
@@ -398,7 +402,7 @@ async function renderOne(index) {
   if (draft) state.drafts[index] = null;
   if (clip && !clip.segments.length) return toast('Keep at least one segment.', { error: true });
   try {
-    const { jobId } = await api(`/api/projects/${state.project.id}/clips/${index}/render`, { method: 'POST', body: { clip } });
+    const { jobId } = await api(`/api/projects/${state.project.id}/clips/${index}/render`, { method: 'POST', body: { clip, options: { musicLevel: state.settings.musicLevel } } });
     pollJob(jobId);
   } catch (err) {
     toast(err.message, { error: true });
@@ -541,7 +545,8 @@ function clipCard(clip, rendered, i) {
       h('div', {}, h('div', { class: 'clip-title' }, clip.title), h('div', { class: 'clip-concept' }, clip.concept),
         h('div', { class: 'clip-badges' },
           h('span', { class: 'badge style' }, styleLabel(clip.style)),
-          h('span', { class: 'badge' }, clip.music ? `♪ ${clip.music.name} · ${Math.round(clip.music.bpm)} BPM` : 'Original sound'))),
+          h('span', { class: 'badge' }, clip.music ? `♪ ${clip.music.name} · ${Math.round(clip.music.bpm)} BPM` : 'Original sound')),
+        clip.lengthNote ? h('div', { class: 'clip-note' }, clip.lengthNote) : null),
       h('div', { class: 'clip-actions' },
         rendered ? h('a', { class: 'btn btn-sm btn-primary', href: `/media/${pid}/output/${rendered.file}`, download: `${base}.mp4` }, icon('download'), 'MP4') : null,
         rendered ? h('a', { class: 'btn btn-sm', href: `/media/${pid}/output/${rendered.srt}`, download: `${base}.srt`, title: 'Caption file to upload with the video' }, 'SRT') : null,
@@ -610,6 +615,7 @@ function planView(plan) {
       h('div', { class: 'clip-badges' },
         h('span', { class: 'badge style' }, styleLabel(clip.style)),
         h('span', { class: 'badge' }, clip.music ? `♪ ${clip.music.name} · cuts on the beat` : 'Original sound')),
+      clip.lengthNote ? h('div', { class: 'clip-note' }, clip.lengthNote) : null,
       clip.concept ? h('div', { class: 'muted small' }, clip.concept) : null,
       h('div', { class: 'plan-hook' }, 'Hook: ', h('q', {}, clip.hook_text), clip.hook_reason ? h('span', { class: 'muted' }, ` · ${clip.hook_reason}`) : null),
       h('div', { class: 'timeline', role: 'img', 'aria-label': 'Clip timeline' }, clip.segments.map((sg) => {
@@ -678,6 +684,7 @@ function renderMusic() {
     h('option', { value: 'none', selected: s.music === 'none' }, 'No music: keep the original sound'),
     ...state.tracks.map((t) => h('option', { value: t.id, selected: s.music === t.id }, `Always use: ${t.name}`)),
   );
+  seg($('#music-level-seg'), [['soft', 'Soft'], ['normal', 'Normal'], ['loud', 'Loud']], s.musicLevel, setSetting('musicLevel'));
   $('#music-total').textContent = state.tracks.length ? `${state.tracks.length} track${state.tracks.length > 1 ? 's' : ''}` : '';
   const moods = state.status?.moods || ['energetic', 'chill', 'build'];
   $('#track-list').replaceChildren(...state.tracks.map((t) => h('li', { class: 'track' },

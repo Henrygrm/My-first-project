@@ -87,7 +87,7 @@ function musicGain(track) {
  *                         music: { path, startAt, loudness } or null
  */
 export async function renderClip(clip, videos, opts) {
-  const { outDir, baseName, reframe = 'auto', audio = 'original', onScreenText = true, transcripts = null, music = null, onProgress } = opts;
+  const { outDir, baseName, reframe = 'auto', audio = 'original', onScreenText = true, transcripts = null, music = null, musicLevel = 'normal', onProgress } = opts;
   await fs.mkdir(outDir, { recursive: true });
   const style = getStyle(clip.style);
 
@@ -125,7 +125,8 @@ export async function renderClip(clip, videos, opts) {
 
     const atempo = seg.speed && seg.speed !== 1 ? `,atempo=${f3(seg.speed)}` : '';
     if (audio === 'original' && v.meta.hasAudio) {
-      filters.push(`[${vIdx}:a]asetpts=PTS-STARTPTS,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo${atempo},apad,atrim=0:${f3(seg.dur)}[a${i}]`);
+      // volume: the video's own level-matching gain (see audioGain in pipeline.js).
+      filters.push(`[${vIdx}:a]asetpts=PTS-STARTPTS,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${f3(v.audioGain ?? 1)}${atempo},apad,atrim=0:${f3(seg.dur)}[a${i}]`);
     } else {
       const sIdx = addInput('-f', 'lavfi', '-t', f3(seg.dur), '-i', 'anullsrc=r=44100:cl=stereo');
       filters.push(`[${sIdx}:a]aformat=sample_fmts=fltp:channel_layouts=stereo[a${i}]`);
@@ -210,12 +211,14 @@ export async function renderClip(clip, videos, opts) {
   if (music) {
     const mIdx = addInput('-stream_loop', '-1', '-ss', f3(music.startAt || 0), '-i', music.path);
     const mixO = audio === 'original' ? style.mix.original : 0;
-    const mixM = style.mix.music * musicGain(music);
+    const level = { soft: 0.6, normal: 1, loud: 1.6 }[musicLevel] ?? 1;
+    const mixM = style.mix.music * level * musicGain(music);
     filters.push(`[${mIdx}:a]atrim=0:${f3(total)},asetpts=PTS-STARTPTS,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${f3(mixM)},afade=t=out:st=${f3(Math.max(0, total - 1.2))}:d=1.2[mus]`);
     if (mixO >= 0.55) {
       // Original sound matters in this style (talking, sizzle): duck the music under it.
       filters.push(`[${aCur}]volume=${f3(mixO)},asplit=2[o1][o2]`);
-      filters.push('[mus][o2]sidechaincompress=threshold=0.04:ratio=5:attack=15:release=350[mduck]');
+      // Gentle ducking: the music dips a few dB under talking or sizzle but stays audible.
+      filters.push('[mus][o2]sidechaincompress=threshold=0.1:ratio=2.5:attack=20:release=400[mduck]');
       filters.push('[o1][mduck]amix=inputs=2:normalize=0:duration=first[amix]');
     } else {
       filters.push(`[${aCur}]volume=${f3(mixO)}[ovol]`);
@@ -225,6 +228,10 @@ export async function renderClip(clip, videos, opts) {
     aCur = 'alim';
   }
 
+  // Finish at social-media loudness (-14 LUFS, like TikTok/Instagram) so every
+  // clip is as loud as the videos around it in the feed.
+  filters.push(`[${aCur}]loudnorm=I=-14:TP=-1.5:LRA=11,aresample=44100[aln]`);
+  aCur = 'aln';
   filters.push(`[${vCur}]fade=t=out:st=${f3(fadeOut)}:d=0.35[vout]`);
   filters.push(`[${aCur}]afade=t=out:st=${f3(fadeOut)}:d=0.35[aout]`);
 

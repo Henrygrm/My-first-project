@@ -3,7 +3,7 @@ import path from 'node:path';
 import { aiConfigured, planEdit, SetupError } from './ai.js';
 import { getBusiness, getPlatform } from './businesses.js';
 import { analyzeSignals, frameAt, pool } from './ffmpeg.js';
-import { autoPlan, clipDuration, makeRng, normalizeAiPlan, sanitizeClip, syncToBeats } from './planner.js';
+import { autoPlan, clipDuration, fitLength, makeRng, normalizeAiPlan, sanitizeClip } from './planner.js';
 import { MOODS, MUSIC_DIR, getTrack, listTracks, pickTrack } from './music.js';
 import { STYLE_IDS, getStyle, stylesForClips } from './styles.js';
 import { renderClip } from './render.js';
@@ -66,6 +66,7 @@ function renderOptions(opts) {
     audio: opts.audio === 'mute' ? 'mute' : 'original',
     onScreenText: opts.onScreenText !== false,
     speechSubtitles: Boolean(opts.speechSubtitles),
+    musicLevel: ['soft', 'normal', 'loud'].includes(opts.musicLevel) ? opts.musicLevel : 'normal',
   };
 }
 
@@ -125,6 +126,7 @@ export async function generate(projectId, opts, ctx) {
   for (const [i, v] of videos.entries()) {
     ctx.stage(`Analysing footage: motion, cuts and audio (${i + 1}/${videos.length})`, 0.02 + (0.18 * i) / videos.length);
     v.signals = await ensureSignals(v);
+    v.audioGain = audioGain(v.signals);
   }
 
   // 2. Optional speech transcription.
@@ -190,7 +192,7 @@ export async function generate(projectId, opts, ctx) {
     if (musicChoice === 'auto') track = await pickTrack(MOODS.includes(clip.music_mood) ? clip.music_mood : getStyle(clip.style).mood, usedTracks, rng);
     else if (musicChoice !== 'none') track = await getTrack(musicChoice);
     if (track) usedTracks.push(track.id);
-    plan.clips[i] = withMusic(clip, track, videos, platform);
+    plan.clips[i] = withMusic(clip, track, videos, platform, targetSeconds);
   }
   if (musicChoice !== 'none' && !hasMusic) plan.musicNote = 'No music added: your music library is empty. Add tracks under Music, then generate again.';
 
@@ -221,13 +223,26 @@ export async function generate(projectId, opts, ctx) {
   return { projectId };
 }
 
-function withMusic(clip, track, videos, platform) {
-  const synced = track ? syncToBeats(clip, track, videos, platform.maxSeconds) : clip;
+/** Attach music (cuts on its beat) and fit the clip to the chosen length. */
+function withMusic(clip, track, videos, platform, target) {
+  const fitted = fitLength(clip, target, videos, track, platform.maxSeconds);
   return {
-    ...synced,
+    ...fitted,
     music: track ? { id: track.id, name: track.name, bpm: track.bpm } : null,
-    estDuration: Math.round(clipDuration(synced) * 10) / 10,
+    estDuration: Math.round(clipDuration(fitted) * 10) / 10,
   };
+}
+
+/**
+ * Gain that brings a video's own sound to a consistent level (~-20 dB RMS
+ * while something is audible), so loud phone audio doesn't drown the music
+ * and quiet audio isn't lost.
+ */
+export function audioGain(signals) {
+  const active = (signals?.loudness || []).filter((db) => db !== null && db > -55);
+  if (!active.length) return 1;
+  const mean = 20 * Math.log10(active.reduce((s, db) => s + 10 ** (db / 20), 0) / active.length);
+  return Math.min(4, Math.max(0.25, 10 ** ((-20 - mean) / 20)));
 }
 
 /** Re-render a single clip after the user edited its text or segments. */
@@ -238,6 +253,11 @@ export async function rerender(projectId, clipIndex, editedClip, opts, ctx) {
   if (!project.plan.clips[idx]) throw new Error('Clip not found');
 
   const videos = videoCtx(project);
+  for (const v of videos) {
+    await fs.mkdir(v.work, { recursive: true });
+    v.signals = await ensureSignals(v);
+    v.audioGain = audioGain(v.signals);
+  }
   const platform = getPlatform(project.plan.platform);
   const { music: musicEdit, ...edits } = editedClip;
   const merged = { ...project.plan.clips[idx], ...edits };
@@ -245,7 +265,7 @@ export async function rerender(projectId, clipIndex, editedClip, opts, ctx) {
   if (!clip.segments.length) throw new Error('This clip has no segments left to render.');
   // Music can be changed per clip ('none' or a track id); re-snap cuts to its beat.
   const trackId = musicEdit === undefined ? clip.music?.id : musicEdit === 'none' ? null : musicEdit;
-  clip = withMusic(clip, trackId ? await getTrack(trackId) : null, videos, platform);
+  clip = withMusic(clip, trackId ? await getTrack(trackId) : null, videos, platform, project.plan.targetSeconds || 30);
   const ropts = renderOptions({ ...project.settings, ...opts });
   const transcripts = {};
   if (ropts.speechSubtitles) {

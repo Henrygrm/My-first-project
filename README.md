@@ -28,7 +28,12 @@ Add tracks under **Music** in the editor (MP3, M4A, WAV and so on). Each track i
 
 - a track is picked to match the style's mood (Energetic / Chill / Build; you can change a track's mood), or you can force one track or turn music off;
 - every cut is snapped onto the beat, and the music starts on a beat after any quiet intro;
-- the music is loudness-matched and mixed under the original sound, ducking under talking and sizzle in the calmer styles.
+- the music and your footage's own sound are both level-matched, then mixed per style (music leads in montages and promos; the real sound stays up front in satisfying clips). **Music volume** (Soft / Normal / Loud) adjusts it;
+- every finished clip is normalised to -14 LUFS, the loudness TikTok and Instagram use.
+
+## Clip length
+
+Clips are made to the length you pick (within the platform limit), with cuts kept on the beat. If there isn't enough usable footage, Cutline uses more of each shot, then slows some shots down a little, then shows the best moments a second time, and says so on the clip. If even that can't reach the length (e.g. 12 seconds of footage for a 60-second clip), the clip says how long it is and why.
 
 Only use music you're allowed to post. Free sources: [Pixabay Music](https://pixabay.com/music/), the YouTube Audio Library (YouTube Studio → Audio library) and [Uppbeat](https://uppbeat.io/). Trending sounds can still be added inside TikTok or Instagram: choose **Mute original sound** and no music, then add the sound in the app.
 

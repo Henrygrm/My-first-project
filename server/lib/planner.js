@@ -7,6 +7,18 @@ export { clipDuration };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const round2 = (v) => Math.round(v * 100) / 100;
+// Rounding must never push a shot past the real end of its video.
+const floor3 = (v) => Math.floor(v * 1000) / 1000;
+function clampToFootage(segs, videos) {
+  return segs.map((s) => {
+    const out = { ...s, start: Math.max(0, s.start), end: Math.min(s.end, floor3(videos[s.video].meta.duration)) };
+    if (out.layout === 'split') {
+      const len = out.end - out.start;
+      out.compare_start = Math.max(0, Math.min(out.compare_start, floor3(videos[out.compare_video].meta.duration - len)));
+    }
+    return out;
+  });
+}
 
 const ROLES = ['hook', 'setup', 'process', 'reveal', 'payoff', 'cta'];
 const QUALITIES = ['strong', 'usable', 'weak'];
@@ -74,7 +86,7 @@ export function sanitizeClip(clip, videos, maxSeconds) {
     style: oneOf(clip.style, STYLE_IDS, 'montage'),
     hook_text: cleanOnScreenText(clip.hook_text).slice(0, 80),
     cta_text: cleanOnScreenText(clip.cta_text).slice(0, 60),
-    segments,
+    segments: clampToFootage(segments, videos),
   };
   enforceMax(out, maxSeconds);
   return out;
@@ -109,8 +121,7 @@ export function syncToBeats(clip, track, videos, maxSeconds) {
     segs.forEach((s, k) => {
       const halves = (k ? d[k - 1] / 2 : 0) + d[k] / 2;
       const visible = (s.end - s.start) / s.speed - halves;
-      const [minB, maxB] = style.beats;
-      let n = clamp(Math.round(visible / beat), minB, maxB * 2);
+      let n = Math.max(style.beats[0], Math.round(visible / beat));
       const limit = Math.min(
         videos[s.video].meta.duration,
         s.layout === 'split' ? videos[s.compare_video].meta.duration : Infinity,
@@ -134,6 +145,123 @@ export function syncToBeats(clip, track, videos, maxSeconds) {
     return syncToBeats(out, track, videos, maxSeconds);
   }
   return out;
+}
+
+/** Free source footage after (dir=1) or before (dir=-1) a shot, up to `want` seconds. */
+function room(segs, i, videos, dir, want) {
+  const s = segs[i];
+  let limit = dir > 0 ? videos[s.video].meta.duration - s.end : s.start;
+  for (const [j, o] of segs.entries()) {
+    if (j === i || o.video !== s.video || o.layout === 'split') continue;
+    if (dir > 0 && o.start >= s.end - 0.01) limit = Math.min(limit, o.start - s.end);
+    if (dir < 0 && o.end <= s.start + 0.01) limit = Math.min(limit, s.start - o.end);
+  }
+  return Math.max(0, Math.min(want, limit));
+}
+
+/** Lengthen the shortest shot that has free footage next to it (up to `step` seconds of playback). */
+function growOnce(segs, videos, step, blocked) {
+  const order = segs.map((s, i) => i).filter((i) => segs[i].layout !== 'split' && !blocked.has(i))
+    .sort((a, b) => (segs[a].end - segs[a].start) / segs[a].speed - (segs[b].end - segs[b].start) / segs[b].speed);
+  for (const i of order) {
+    const want = step * segs[i].speed;
+    const after = room(segs, i, videos, 1, want);
+    if (after >= 0.1) {
+      segs[i] = { ...segs[i], end: round2(segs[i].end + after) };
+      return i;
+    }
+    const before = room(segs, i, videos, -1, want);
+    if (before >= 0.1) {
+      segs[i] = { ...segs[i], start: round2(segs[i].start - before) };
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Make a clip match the length the user picked (within the platform limit).
+ * Order of preference: use more of each shot → slow shots down a little →
+ * replay moments (each at most once more). Overshoot is trimmed off so the
+ * result lands within about a beat of the target. Cuts stay on the beat.
+ */
+export function fitLength(clip, target, videos, track, maxSeconds) {
+  const goal = Math.min(target, maxSeconds);
+  const sync = (c) => (track ? syncToBeats(c, track, videos, maxSeconds) : c);
+  const step = track ? 60 / track.bpm : 0.5;
+  const tolerance = Math.max(0.75, step);
+  const dur = (c) => clipDuration(c);
+  let c = sync({ ...clip, segments: clip.segments.map((s) => ({ ...s })) });
+
+  // Too long: drop middle shots, keeping the hook and the ending.
+  while (dur(c) > goal + tolerance && c.segments.length > 2) {
+    const segs = [...c.segments];
+    segs.splice(segs.length - 2, 1);
+    c = sync({ ...c, segments: segs });
+  }
+
+  // Short: use more of each shot. A shot whose extra footage gets rounded
+  // away by the beat grid is skipped from then on.
+  const blocked = new Set();
+  for (let guard = 0; guard < 800 && dur(c) < goal - tolerance / 2; guard++) {
+    const segs = c.segments.map((s) => ({ ...s }));
+    const i = growOnce(segs, videos, step, blocked);
+    if (i < 0) break;
+    const before = dur(c);
+    const next = sync({ ...c, segments: segs });
+    if (dur(next) > before + 0.01) c = next;
+    else blocked.add(i);
+  }
+
+  // Still short: slow shots down a little (no slower than 0.7x).
+  let stretched = '';
+  for (let guard = 0; guard < 12 && dur(c) < goal - tolerance / 2; guard++) {
+    const segs = c.segments.map((s) => (s.layout === 'split' ? s : { ...s, speed: round2(Math.max(0.7, s.speed * 0.92)) }));
+    if (segs.every((s, i) => s.speed === c.segments[i].speed)) break;
+    c = sync({ ...c, segments: segs });
+    stretched = 'slowed';
+  }
+
+  // Still short: replay moments, best first, each at most once more.
+  const rank = { reveal: 0, payoff: 1, hook: 2 };
+  const originals = c.segments.filter((s) => s.layout !== 'split')
+    .sort((a, b) => (rank[a.role] ?? 3) - (rank[b.role] ?? 3) || (b.end - b.start) - (a.end - a.start));
+  for (const [n, src] of originals.entries()) {
+    if (dur(c) >= goal - tolerance / 2) break;
+    const replay = { ...src, caption: '', role: src.role === 'hook' ? 'process' : src.role, effect: n % 2 ? 'punch' : 'zoom_in', transition: n % 2 ? 'cut' : 'fade' };
+    c = sync({ ...c, segments: [...c.segments.slice(0, -1), replay, c.segments.at(-1)] });
+    stretched = 'replayed';
+  }
+
+  // Overshoot: trim the longest shots back towards the target.
+  for (let guard = 0; guard < 40 && (dur(c) > goal + tolerance / 2 || dur(c) > maxSeconds); guard++) {
+    const segs = c.segments.map((s) => ({ ...s }));
+    const i = segs.reduce((bi, s, j) => (s.layout !== 'split' && (s.end - s.start) / s.speed > (segs[bi].end - segs[bi].start) / segs[bi].speed ? j : bi), 0);
+    const cut = Math.min((dur(c) - goal) * segs[i].speed, (segs[i].end - segs[i].start) - 0.6);
+    if (cut <= 0.05) break;
+    segs[i].end = round2(segs[i].end - Math.max(cut, step * segs[i].speed * 0.6));
+    const before = dur(c);
+    c = sync({ ...c, segments: segs });
+    if (dur(c) >= before) break;
+  }
+
+  // Never exceed the platform limit: shave the very end (the last cut is the end of the clip).
+  if (dur(c) > maxSeconds) {
+    const segs = c.segments.map((s) => ({ ...s }));
+    const last = segs.at(-1);
+    last.end = Math.round((last.end - (dur(c) - maxSeconds) * last.speed - 0.005) * 1000) / 1000;
+    c = { ...c, segments: segs };
+  }
+
+  c = { ...c, segments: clampToFootage(c.segments, videos) };
+  const total = dur(c);
+  let lengthNote = null;
+  if (total < goal - tolerance) {
+    lengthNote = `This clip is ${Math.round(total)}s, not ${goal}s: there isn't enough usable footage (shots are only repeated once). Upload more clips to reach the full length.`;
+  } else if (stretched) {
+    lengthNote = `To reach ${goal}s some shots were slowed down${stretched === 'replayed' ? ' and some moments are shown twice' : ''}. Upload more footage for a tighter edit.`;
+  }
+  return { ...c, lengthNote };
 }
 
 /** Convert Claude's 1-based plan into the internal 0-based, validated form. */
@@ -299,8 +427,9 @@ function buildStyledClip(styleId, picked, ctx) {
 export function autoPlan({ videos, business, platform, clipCount, targetSeconds, styles, rng = Math.random }) {
   const scores = secondScores(videos);
   const totalFootage = videos.reduce((s, v) => s + v.meta.duration, 0);
-  const target = Math.min(targetSeconds, platform.maxSeconds, Math.max(4, totalFootage * 0.8));
-  const minLen = Math.min(target, 6);
+  const target = Math.min(targetSeconds, platform.maxSeconds);
+  // Pick a little more footage than the target: transitions overlap shots.
+  const want = target * 1.15 + 1;
 
   // Candidate windows of a given length every 0.5s across all videos.
   const candidatesFor = (len) => {
@@ -318,18 +447,18 @@ export function autoPlan({ videos, business, platform, clipCount, targetSeconds,
   const pick = (candidates, segLen, bar, used) => {
     const picked = [];
     let total = 0;
-    // Prefer windows not used by earlier clips; then allow reuse of good ones.
-    for (const pass of [0, 1]) {
+    // Best footage first: spread out and unused by earlier clips, then
+    // neighbouring moments, then moments another clip also uses.
+    for (const pass of [0, 1, 2]) {
       for (const c of candidates) {
-        if (total >= target || c.score < bar) break;
-        if (picked.some((p) => overlaps(p, c))) continue;
-        if (pass === 0 && used.some((u) => overlaps(u, c, 0))) continue;
-        // Spread picks out: avoid stacking many windows next to each other.
+        if (total >= want || c.score < bar) break;
+        if (picked.some((p) => overlaps(p, c, 0.05))) continue;
+        if (pass < 2 && used.some((u) => overlaps(u, c, 0))) continue;
         if (pass === 0 && picked.some((p) => p.video === c.video && Math.abs(p.start - c.start) < segLen * 2.5)) continue;
         picked.push(c);
         total += c.end - c.start;
       }
-      if (total >= target) break;
+      if (total >= want) break;
     }
     return { picked, total };
   };
@@ -342,10 +471,11 @@ export function autoPlan({ videos, business, platform, clipCount, targetSeconds,
     // Shot length: the style's range, nudged by the industry's natural pace.
     const segLen = round2(clamp((style.segLen[0] + style.segLen[1]) / 2 * (0.85 + rng() * 0.3), 0.8, 5));
     const candidates = candidatesFor(segLen);
-    // Only use footage that is reasonably good. A tight clip beats one padded with dead time.
+    // Skip only genuinely bad footage (dark, frozen, dead air); fitLength()
+    // later stretches the clip if usable footage runs out.
     const best = candidates[0]?.score ?? 0;
-    let { picked, total } = pick(candidates, segLen, Math.max(0.25, best * 0.42), used);
-    if (total < minLen) ({ picked, total } = pick(candidates, segLen, best * 0.2, used));
+    let { picked } = pick(candidates, segLen, Math.min(0.15, best * 0.3), used);
+    if (!picked.length) ({ picked } = pick(candidates, segLen, -Infinity, used));
     if (!picked.length) break;
     used.push(...picked);
     clips.push(sanitizeClip(buildStyledClip(styleId, picked, { business, videos, rng, k }), videos, platform.maxSeconds));
@@ -353,14 +483,10 @@ export function autoPlan({ videos, business, platform, clipCount, targetSeconds,
 
   if (!clips.length) throw new Error('The footage is too short to build a clip from.');
 
-  const shortest = Math.min(...clips.map(clipDuration));
-  const shortNote = shortest < target * 0.8
-    ? ` Clips are shorter than the ${target}s target because there wasn't enough strong footage; static, dark and silent parts were left out rather than used as filler.`
-    : '';
 
   return {
     source: 'auto',
-    summary: `Auto-edit (no AI) chose the most active moments from ${Math.round(totalFootage)}s of footage using measured motion, audio and brightness, then cut each clip in a different style.${shortNote} Hook and caption text come from templates for this industry. Edit them below and re-render, or connect Claude for footage-aware editing.`,
+    summary: `Auto-edit (no AI) chose the most active moments from ${Math.round(totalFootage)}s of footage using measured motion, audio and brightness, then cut each clip in a different style. Hook and caption text come from templates for this industry. Edit them below and re-render, or connect Claude for footage-aware editing.`,
     footage_review: [],
     cut_sections: [],
     reshoot_tips: [

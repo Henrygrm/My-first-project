@@ -161,6 +161,22 @@ async function main() {
     }
   }
   await checkClips(base, dataDir, p);
+  for (const c of p.plan.clips) {
+    assert.ok(Math.abs(c.estDuration - 15) <= 0.75 || c.lengthNote, `${c.style}: ${c.estDuration}s for a 15s target with no explanation`);
+  }
+  log('every clip matches the chosen length (or explains why not):', p.plan.clips.map((c) => `${c.estDuration}s${c.lengthNote ? ' (note)' : ''}`).join(', '));
+
+  // Music is really in the file: with the footage's own sound muted, any audio must be the music.
+  job = (await call(base, `/api/projects/${project.id}/generate`, { method: 'POST', body: { business: 'gym', mode: 'auto', clipCount: 1, targetSeconds: 15, style: 'satisfying', music: 'auto', audio: 'mute', musicLevel: 'normal' } })).data;
+  await waitJob(base, job.jobId);
+  const pm2 = (await call(base, `/api/projects/${project.id}`)).data;
+  const vol = execFileSync('bash', ['-c', `ffmpeg -hide_banner -i "${path.join(dataDir, 'projects', project.id, 'output', pm2.clips[0].file)}" -af ebur128 -f null - 2>&1 | grep -E '^ +I:' | tail -1`]).toString();
+  const lufs = Number(vol.match(/(-?[\d.]+) LUFS/)[1]);
+  assert.ok(lufs > -18 && lufs < -10, `music-only clip loudness ${lufs} LUFS (expected about -14)`);
+  log(`music is audible in the finished file: ${lufs} LUFS with the footage muted (calmest style)`);
+  job = (await call(base, `/api/projects/${project.id}/generate`, { method: 'POST', body: { business: 'detailing', platform: 'tiktok', mode: 'auto', clipCount: 3, targetSeconds: 15, style: 'mix', music: 'auto' } })).data;
+  await waitJob(base, job.jobId);
+  p = (await call(base, `/api/projects/${project.id}`)).data;
   log(`auto-edit rendered ${p.clips.length} clips (${p.plan.clips.map((c) => c.style).join(', ')}) in ${((Date.now() - t) / 1000).toFixed(1)}s:`, p.clips.map((c) => `${c.duration}s`).join(', '));
 
   // AI edit via mock Claude
