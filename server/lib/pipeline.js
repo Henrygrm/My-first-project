@@ -213,6 +213,8 @@ export async function generate(projectId, opts, ctx) {
     try {
       res = await planEdit({
         videos, business, profile, platform, clipCount, targetSeconds, hasMusic,
+        // Only offer the library when Cutline is choosing the songs.
+        tracks: musicChoice === 'auto' ? tracks : [],
         instructions: (opts.instructions || '').slice(0, 2000),
         // "Mix": the AI picks the best style for each clip itself.
         styles: styleChoice === 'mix' ? null : suggested,
@@ -231,10 +233,13 @@ export async function generate(projectId, opts, ctx) {
   // Music: a track per clip (varied, matched to the clip's mood) with every
   // cut on its beat, then fit each clip to the chosen length.
   const used = [];
-  for (const [i, clip] of plan.clips.entries()) {
+  for (const [i, { music_track: aiPick, ...clip }] of plan.clips.entries()) {
     let track = null;
-    if (musicChoice === 'auto') track = await pickTrack(MOODS.includes(clip.music_mood) ? clip.music_mood : getStyle(clip.style).mood, used, rng);
-    else if (musicChoice !== 'none') track = await getTrack(musicChoice);
+    // The AI's chosen song first, then a song with the clip's mood.
+    if (musicChoice === 'auto') {
+      if (aiPick && aiPick !== 'auto') track = findTrack(tracks, aiPick);
+      track ||= await pickTrack(MOODS.includes(clip.music_mood) ? clip.music_mood : getStyle(clip.style).mood, used, rng);
+    } else if (musicChoice !== 'none') track = await getTrack(musicChoice);
     if (track) used.push(track.id);
     plan.clips[i] = withMusic(clip, track, videos, platform, targetSeconds);
   }

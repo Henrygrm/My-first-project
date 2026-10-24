@@ -145,6 +145,10 @@ const ClipSchema = z.object({
   hashtags: z.array(z.string()),
 });
 
+const PlanClipSchema = ClipSchema.extend({
+  music_track: z.string().describe('Exact name of the song from the MUSIC LIBRARY that best fits this clip, or "auto" if no library is given'),
+});
+
 const PlanSchema = z.object({
   strategy: z.string().describe('2–4 sentences: what will make THIS business stand out on short-form video, who to target, and how the clips split the work between them'),
   summary: z.string().describe('2–3 sentences: what the footage contains and the editing approach'),
@@ -155,7 +159,7 @@ const PlanSchema = z.object({
     description: z.string(),
     quality: z.string().describe('One of: strong, usable, weak'),
   })).describe('Notable moments across all videos, in time order'),
-  clips: z.array(ClipSchema),
+  clips: z.array(PlanClipSchema),
   cut_sections: z.array(z.object({
     video: z.number().describe('1-based video number'),
     start: z.number(),
@@ -189,6 +193,9 @@ function describeSignals(s) {
 }
 
 const fmt = (t) => `${Number(t).toFixed(1)}s`;
+
+const fmtLen = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const libraryList = (tracks) => tracks.map((t) => `- "${t.name}": ${t.mood === 'build' ? 'build-up' : t.mood}, ${Math.round(t.bpm)} BPM, ${fmtLen(t.duration)}`).join('\n');
 
 function businessBlock(business, profile) {
   const p = profile || {};
@@ -262,7 +269,7 @@ ${styleBriefs()}`;
  *   styles: assigned style per clip, or null to let Claude choose
  */
 export async function planEdit(p) {
-  const { videos, business, profile, platform, instructions, clipCount, targetSeconds, styles, hasMusic } = p;
+  const { videos, business, profile, platform, instructions, clipCount, targetSeconds, styles, hasMusic, tracks = [] } = p;
   const styleRule = styles
     ? `Use these styles: ${styles.map((id, i) => `clip ${i + 1} = "${id}"`).join(', ')}.`
     : `Choose the best style for each clip for this business and footage. Every clip must use a different style and a different angle.`;
@@ -274,7 +281,10 @@ export async function planEdit(p) {
 PLATFORM: ${platform.label}, sweet spot ${platform.sweetSpot}. ${platform.notes}
 DELIVERABLE: ${clipCount} clip${clipCount > 1 ? 's' : ''}, each about ${targetSeconds} seconds, portrait 9:16.
 ${styleRule}
-${instructions ? `\nINSTRUCTIONS FROM THE CREATOR (follow these closely):\n${instructions}\n` : ''}
+${tracks.length ? `
+MUSIC LIBRARY (pick one song per clip by its exact name; the mood label was set by the creator, so trust it; the tempo and the song name hint at the vibe. Match the song to the clip's style and energy and to what suits this business. Use a different song for each clip when there are enough):
+${libraryList(tracks)}
+` : ''}${instructions ? `\nINSTRUCTIONS FROM THE CREATOR (follow these closely):\n${instructions}\n` : ''}
 First work out the strategy: what about this business and this footage will make people stop scrolling, and which ${clipCount > 1 ? `${clipCount} different angles` : 'angle'} will pull the most attention and customers. Then design the clip${clipCount > 1 ? 's' : ''}.
 
 The raw footage follows: ${videos.length} video${videos.length > 1 ? 's' : ''}.`,
@@ -328,7 +338,8 @@ export async function reviseEdit(p) {
 
 PLATFORM: ${platform.label} (max ${platform.maxSeconds}s).
 ${plan.strategy ? `STRATEGY SO FAR: ${plan.strategy}\n` : ''}
-MUSIC LIBRARY: ${tracks.length ? tracks.map((t) => `"${t.name}" (${t.mood}, ${Math.round(t.bpm)} BPM)`).join('; ') : 'empty'}
+MUSIC LIBRARY:
+${tracks.length ? libraryList(tracks) : 'empty'}
 
 THE CURRENT CLIPS (video numbers are 1-based):
 ${JSON.stringify(current, null, 1)}

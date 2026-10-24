@@ -37,7 +37,7 @@ You need Node.js 20.12+ and FFmpeg (`brew install node ffmpeg`).
 
 ## Music
 
-Each song is analysed once for tempo and beat. When a clip is made, a song matching its mood is picked (a different one per clip when possible), every cut lands on the beat, the music starts on a beat after any quiet intro, both music and footage sound are level-matched, and the finished clip is normalised to -14 LUFS (what TikTok and Instagram use).
+Each song is analysed once for tempo and beat. When a clip is made with a Claude key, Claude sees your song list (names, moods, tempos) and picks the best song for each clip and business; in free mode, a song matching the clip's mood is picked. Each clip gets a different song when possible. Every cut lands on the beat, the music starts on a beat after any quiet intro, both music and footage sound are level-matched, and the finished clip is normalised to -14 LUFS (what TikTok and Instagram use).
 
 Only use music you're allowed to post. Pixabay Music tracks are free for social posts.
 

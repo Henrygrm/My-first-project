@@ -15,6 +15,9 @@ function planFor(text) {
   const assigned = [...text.matchAll(/clip \d+ = "(\w+)"/g)].map((m) => m[1]);
   // No styles given = the AI chooses; pick a different one per clip like a real plan would.
   const own = ['transformation', 'satisfying', 'promo', 'story'];
+  // Song pick: the first energetic song in the library, to show the pick beats the clip's mood.
+  const library = [...text.matchAll(/^- "(.+?)": ([\w-]+), /gm)].map((m) => ({ name: m[1], mood: m[2] }));
+  const song = (library.find((t) => t.mood === 'energetic') || library[0])?.name || 'auto';
   const clips = Array.from({ length: clipCount }, (_, k) => {
     const segments = [];
     videos.forEach((v, vi) => {
@@ -42,7 +45,7 @@ function planFor(text) {
       angle: ['Transformation reveal', 'Satisfying process', 'Offer', 'Behind the scenes'][k % 4],
       target_viewer: 'Locals who want their car looking new', why_it_works: 'Mock: the reveal pays off the hook.',
       hook_text: 'Watch this transformation 😮', hook_reason: 'Mock reason',
-      segments, cta_text: 'Book today', pacing_notes: 'Fast',
+      segments, cta_text: 'Book today', pacing_notes: 'Fast', music_track: song,
       post_caption: 'Mock caption ✨', hashtags: ['#mock', '#test'],
     };
   });

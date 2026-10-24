@@ -185,6 +185,12 @@ async function main() {
   p = (await call(base, `/api/projects/${project.id}`)).data;
   log(`auto-edit rendered ${p.clips.length} clips (${p.plan.clips.map((c) => c.style).join(', ')}) in ${((Date.now() - t) / 1000).toFixed(1)}s:`, p.clips.map((c) => `${c.duration}s`).join(', '));
 
+  // A second song: the AI should pick it by name even though the clips' mood is chill
+  const hform = new FormData();
+  hform.append('tracks', new Blob([await fs.readFile(track)]), 'hype anthem.mp3');
+  const hype = (await (await fetch(`${base}/api/music`, { method: 'POST', body: hform })).json()).added[0];
+  assert.equal((await call(base, `/api/music/${hype.id}`, { method: 'PATCH', body: { mood: 'energetic' } })).data.mood, 'energetic');
+
   // AI edit via mock Claude
   job = (await call(base, `/api/projects/${project.id}/generate`, { method: 'POST', body: { business: 'restaurant', platform: 'reels', mode: 'ai', clipCount: 2, targetSeconds: 15, instructions: 'Open on the sizzle', reframe: 'fill' } })).data;
   t = Date.now();
@@ -204,6 +210,9 @@ async function main() {
   assert.match(p.plan.strategy, /Mock strategy/, 'strategy kept');
   assert.ok(p.plan.clips.every((c) => c.angle && c.why_it_works && c.target_viewer), 'angle and reasoning kept');
   assert.match(planReq0().body.messages[0].content[0].text, /Choose the best style for each clip/);
+  assert.match(planReq0().body.messages[0].content[0].text, /MUSIC LIBRARY[^\n]*\n- "beat 120": chill, 120 BPM, 0:40\n- "hype anthem": energetic, 120 BPM, 0:40/);
+  assert.ok(p.plan.clips.every((c) => c.music?.name === 'hype anthem'), `AI song pick used: ${p.plan.clips.map((c) => c.music?.name)}`);
+  assert.ok(p.plan.clips.every((c) => !('music_track' in c)), 'pick not stored on the clip');
   await checkClips(base, dataDir, p);
   const planReq = planReq0();
   const images = planReq.body.messages[0].content.filter((x) => x.type === 'image').length;
@@ -245,7 +254,7 @@ async function main() {
   assert.match(rv.chat.at(-1).text, /Mock: changed clip 2/);
   const revReq = requests.at(-1).body.messages[0].content[0].text;
   assert.match(revReq, /THE CURRENT CLIPS/);
-  assert.match(revReq, /MUSIC LIBRARY: "beat 120"/);
+  assert.match(revReq, /MUSIC LIBRARY:\n- "beat 120": chill, 120 BPM/);
   await checkClips(base, dataDir, rv);
   log('ask for changes (AI): clip 2 revised and re-rendered, clip 1 untouched');
   assert.equal((await call(base, `/api/projects/${project.id}/revise`, { method: 'POST', body: { request: '  ' } })).status, 400);
