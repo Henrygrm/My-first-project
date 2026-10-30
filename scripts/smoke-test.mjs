@@ -185,6 +185,14 @@ async function main() {
   p = (await call(base, `/api/projects/${project.id}`)).data;
   log(`auto-edit rendered ${p.clips.length} clips (${p.plan.clips.map((c) => c.style).join(', ')}) in ${((Date.now() - t) / 1000).toFixed(1)}s:`, p.clips.map((c) => `${c.duration}s`).join(', '));
 
+  // Clips made in free mode, then a key is added: the change bar must use the AI.
+  job = (await call(base, `/api/projects/${project.id}/revise`, { method: 'POST', body: { request: 'Open on the best moment', clipIndex: 0, mode: 'ai' } })).data;
+  await waitJob(base, job.jobId);
+  const fm = (await call(base, `/api/projects/${project.id}`)).data;
+  assert.match(fm.chat.at(-1).text, /Mock: changed clip 1/, `free-mode clips revised by the AI: ${fm.chat.at(-1).text}`);
+  assert.equal(fm.plan.clips[0].hook_text, 'Revised by the AI');
+  log('change bar uses the AI even for clips first made in free mode');
+
   // A second song: the AI should pick it by name even though the clips' mood is chill
   const hform = new FormData();
   hform.append('tracks', new Blob([await fs.readFile(track)]), 'hype anthem.mp3');
@@ -259,6 +267,72 @@ async function main() {
   log('ask for changes (AI): clip 2 revised and re-rendered, clip 1 untouched');
   assert.equal((await call(base, `/api/projects/${project.id}/revise`, { method: 'POST', body: { request: '  ' } })).status, 400);
 
+  // Animated ads (AI): photos, logo, storyboard normalisation, song pick, render
+  const imgDir = path.join(TMP, 'img');
+  await fs.mkdir(imgDir, { recursive: true });
+  ffmpeg(['-f', 'lavfi', '-i', 'testsrc2=s=1600x1200', '-frames:v', '1', path.join(imgDir, 'shop.jpg')]);
+  ffmpeg(['-f', 'lavfi', '-i', 'color=c=0xd22b2b:s=400x160', '-frames:v', '1', path.join(imgDir, 'logo.png')]);
+  const upImg = async (b, pid, file, kind) => {
+    const f = new FormData();
+    f.append('images', new Blob([await fs.readFile(file)]), path.basename(file));
+    return (await fetch(`${b}/api/projects/${pid}/ad-assets${kind ? `?kind=${kind}` : ''}`, { method: 'POST', body: f })).json();
+  };
+  let ia = await upImg(base, project.id, path.join(imgDir, 'shop.jpg'));
+  assert.equal(ia.added.length, 1, JSON.stringify(ia));
+  ia = await upImg(base, project.id, path.join(imgDir, 'logo.png'), 'logo');
+  assert.deepEqual(ia.adAssets.map((x) => x.kind), ['photo', 'logo']);
+  const notImg = new FormData();
+  notImg.append('images', new Blob([Buffer.from('nope')]), 'fake.jpg');
+  assert.equal((await (await fetch(`${base}/api/projects/${project.id}/ad-assets`, { method: 'POST', body: notImg })).json()).failed.length, 1, 'bad image rejected');
+  const adProfile = { name: 'Gloss Boss', services: 'ceramic coating, interiors', location: 'Parramatta', offer: '20% off this week' };
+  job = (await call(base, `/api/projects/${project.id}/ads/generate`, { method: 'POST', body: { mode: 'ai', business: 'detailing', profile: adProfile, count: 2, seconds: 10, format: '9:16', theme: 'auto', music: 'auto' } })).data;
+  t = Date.now();
+  await waitJob(base, job.jobId);
+  let ap = (await call(base, `/api/projects/${project.id}`)).data;
+  assert.equal(ap.adPlan.source, 'ai');
+  assert.deepEqual(ap.adPlan.ads.map((a) => a.theme), ['neon', 'luxury'], 'theme labels normalised');
+  assert.equal(ap.adPlan.ads[0].accent, '#ff3366', 'brand colour normalised');
+  assert.ok(ap.adPlan.ads.every((a) => a.music?.name === 'hype anthem'), 'AI song pick used for ads');
+  const sc = ap.adPlan.ads[0].scenes;
+  assert.deepEqual(sc.map((x) => x.type), ['hook', 'features', 'hook', 'offer', 'cta'], 'scene types normalised; photo scene with a bad photo number falls back');
+  assert.equal(sc[0].photo, 0, '1-based photo number converted');
+  assert.equal(sc[2].photo, -1, 'bad photo number dropped');
+  assert.ok(!sc[0].headline.includes('🔥'), 'emoji stripped');
+  const adReq = requests.at(-1).body;
+  assert.equal(adReq.messages[0].content.filter((x) => x.type === 'image').length, 2, 'photo and logo sent to Claude');
+  assert.match(adReq.system, /NEVER invent facts/);
+  for (const [i, r] of ap.adRenders.entries()) {
+    const info = probe(path.join(dataDir, 'projects', project.id, 'ad-output', r.file));
+    const v = info.streams.find((x) => x.codec_type === 'video');
+    assert.equal(`${v.width}x${v.height}`, '1080x1920');
+    assert.ok(info.streams.some((x) => x.codec_type === 'audio'));
+    assert.ok(Math.abs(Number(info.format.duration) - 10) <= 1, `ad ${i + 1} is ${info.format.duration}s for a 10s target`);
+    assert.equal((await fetch(`${base}/media/${project.id}/ad-output/${r.thumb}`)).status, 200);
+  }
+  log(`AI ads rendered: ${ap.adRenders.map((r) => `${r.duration}s`).join(', ')} in ${((Date.now() - t) / 1000).toFixed(1)}s`);
+
+  const adPrior = ap;
+  job = (await call(base, `/api/projects/${project.id}/ads/revise`, { method: 'POST', body: { request: 'no music on this one', adIndex: 1 } })).data;
+  await waitJob(base, job.jobId);
+  ap = (await call(base, `/api/projects/${project.id}`)).data;
+  assert.equal(ap.adPlan.ads[1].scenes[0].headline, 'Revised ad');
+  assert.equal(ap.adPlan.ads[1].theme, 'clean');
+  assert.equal(ap.adPlan.ads[1].music, null);
+  assert.equal(ap.adRenders[0].file, adPrior.adRenders[0].file, 'other ad untouched');
+  assert.notEqual(ap.adRenders[1].file, adPrior.adRenders[1].file, 'changed ad re-rendered');
+  assert.match(ap.adChat.at(-1).text, /Mock: changed ad 2/);
+  log('ads change bar (AI): ad 2 revised and re-rendered, ad 1 untouched');
+
+  const edAd = { ...ap.adPlan.ads[0], scenes: ap.adPlan.ads[0].scenes.slice(0, 2).map((x, i) => ({ ...x, headline: i ? x.headline : 'Hand edited', duration: 2.5 })), music: 'none' };
+  job = (await call(base, `/api/projects/${project.id}/ads/0/render`, { method: 'POST', body: { ad: edAd } })).data;
+  await waitJob(base, job.jobId);
+  ap = (await call(base, `/api/projects/${project.id}`)).data;
+  assert.equal(ap.adPlan.ads[0].scenes[0].headline, 'Hand edited');
+  assert.equal(ap.adPlan.ads[0].scenes[0].photo, 0, 'photo kept on hand edit');
+  assert.equal(ap.adPlan.ads[0].scenes.length, 3, 'kept scenes + call to action');
+  assert.equal(ap.adPlan.ads[0].music, null);
+  log('ad hand edit + re-render ok');
+
   // Project list + delete video marks plan stale
   const list = (await call(base, '/api/projects')).data;
   assert.equal(list[0].id, project.id);
@@ -307,6 +381,28 @@ async function main() {
   assert.deepEqual(r.clips.map((c) => c.file), files, 'nothing re-rendered for a request it could not understand');
   await checkClips(srv2.base, path.join(TMP, 'data-3556'), r);
   log('ask for changes without a key: length, song, hook, no music, and an honest "not understood"');
+
+  // Animated ads without a key: templates, square format, rule-based changes
+  const jEmpty = (await call(srv2.base, `/api/projects/${p3.id}/ads/generate`, { method: 'POST', body: { mode: 'auto', profile: {} } })).data;
+  await assert.rejects(waitJob(srv2.base, jEmpty.jobId), /business name/, 'ads need business details');
+  const stills = (await call(srv2.base, `/api/projects/${p3.id}/ad-assets/stills`, { method: 'POST', body: { count: 3 } })).data;
+  assert.ok(stills.adAssets.length >= 3, 'stills taken from footage');
+  const ja = (await call(srv2.base, `/api/projects/${p3.id}/ads/generate`, { method: 'POST', body: { mode: 'auto', business: 'detailing', profile: { name: 'Gloss Boss', services: 'ceramic coating', location: 'Parramatta' }, count: 3, seconds: 15, format: '1:1', theme: 'auto', music: 'none' } })).data;
+  await waitJob(srv2.base, ja.jobId);
+  let fp = (await call(srv2.base, `/api/projects/${p3.id}`)).data;
+  assert.equal(fp.adPlan.source, 'auto');
+  assert.equal(new Set(fp.adPlan.ads.map((a) => a.theme)).size, 3, 'each template ad has its own look');
+  assert.ok(fp.adPlan.ads.every((a) => a.scenes.at(-1).type === 'cta' && /Gloss Boss/.test(a.scenes.at(-1).headline)), 'ends with a named call to action');
+  assert.ok(!JSON.stringify(fp.adPlan).match(/% off|review/i), 'no invented offers or reviews');
+  const sq = probe(path.join(TMP, 'data-3556', 'projects', p3.id, 'ad-output', fp.adRenders[0].file));
+  assert.equal(`${sq.streams[0].width}x${sq.streams[0].height}`, '1080x1080');
+  const jr = (await call(srv2.base, `/api/projects/${p3.id}/ads/revise`, { method: 'POST', body: { request: 'make ad 1 neon and 10 seconds' } })).data;
+  await waitJob(srv2.base, jr.jobId);
+  fp = (await call(srv2.base, `/api/projects/${p3.id}`)).data;
+  assert.equal(fp.adPlan.ads[0].theme, 'neon');
+  assert.ok(Math.abs(fp.adRenders[0].duration - 10) <= 0.5, `revised ad is ${fp.adRenders[0].duration}s`);
+  assert.match(fp.adChat.at(-1).text, /^Done: set the length to 10 seconds, switched to the Neon look/);
+  log('free-mode ads: stills from footage, 3 looks, 1:1 format, rule-based changes');
 
   // Settings: save a key (to a temp .env), check it, remove it
   const envFile = path.join(TMP, 'env-3556');

@@ -2,13 +2,14 @@ import { $, $$, api, copyText, fmtDuration, fmtSec, h, icon, slug, store, timeAg
 
 // Must match package.json. If the server reports a different version, an
 // old copy of Cutline is still running and new features won't work.
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 
 const ROLE_COLORS = { hook: '#ffb03d', setup: '#6aa8ff', process: '#6aa8ff', reveal: '#3ddc97', payoff: '#3ddc97', cta: '#c79bff' };
 const DEFAULTS = {
   business: 'restaurant', businessCustom: '', platform: 'tiktok', clipCount: 2, targetSeconds: 30,
   style: 'mix', music: 'auto', musicLevel: 'normal', mode: 'ai', reframe: 'auto', audio: 'original',
   onScreenText: true, speechSubtitles: false, instructions: '',
+  adFormat: '9:16', adSeconds: 15, adCount: 2, adTheme: 'auto', adMusic: 'auto', adAccent: '#ffb03d', adAccentOn: false, adInstructions: '',
 };
 
 const state = {
@@ -21,6 +22,8 @@ const state = {
   job: null,
   drafts: {},
   openEditors: new Set(),
+  adDrafts: {},
+  openAdEditors: new Set(),
 };
 
 const saveSettings = () => store.set('settings', state.settings);
@@ -95,12 +98,13 @@ function renderAlerts() {
 
 function route() {
   const name = location.hash.replace(/^#\/?/, '') || 'home';
-  const page = ['home', 'music', 'settings'].includes(name) ? name : 'home';
+  const page = ['home', 'ads', 'music', 'settings'].includes(name) ? name : 'home';
   $$('.page').forEach((p) => (p.hidden = p.id !== `page-${page}`));
   $$('.nav a').forEach((a) => a.classList.toggle('active', a.dataset.page === page));
   if (page === 'music') renderMusicPage();
   if (page === 'settings') renderSettings();
   if (page === 'home') renderHome();
+  if (page === 'ads') renderAds();
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +123,8 @@ function setProject(p) {
   state.project = p;
   state.drafts = {};
   state.openEditors.clear();
+  state.adDrafts = {};
+  state.openAdEditors.clear();
   if (p) store.set('project', p.id);
   else store.remove('project');
   $('#project-name').value = p ? p.name : 'New project';
@@ -150,9 +156,14 @@ async function openProject(id) {
   for (const k of ['clipCount', 'targetSeconds', 'style', 'music', 'musicLevel']) {
     if (p.settings?.[k] !== undefined) state.settings[k] = p.settings[k];
   }
+  const as = p.adSettings;
+  if (as) {
+    Object.assign(state.settings, { adFormat: as.format, adSeconds: as.seconds, adCount: as.count, adTheme: as.theme, adMusic: as.music });
+    if (as.accent) Object.assign(state.settings, { adAccent: as.accent, adAccentOn: true });
+  }
   if (p.profile && Object.values(p.profile).some(Boolean)) state.profile = { ...p.profile };
   saveSettings();
-  renderHome();
+  route();
   if (p.activeJob) pollJob(p.activeJob);
 }
 
@@ -160,7 +171,7 @@ async function newProject() {
   if (state.job) return toast('Wait for the current job to finish first.', { error: true });
   setProject(null);
   await ensureProject();
-  renderHome();
+  route();
   $('#project-name').select();
 }
 
@@ -183,7 +194,7 @@ async function showProjects() {
         await api(`/api/projects/${p.id}`, { method: 'DELETE' });
         if (p.id === state.project?.id) {
           setProject(null);
-          renderHome();
+          route();
         }
         showProjects();
       } catch (err) {
@@ -232,6 +243,7 @@ function renderControls() {
 function renderProfileSummary() {
   const p = state.profile;
   $('#profile-summary').textContent = p.name ? `· ${p.name}` : '· helps the AI';
+  $('#ad-profile-summary').textContent = p.name ? `· ${p.name}` : '';
   if (!p.name && !state.project?.plan) $('#profile-box').open = true;
 }
 
@@ -378,12 +390,11 @@ async function ask(e) {
   try {
     const { jobId } = await api(`/api/projects/${state.project.id}/revise`, {
       method: 'POST',
-      body: { request, clipIndex: which === 'all' ? null : Number(which) },
+      body: { request, clipIndex: which === 'all' ? null : Number(which), mode: aiOn() ? 'ai' : 'auto' },
     });
     input.value = '';
     state.project.chat = [...(state.project.chat || []), { who: 'you', text: which === 'all' ? request : `Clip ${Number(which) + 1}: ${request}` }];
-    renderChat();
-    pollJob(jobId);
+    pollJob(jobId, 'revise');
   } catch (err) {
     toast(err.message, { error: true });
   }
@@ -402,22 +413,33 @@ async function renderOne(index) {
   }
 }
 
-function showJobError(message) {
-  const box = $('#job');
-  box.hidden = false;
-  box.classList.add('error');
-  $('#job-stage').textContent = message;
-  $('#job-pct').textContent = '';
-  $('#job-bar').style.width = '0%';
+// The same progress shows on the Home and Ads pages.
+function setJobUi({ hidden, error, stage, pct }) {
+  for (const pre of ['', 'ad-']) {
+    const box = $(`#${pre}job`);
+    if (hidden !== undefined) box.hidden = hidden;
+    if (error !== undefined) box.classList.toggle('error', error);
+    if (stage !== undefined) $(`#${pre}job-stage`).textContent = stage;
+    if (pct !== undefined) {
+      $(`#${pre}job-pct`).textContent = pct === null ? '' : `${Math.round(pct * 100)}%`;
+      $(`#${pre}job-bar`).style.width = `${Math.round((pct || 0) * 100)}%`;
+    }
+  }
 }
 
-async function pollJob(jobId) {
-  state.job = { id: jobId };
-  const box = $('#job');
-  box.hidden = false;
-  box.classList.remove('error');
-  updateGenerateState();
+function showJobError(message) {
+  setJobUi({ hidden: false, error: true, stage: message, pct: null });
+}
+
+function refreshViews() {
   renderResults();
+  renderAdResults();
+}
+
+async function pollJob(jobId, kind = null) {
+  state.job = { id: jobId, kind };
+  setJobUi({ hidden: false, error: false, stage: 'Starting…', pct: 0 });
+  refreshViews();
   let misses = 0;
   let finished = null;
   while (state.job?.id === jobId) {
@@ -428,12 +450,12 @@ async function pollJob(jobId) {
     } catch (err) {
       if (err.status === 404) {
         state.job = null;
-        box.hidden = true;
+        setJobUi({ hidden: true });
         toast('Cutline restarted. Anything unfinished has a Render button.', { error: true });
         break;
       }
       if (!err.status && ++misses <= 15) {
-        $('#job-stage').textContent = 'Lost connection to Cutline, retrying…';
+        setJobUi({ stage: 'Lost connection to Cutline, retrying…' });
         await new Promise((r) => setTimeout(r, 2000));
         continue;
       }
@@ -441,19 +463,18 @@ async function pollJob(jobId) {
       showJobError(err.status ? err.message : 'Cutline stopped. Double-click "Start Cutline", then reload this page.');
       break;
     }
-    $('#job-stage').textContent = job.stage;
-    $('#job-pct').textContent = `${Math.round(job.progress * 100)}%`;
-    $('#job-bar').style.width = `${Math.round(job.progress * 100)}%`;
+    if (state.job && !state.job.kind) state.job.kind = job.kind;
+    setJobUi({ stage: job.stage, pct: job.progress });
     if (job.status === 'done' || job.status === 'error') {
       state.job = null;
       finished = job;
       if (job.status === 'error') {
         showJobError(job.error);
-        if (job.kind === 'revise') toast(job.error, { error: true });
+        if (job.kind === 'revise' || job.kind === 'ads-revise') toast(job.error, { error: true });
       } else {
-        setTimeout(() => { if (!state.job) box.hidden = true; }, 2000);
-        if (job.kind === 'generate') toast('Clips ready');
-        if (job.kind === 'render') toast('Clip updated');
+        setTimeout(() => { if (!state.job) setJobUi({ hidden: true }); }, 2000);
+        const done = { generate: 'Clips ready', render: 'Clip updated', ads: 'Ads ready', 'ad-render': 'Ad updated' }[job.kind];
+        if (done) toast(done);
       }
       break;
     }
@@ -462,8 +483,7 @@ async function pollJob(jobId) {
   try {
     await reloadProject();
   } catch {}
-  updateGenerateState();
-  renderResults();
+  refreshViews();
 }
 
 // ---------------------------------------------------------------------------
@@ -473,7 +493,9 @@ async function pollJob(jobId) {
 function renderChat() {
   const chat = state.project?.chat || [];
   const box = $('#chat');
-  box.replaceChildren(...chat.slice(-12).map((m) => h('div', { class: `msg ${m.who}` }, m.text)));
+  const msgs = chat.slice(-12).map((m) => h('div', { class: `msg ${m.who}${m.error ? ' error' : ''}` }, m.text));
+  if (state.job?.kind === 'revise') msgs.push(h('div', { class: 'msg cutline pending' }, aiOn() ? 'The AI is working on it…' : 'Working on it…'));
+  box.replaceChildren(...msgs);
   box.scrollTop = box.scrollHeight;
 }
 
@@ -572,6 +594,301 @@ function clipEditor(clip, rendered, i, busy) {
     h('input', { value: draft.cta_text || '', maxlength: '60', oninput: bind(draft, 'cta_text') }),
     rendered ? h('a', { class: 'muted small', href: `/media/${state.project.id}/output/${rendered.srt}`, download: `${slug(state.project.name)}-clip-${i + 1}.srt` }, 'Download captions file (.srt)') : null,
     h('button', { class: 'btn btn-sm btn-primary', disabled: busy || !ffmpegOk(), onclick: () => renderOne(i) }, icon('refresh'), 'Save and re-render'));
+}
+
+
+// ---------------------------------------------------------------------------
+// Ads page
+// ---------------------------------------------------------------------------
+
+const themeLabel = (id) => (id === 'auto' ? 'AI picks' : state.status?.ads?.themes.find((t) => t.id === id)?.label || id);
+const SCENE_LABELS = { hook: 'Hook', photo: 'Photo', features: 'List', offer: 'Offer', stat: 'Number', review: 'Review', cta: 'Call to action' };
+const SCENE_COLORS = { hook: '#ffb03d', photo: '#6aa8ff', features: '#3ddc97', offer: '#ff7a9a', stat: '#c79bff', review: '#ffd84d', cta: '#c79bff' };
+
+function renderAds() {
+  renderAdControls();
+  renderAdAssets();
+  renderAdResults();
+}
+
+function renderAdControls() {
+  const s = state.settings;
+  const st = state.status;
+  $('#ad-biz-type').replaceChildren(...(st?.businesses || []).map((b) => h('option', { value: b.id, selected: b.id === s.business }, b.id === 'other' && s.businessCustom ? s.businessCustom : b.label)));
+  for (const input of $$('[data-profile]')) input.value = state.profile[input.dataset.profile] || '';
+  renderProfileSummary();
+  const ads = st?.ads || { formats: [], lengths: [], themes: [] };
+  seg($('#ad-format-seg'), ads.formats.map((f) => [f.id, f.id]), s.adFormat, setSetting('adFormat'));
+  seg($('#ad-length-seg'), ads.lengths.map((l) => [l, `${l}s`]), s.adSeconds, setSetting('adSeconds'));
+  seg($('#ad-count-seg'), [[1, '1'], [2, '2'], [3, '3']], s.adCount, setSetting('adCount'));
+  $('#ad-theme-select').replaceChildren(
+    h('option', { value: 'auto', selected: s.adTheme === 'auto' }, aiOn() ? 'AI picks the best look' : 'Mix of looks'),
+    ...ads.themes.map((t) => h('option', { value: t.id, selected: t.id === s.adTheme }, `${t.label}: ${t.brief.split(',')[0]}`)),
+  );
+  if (s.adMusic !== 'auto' && s.adMusic !== 'none' && !state.tracks.some((t) => t.id === s.adMusic)) s.adMusic = 'auto';
+  $('#ad-music-select').replaceChildren(
+    h('option', { value: 'auto', selected: s.adMusic === 'auto' }, state.tracks.length ? 'Auto (best song per ad)' : 'Auto (add songs first)'),
+    h('option', { value: 'none', selected: s.adMusic === 'none' }, 'No music'),
+    ...state.tracks.map((t) => h('option', { value: t.id, selected: s.adMusic === t.id }, t.name)),
+  );
+  $('#ad-accent').value = s.adAccent;
+  $('#ad-accent-on').checked = s.adAccentOn;
+  $('#ad-notes-block').hidden = !aiOn();
+  $('#ad-instructions').value = s.adInstructions || '';
+  updateAdState();
+}
+
+function updateAdState() {
+  const p = state.profile;
+  let reason = '';
+  if (!state.status) reason = "Cutline isn't running.";
+  else if (!versionOk()) reason = 'Restart Cutline first (see the red message at the top).';
+  else if (!ffmpegOk()) reason = 'Install FFmpeg first.';
+  else if (!p.name && !p.services) reason = 'Fill in the business name and what they sell.';
+  else if (state.job) reason = 'Working…';
+  $('#ad-generate').disabled = Boolean(reason);
+  $('#ad-generate-label').textContent = aiOn() ? 'Make ads with AI' : 'Make ads (free mode)';
+  const photos = (state.project?.adAssets || []).filter((a) => a.kind === 'photo').length;
+  $('#ad-hint').textContent = reason || (!photos ? 'Tip: add a few photos (or use stills from your videos) for better ads.' : aiOn() ? '' : 'Free mode: ads built from templates. Add a Claude key in Settings for AI-written ads.');
+  const can = Boolean(state.project?.adPlan) && !state.job && versionOk();
+  for (const id of ['ad-ask-input', 'ad-ask-send', 'ad-ask-which']) $(`#${id}`).disabled = !can;
+  $('#ad-ask-input').placeholder = !state.project?.adPlan
+    ? 'Make ads first, then tell the AI what to change here'
+    : aiOn() ? 'Tell the AI what to change, e.g. "ad 1: open with the offer, use the neon look"' : 'e.g. "make it 20 seconds", "make it luxury", "hook: Your text", "redo ad 2"';
+}
+
+function renderAdAssets() {
+  const pid = state.project?.id;
+  const assets = state.project?.adAssets || [];
+  const photos = assets.filter((a) => a.kind === 'photo');
+  const logo = assets.find((a) => a.kind === 'logo');
+  $('#ad-asset-count').textContent = assets.length ? `${photos.length} photo${photos.length === 1 ? '' : 's'}${logo ? ' + logo' : ''}` : '';
+  $('#ad-logo-label').textContent = logo ? 'Replace logo' : 'Add logo';
+  $('#ad-stills').disabled = !state.project?.videos?.length || Boolean(state.job);
+  $('#ad-stills').title = state.project?.videos?.length ? 'Take sharp stills from the videos on the Home page' : 'Add videos on the Home page first';
+  const tile = (a, label) => h('div', { class: `asset${a.kind === 'logo' ? ' logo' : ''}`, style: { backgroundImage: `url("/media/${pid}/ad-assets/${a.thumb}?v=${a.rev || 0}")` }, title: a.name },
+    h('span', { class: 'num' }, label),
+    h('div', { class: 'tools' },
+      a.kind === 'photo' ? h('button', { type: 'button', title: 'Rotate', 'aria-label': 'Rotate', onclick: () => assetAction(a, 'rotate') }, icon('rotate')) : null,
+      h('button', { type: 'button', title: 'Remove', 'aria-label': 'Remove', onclick: () => assetAction(a, 'delete') }, icon('trash'))));
+  $('#ad-assets').replaceChildren(...(logo ? [tile(logo, 'Logo')] : []), ...photos.map((a, i) => tile(a, String(i + 1))));
+}
+
+async function assetAction(a, action) {
+  if (state.job) return toast('Wait for the current job to finish first.', { error: true });
+  try {
+    const p = await api(`/api/projects/${state.project.id}/ad-assets/${a.id}${action === 'rotate' ? '/rotate' : ''}`, { method: action === 'rotate' ? 'POST' : 'DELETE' });
+    state.project = { ...state.project, ...p };
+    renderAdAssets();
+    updateAdState();
+  } catch (err) {
+    toast(err.message, { error: true });
+  }
+}
+
+async function handleAdImages(files, kind = 'photo') {
+  files = [...files].filter((f) => f.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif|gif)$/i.test(f.name));
+  if (!files.length) return toast('Those files are not images.', { error: true });
+  if (!versionOk()) return toast('Restart Cutline first: an old copy is still running (see the red message).', { error: true });
+  if (state.job) return toast('Wait for the current job to finish first.', { error: true });
+  const zone = $('#ad-dropzone');
+  try {
+    await ensureProject();
+    showUploadProgress(zone, `Adding ${files.length} image${files.length > 1 ? 's' : ''}…`, 0);
+    const res = await upload(`/api/projects/${state.project.id}/ad-assets${kind === 'logo' ? '?kind=logo' : ''}`, 'images', files, (p) => showUploadProgress(zone, p >= 1 ? 'Processing…' : `Uploading… ${Math.round(p * 100)}%`, p));
+    state.project.adAssets = res.adAssets;
+    for (const f of res.failed) toast(`${f.name}: ${f.error}`, { error: true });
+    if (res.added.length) toast(kind === 'logo' ? 'Logo added' : `Added ${res.added.length} photo${res.added.length > 1 ? 's' : ''}`);
+  } catch (err) {
+    toast(err.message, { error: true });
+  } finally {
+    showUploadProgress(zone, null);
+    $('#ad-file-input').value = '';
+    $('#ad-logo-input').value = '';
+    renderAdAssets();
+    updateAdState();
+  }
+}
+
+async function addStills() {
+  const btn = $('#ad-stills');
+  btn.disabled = true;
+  btn.textContent = 'Taking stills…';
+  try {
+    const p = await api(`/api/projects/${state.project.id}/ad-assets/stills`, { method: 'POST', body: { count: 6 } });
+    state.project = { ...state.project, ...p };
+    toast('Added stills from your videos');
+  } catch (err) {
+    toast(err.message, { error: true });
+  } finally {
+    btn.textContent = 'Use stills from my videos';
+    renderAdAssets();
+    updateAdState();
+  }
+}
+
+async function generateAds() {
+  const s = state.settings;
+  s.adInstructions = $('#ad-instructions').value;
+  saveSettings();
+  try {
+    await ensureProject();
+    await patchProject({ profile: state.profile });
+    const { jobId } = await api(`/api/projects/${state.project.id}/ads/generate`, {
+      method: 'POST',
+      body: {
+        business: s.business, businessCustom: s.businessCustom, profile: state.profile,
+        count: s.adCount, seconds: s.adSeconds, format: s.adFormat, theme: s.adTheme,
+        accent: s.adAccentOn ? s.adAccent : '', music: s.adMusic, musicLevel: s.musicLevel,
+        mode: aiOn() ? 'ai' : 'auto', instructions: aiOn() ? s.adInstructions : '',
+      },
+    });
+    state.adDrafts = {};
+    state.openAdEditors.clear();
+    pollJob(jobId, 'ads');
+  } catch (err) {
+    showJobError(err.message);
+  }
+}
+
+async function askAds(e) {
+  e.preventDefault();
+  const input = $('#ad-ask-input');
+  const request = input.value.trim();
+  if (!request || !state.project?.adPlan) return;
+  const which = $('#ad-ask-which').value;
+  try {
+    const { jobId } = await api(`/api/projects/${state.project.id}/ads/revise`, {
+      method: 'POST',
+      body: { request, adIndex: which === 'all' ? null : Number(which), mode: aiOn() ? 'ai' : 'auto' },
+    });
+    input.value = '';
+    state.project.adChat = [...(state.project.adChat || []), { who: 'you', text: which === 'all' ? request : `Ad ${Number(which) + 1}: ${request}` }];
+    state.adDrafts = {};
+    pollJob(jobId, 'ads-revise');
+  } catch (err) {
+    toast(err.message, { error: true });
+  }
+}
+
+function renderAdResults() {
+  const plan = state.project?.adPlan;
+  const renders = state.project?.adRenders || [];
+  const which = $('#ad-ask-which');
+  const prev = which.value;
+  which.replaceChildren(h('option', { value: 'all' }, 'All ads'), ...(plan?.ads || []).map((_, i) => h('option', { value: String(i) }, `Ad ${i + 1}`)));
+  if ([...which.options].some((o) => o.value === prev)) which.value = prev;
+
+  const chat = state.project?.adChat || [];
+  const msgs = chat.slice(-12).map((m) => h('div', { class: `msg ${m.who}${m.error ? ' error' : ''}` }, m.text));
+  if (state.job?.kind === 'ads-revise') msgs.push(h('div', { class: 'msg cutline pending' }, aiOn() ? 'The AI is working on it…' : 'Working on it…'));
+  const chatBox = $('#ad-chat');
+  chatBox.replaceChildren(...msgs);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  updateAdState();
+
+  const strategy = $('#ad-strategy');
+  strategy.replaceChildren();
+  if (plan?.source === 'ai' && plan.strategy) strategy.append(h('div', { class: 'strategy' }, h('b', {}, 'AI plan'), plan.strategy));
+  if (plan?.source === 'auto') strategy.append(h('div', { class: 'strategy muted' }, h('b', {}, 'Free mode'), 'Ads built from templates and your business details. Add your Claude key in Settings for ads written for this business.'));
+  if (plan?.musicNote) strategy.append(h('div', { class: 'notice' }, plan.musicNote));
+
+  const box = $('#ads');
+  if (!plan) {
+    box.replaceChildren(h('div', { class: 'empty' },
+      h('b', {}, state.job?.kind === 'ads' ? 'Making your ads…' : 'No ads yet'),
+      h('span', {}, state.job?.kind === 'ads' ? 'This can take a minute or two.' : 'Fill in the business details, add photos or a logo if you have them, and press Make ads.')));
+    return;
+  }
+  box.replaceChildren(h('div', { class: 'clips-grid' }, plan.ads.map((ad, i) => adCard(ad, renders[i], i, plan.format))));
+}
+
+function adCard(ad, rendered, i, format) {
+  const pid = state.project.id;
+  const busy = Boolean(state.job);
+  const editing = state.openAdEditors.has(i);
+  const postText = [ad.post_caption, (ad.hashtags || []).join(' ')].filter(Boolean).join('\n\n');
+  const ratio = { '9:16': '9 / 16', '1:1': '1 / 1', '4:5': '4 / 5' }[format] || '9 / 16';
+  const media = h('div', { class: 'clip-video', style: { aspectRatio: ratio } }, rendered
+    ? [h('video', { src: `/media/${pid}/ad-output/${rendered.file}`, poster: `/media/${pid}/ad-output/${rendered.thumb}`, controls: true, playsinline: true, preload: 'metadata' }),
+      h('span', { class: 'dur' }, fmtDuration(rendered.duration))]
+    : h('div', { class: 'clip-pending' }, busy ? 'Animating…' : h('div', {}, h('p', {}, 'Not rendered yet.'), h('br'),
+      h('button', { class: 'btn btn-sm', onclick: () => renderAdOne(i), disabled: !ffmpegOk() }, icon('play'), 'Render'))));
+  return h('article', { class: 'clip' }, media,
+    h('div', { class: 'clip-body' },
+      h('div', { class: 'clip-title' }, `${i + 1}. ${ad.title}`),
+      h('div', { class: 'badges' },
+        h('span', { class: 'badge style' }, themeLabel(ad.theme)),
+        ad.angle ? h('span', { class: 'badge' }, ad.angle) : null,
+        h('span', { class: 'badge' }, ad.music ? `♪ ${ad.music.name}` : 'No music')),
+      ad.why_it_works ? h('div', { class: 'clip-why' }, h('b', {}, 'Why: '), ad.why_it_works) : null,
+      h('div', { class: 'clip-actions' },
+        rendered ? h('a', { class: 'btn btn-sm btn-primary', href: `/media/${pid}/ad-output/${rendered.file}`, download: `${slug(state.project.name)}-ad-${i + 1}.mp4` }, icon('download'), 'MP4') : null,
+        postText ? h('button', { class: 'btn btn-sm', onclick: () => copyText(postText), title: 'Copy post caption + hashtags' }, icon('copy'), 'Caption') : null,
+        h('button', { class: 'btn btn-sm', 'aria-expanded': String(editing), onclick: () => {
+          editing ? state.openAdEditors.delete(i) : state.openAdEditors.add(i);
+          renderAdResults();
+        } }, icon('edit'), 'Edit')),
+      editing ? adEditor(ad, i, busy) : null));
+}
+
+function adEditor(ad, i, busy) {
+  const photos = (state.project.adAssets || []).filter((a) => a.kind === 'photo');
+  const themes = state.status?.ads?.themes || [];
+  const draft = (state.adDrafts[i] ??= structuredClone({
+    theme: ad.theme, accent: ad.accent || '', music: ad.music?.id || 'none',
+    scenes: ad.scenes.map((sc) => ({ ...sc, itemsText: (sc.items || []).join(', ') })),
+  }));
+  const bind = (obj, key) => (e) => { obj[key] = e.target.value; };
+  const themeAccent = () => themes.find((t) => t.id === draft.theme)?.accent || '#ffb03d';
+  return h('div', { class: 'clip-edit' },
+    h('label', {}, 'Look'),
+    h('select', { onchange: (e) => (draft.theme = e.target.value) }, themes.map((t) => h('option', { value: t.id, selected: t.id === draft.theme }, t.label))),
+    h('div', { class: 'accent-row' },
+      h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: Boolean(draft.accent), onchange: (e) => { draft.accent = e.target.checked ? (draft.accent || themeAccent()) : ''; } }), h('span'), 'Brand colour'),
+      h('input', { type: 'color', value: draft.accent || themeAccent(), oninput: (e) => (draft.accent = e.target.value), 'aria-label': 'Brand colour' })),
+    h('label', {}, 'Music'),
+    h('select', { onchange: (e) => (draft.music = e.target.value) },
+      h('option', { value: 'none', selected: draft.music === 'none' }, 'No music'),
+      state.tracks.map((t) => h('option', { value: t.id, selected: t.id === draft.music }, t.name))),
+    h('label', {}, 'Scenes'),
+    h('div', { class: 'scene-list' }, draft.scenes.map((sc) => {
+      const row = h('div', { class: `scene-edit${sc.removed ? ' removed' : ''}` },
+        h('span', { class: 'role', style: { background: SCENE_COLORS[sc.type] } }, SCENE_LABELS[sc.type] || sc.type),
+        h('input', { value: sc.headline || '', placeholder: 'Headline', maxlength: '90', oninput: bind(sc, 'headline') }),
+        h('button', { class: 'icon-btn', type: 'button', title: sc.removed ? 'Put back' : 'Remove scene', onclick: () => {
+          sc.removed = !sc.removed;
+          row.classList.toggle('removed', sc.removed);
+          row.querySelector('.icon-btn').replaceChildren(icon(sc.removed ? 'refresh' : 'trash'));
+        } }, icon(sc.removed ? 'refresh' : 'trash')),
+        h('input', { class: 'full', value: sc.subline || '', placeholder: 'Small line (optional)', maxlength: '90', oninput: bind(sc, 'subline') }),
+        sc.type === 'features' || sc.type === 'cta'
+          ? h('input', { class: 'full', value: sc.itemsText, placeholder: sc.type === 'cta' ? 'Button text, e.g. Book now' : 'Points, separated by commas', maxlength: '180', oninput: bind(sc, 'itemsText') })
+          : null,
+        h('div', { class: 'row' },
+          h('select', { title: 'Photo behind this scene', onchange: (e) => (sc.photo = Number(e.target.value)) },
+            h('option', { value: '-1', selected: sc.photo < 0 }, 'No photo (animated background)'),
+            photos.map((_, k) => h('option', { value: String(k), selected: sc.photo === k }, `Photo ${k + 1}`))),
+          h('input', { type: 'number', min: '1.2', max: '6', step: '0.1', value: String(sc.duration), title: 'Seconds', oninput: (e) => (sc.duration = Number(e.target.value)) })));
+      return row;
+    })),
+    h('button', { class: 'btn btn-sm btn-primary', disabled: busy || !ffmpegOk(), onclick: () => renderAdOne(i) }, icon('refresh'), 'Save and re-render'));
+}
+
+async function renderAdOne(i) {
+  const draft = state.adDrafts[i];
+  const ad = draft ? {
+    theme: draft.theme, accent: draft.accent, music: draft.music,
+    scenes: draft.scenes.filter((sc) => !sc.removed).map(({ itemsText, removed, ...sc }) => ({ ...sc, items: String(itemsText || '').split(',').map((x) => x.trim()).filter(Boolean) })),
+  } : {};
+  if (draft && !ad.scenes.length) return toast('Keep at least one scene.', { error: true });
+  try {
+    const { jobId } = await api(`/api/projects/${state.project.id}/ads/${i}/render`, { method: 'POST', body: { ad } });
+    state.adDrafts[i] = null;
+    pollJob(jobId, 'ad-render');
+  } catch (err) {
+    toast(err.message, { error: true });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -767,6 +1084,7 @@ function wire() {
       state.profile[input.dataset.profile] = input.value;
       store.set('profile', state.profile);
       renderProfileSummary();
+      updateAdState();
       clearTimeout(profileTimer);
       profileTimer = setTimeout(() => patchProject({ profile: state.profile }), 600);
     });
@@ -777,7 +1095,7 @@ function wire() {
 
   const dz = $('#dropzone');
   $('#file-input').addEventListener('change', (e) => handleVideoFiles(e.target.files));
-  for (const [zone, handler] of [[dz, handleVideoFiles], [$('#music-drop'), handleMusicFiles]]) {
+  for (const [zone, handler] of [[dz, handleVideoFiles], [$('#music-drop'), handleMusicFiles], [$('#ad-dropzone'), handleAdImages]]) {
     ['dragenter', 'dragover'].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add('drag'); }));
     ['dragleave', 'drop'].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.remove('drag'); }));
     zone.addEventListener('drop', (e) => handler(e.dataTransfer.files));
@@ -792,6 +1110,27 @@ function wire() {
 
   $('#btn-generate').addEventListener('click', generate);
   $('#ask-form').addEventListener('submit', ask);
+
+  // Ads page
+  $('#ad-biz-type').addEventListener('change', (e) => {
+    state.settings.business = e.target.value;
+    saveSettings();
+    patchProject({ business: e.target.value });
+  });
+  $('#ad-file-input').addEventListener('change', (e) => handleAdImages(e.target.files));
+  $('#ad-logo-input').addEventListener('change', (e) => handleAdImages(e.target.files, 'logo'));
+  $('#ad-stills').addEventListener('click', addStills);
+  $('#ad-theme-select').addEventListener('change', (e) => setSetting('adTheme')(e.target.value));
+  $('#ad-music-select').addEventListener('change', (e) => setSetting('adMusic')(e.target.value));
+  $('#ad-accent').addEventListener('input', (e) => {
+    setSetting('adAccent')(e.target.value);
+    $('#ad-accent-on').checked = true;
+    setSetting('adAccentOn')(true);
+  });
+  $('#ad-accent-on').addEventListener('change', (e) => setSetting('adAccentOn')(e.target.checked));
+  $('#ad-instructions').addEventListener('change', (e) => setSetting('adInstructions')(e.target.value));
+  $('#ad-generate').addEventListener('click', generateAds);
+  $('#ad-ask-form').addEventListener('submit', askAds);
 
   const nameInput = $('#project-name');
   nameInput.addEventListener('keydown', (e) => e.key === 'Enter' && nameInput.blur());

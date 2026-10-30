@@ -5,7 +5,7 @@ import { getBusiness, getPlatform } from './businesses.js';
 import { parseRequest } from './commands.js';
 import { analyzeSignals, frameAt, pool } from './ffmpeg.js';
 import { autoPlan, clipDuration, fitLength, makeRng, normalizeAiPlan, sanitizeClip } from './planner.js';
-import { MOODS, MUSIC_DIR, getTrack, listTracks, pickTrack } from './music.js';
+import { MOODS, MUSIC_DIR, findTrack, getTrack, listTracks, pickTrack } from './music.js';
 import { STYLE_IDS, getStyle, stylesForClips } from './styles.js';
 import { renderClip } from './render.js';
 import { loadProject, projectDir, updateProject } from './store.js';
@@ -13,7 +13,7 @@ import { transcribe, transcriptionConfigured } from './transcribe.js';
 
 // Claude accepts at most 100 images per request; stay well under it.
 const MAX_FRAMES = Math.min(90, Number(process.env.AI_MAX_FRAMES || 40));
-const PROFILE_FIELDS = ['name', 'services', 'location', 'offer', 'audience', 'notes'];
+const PROFILE_FIELDS = ['name', 'services', 'location', 'offer', 'audience', 'contact', 'review', 'notes'];
 
 export function cleanProfile(p = {}) {
   return Object.fromEntries(PROFILE_FIELDS.map((k) => [k, String(p[k] || '').trim().slice(0, 300)]));
@@ -167,8 +167,14 @@ function withMusic(clip, track, videos, platform, target) {
   };
 }
 
-function addChat(p, who, text) {
-  p.chat = [...(p.chat || []), { who, text, at: new Date().toISOString() }].slice(-60);
+function addChat(p, who, text, error = false) {
+  p.chat = [...(p.chat || []), { who, text, at: new Date().toISOString(), ...(error ? { error: true } : {}) }].slice(-60);
+}
+
+/** True if a revised clip from the AI differs from the current one in anything that renders. */
+function clipChangedFrom(old, item) {
+  const pick = (c) => JSON.stringify([c.hook_text, c.cta_text, c.style, (c.segments || []).map((s) => [Number(s.start).toFixed(1), Number(s.end).toFixed(1), s.caption, Number(s.speed)])]);
+  return pick(old) !== pick(item) || (item.music_track && item.music_track !== 'keep') || Math.abs((item.target_seconds || 0) - (old.targetSeconds || 0)) >= 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -309,12 +315,8 @@ const toZero = (s) => ({
   ...(s.compare_video ? { compare_video: Math.round(Number(s.compare_video)) - 1 } : {}),
 });
 
-function findTrack(tracks, name) {
-  const n = String(name || '').toLowerCase().trim();
-  return tracks.find((t) => t.name.toLowerCase() === n) || tracks.find((t) => n && (t.name.toLowerCase().includes(n) || n.includes(t.name.toLowerCase()))) || null;
-}
 
-export async function revise(projectId, { request, clipIndex }, ctx) {
+export async function revise(projectId, { request, clipIndex, mode }, ctx) {
   const project = await loadProject(projectId);
   if (!project?.plan) throw new Error('Generate clips first, then ask for changes.');
   const text = String(request || '').trim().slice(0, 1000);
@@ -328,7 +330,8 @@ export async function revise(projectId, { request, clipIndex }, ctx) {
   const business = getBusiness(plan.business, project.businessCustom);
   const profile = cleanProfile(project.profile);
   const tracks = await listTracks();
-  const useAi = aiConfigured() && project.settings?.mode !== 'auto';
+  // Follow the engine chosen in Settings now, not the one the clips were made with.
+  const useAi = aiConfigured() && mode !== 'auto';
   const { videos, speech } = await prepareVideos(project, ctx, { frames: useAi, transcripts: project.settings?.speechSubtitles ? 'required' : useAi });
   let ropts = renderOptions(project.settings || {});
   const newClips = plan.clips.map((c) => ({ ...c }));
@@ -342,17 +345,26 @@ export async function revise(projectId, { request, clipIndex }, ctx) {
     let res;
     try {
       res = await reviseEdit({ videos, business, profile, platform, plan, request: text, clipNumber: focus !== null ? focus + 1 : null, tracks, hasMusic: tracks.length > 0 });
+    } catch (err) {
+      await updateProject(projectId, (p) => addChat(p, 'cutline', `That didn't work: ${err.message}`, true));
+      throw err;
     } finally {
       clearInterval(ticker);
     }
     reply = res.data.reply;
+    const unusable = [];
     for (const item of res.data.clips || []) {
       const i = Math.round(Number(item.clip_number)) - 1;
-      if (!item.changed || !newClips[i]) continue;
+      // Trust the content over the flag: a clip that came back different counts as changed.
+      if (!newClips[i] || !(item.changed || clipChangedFrom(newClips[i], item))) continue;
+      if (focus !== null && i !== focus) continue;
       const old = newClips[i];
       const { clip_number: _n, changed: _c, target_seconds: targetSecs, music_track: musicName, ...fields } = item;
       let clip = sanitizeClip({ ...old, ...fields, segments: (fields.segments || []).map(toZero) }, videos, platform.maxSeconds);
-      if (!clip.segments.length) continue;
+      if (!clip.segments.length) {
+        unusable.push(i + 1);
+        continue;
+      }
       const target = Math.max(8, Math.min(platform.maxSeconds, Number(targetSecs) || old.targetSeconds || plan.targetSeconds));
       let track = old.music?.id ? await getTrack(old.music.id) : null;
       if (musicName === 'none') track = null;
@@ -360,6 +372,9 @@ export async function revise(projectId, { request, clipIndex }, ctx) {
       newClips[i] = withMusic(clip, track, videos, platform, target);
       changed.push(i);
     }
+    console.log(`[revise] "${text}" → changed clips: ${changed.map((i) => i + 1).join(', ') || 'none'}`);
+    if (unusable.length) reply += ` (Clip ${unusable.join(' and ')} came back with no usable shots, so I kept the old version.)`;
+    if (!changed.length && !unusable.length) reply += ' (No clip was actually changed. Try saying exactly what to change, e.g. "clip 1: open on the shiny wheel and make it 20 seconds".)';
   } else {
     const cmd = parseRequest(text, plan, tracks);
     reply = cmd.reply;

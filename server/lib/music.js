@@ -29,6 +29,13 @@ export async function listTracks() {
   return readIndex();
 }
 
+/** Find a track by name (exact, then partial), as named by the AI or the user. */
+export function findTrack(tracks, name) {
+  const n = String(name || '').toLowerCase().trim();
+  if (!n) return null;
+  return tracks.find((t) => t.name.toLowerCase() === n) || tracks.find((t) => t.name.toLowerCase().includes(n) || n.includes(t.name.toLowerCase())) || null;
+}
+
 export async function getTrack(id) {
   return (await readIndex()).find((t) => t.id === id) || null;
 }

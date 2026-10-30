@@ -8,11 +8,11 @@ import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 import { cleanOnScreenText } from './subtitles.js';
 
 const FONTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../assets/fonts');
-const HEAVY = 'Cutline Inter ExtraBold';
-const BOLD = 'Cutline Inter Bold';
+export const HEAVY = 'Cutline Inter ExtraBold';
+export const BOLD = 'Cutline Inter Bold';
 let fontsLoaded = false;
 
-function loadFonts() {
+export function loadFonts() {
   if (fontsLoaded) return;
   GlobalFonts.registerFromPath(path.join(FONTS_DIR, 'Inter-ExtraBold.otf'), HEAVY);
   GlobalFonts.registerFromPath(path.join(FONTS_DIR, 'Inter-Bold.otf'), BOLD);

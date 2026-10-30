@@ -75,7 +75,7 @@ function splitChain(afterLabel, beforeLabel, out, seg, tmA, tmB, dur) {
 }
 
 /** Loudness-match music to roughly -20 dB RMS so quiet and loud tracks sit the same. */
-function musicGain(track) {
+export function musicGain(track) {
   return clamp(10 ** ((-20 - (track.loudness ?? -20)) / 20), 0.3, 3);
 }
 

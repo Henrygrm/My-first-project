@@ -10,9 +10,10 @@ The first time, macOS may ask whether to open it: right-click **Start Cutline** 
 
 You need Node.js 20.12+ and FFmpeg (`brew install node ffmpeg`).
 
-## The three pages
+## The pages
 
 - **Home.** Pick the business, fill in its details (name, services, suburb, offer, customers), drop in footage, choose platform, length, number of clips, style and music, then **Generate**. Finished clips show with their angle and why they should work. Download the MP4, copy the post caption, or open **Edit** to change text or shots by hand. The bar at the top takes plain-English changes for all clips or one clip.
+- **Ads.** Animated (motion-graphics) video ads with no filming needed. Fill in the business details, optionally add photos, a logo, or **Use stills from my videos**, pick the format (9:16, 1:1 or 4:5), length (10–30 s), number of ads, look and music, then **Make ads**. Each ad is a storyboard of animated scenes: a hook, photos with caption boxes, a ticked feature list, a pulsing offer badge, a counting number, a 5-star review and a call to action with a button, with transitions and scene changes on the music's beat. Six looks: Bold, Clean, Luxury, Playful, Neon, Fresh, plus your brand colour. With a Claude key, Claude looks at the photos and logo and writes each ad around the business (and never invents offers, reviews or numbers you didn't give it). Without a key, ads are built from templates. Edit any scene's text, photo or length by hand, or type changes into the bar.
 - **Music.** Add MP3s and see every song already added, with its tempo, length and mood (Energetic / Chill / Build-up, which decides which clips use it). Play, change the mood, or remove. **Music volume** sets how loud music sits against the footage's own sound.
 - **Settings.** Paste the Claude API key (saved to `.env` on this computer, never sent to the browser), check it works, pick the model, switch between Claude AI and free auto-edit, and set framing, footage sound, on-screen text and spoken subtitles (needs an OpenAI key).
 

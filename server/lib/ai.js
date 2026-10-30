@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
+import { AD_THEMES, ANIMATIONS, SCENE_TYPES } from './adRender.js';
 import { STYLES } from './styles.js';
 
 export const MODELS = {
@@ -206,6 +207,8 @@ function businessBlock(business, profile) {
     p.location ? `Location: ${p.location}` : null,
     p.offer ? `Current offer: ${p.offer}` : null,
     p.audience ? `Their customers: ${p.audience}` : null,
+    p.contact ? `Contact / where to book: ${p.contact}` : null,
+    p.review ? `A real customer review: "${p.review}"` : null,
     p.notes ? `Notes: ${p.notes}` : null,
     '',
     'What usually performs for this industry (priority order):',
@@ -347,11 +350,145 @@ ${JSON.stringify(current, null, 1)}
 THE CREATOR'S REQUEST${clipNumber ? ` (about clip ${clipNumber})` : ''}:
 "${request}"
 
-Apply the request. Return every clip in order. Clips the request does not affect must come back unchanged with changed=false. Keep anything the creator did not ask to change. If the request needs footage that does not exist, say so in the reply and do the closest sensible thing.
+Apply the request:
+- ${clipNumber ? `Change only clip ${clipNumber}.` : 'If the request names clips, change those; otherwise apply it to every clip.'}
+- Make the change clearly visible in the finished video. A tweak the creator would not notice does not count.
+- Set changed=true on every clip you modify. Return every clip in order; clips you leave alone come back exactly as given with changed=false.
+- Keep everything the creator did not ask to change, including the length (target_seconds = the current length_seconds unless asked).
+- To use different shots, pick new moments from the footage below (video numbers are 1-based, times are seconds in that video).
+- If something is impossible (e.g. footage that does not exist), say so in the reply and do the closest sensible thing.
+- The reply says exactly what you changed, in plain words.
 
 The footage follows so you can choose different moments if asked.`,
   }];
   content.push(...(await footageContent(videos)));
 
   return structuredCall({ system: editorSystem(platform, hasMusic), content, schema: RevisionSchema, effort: 'medium' });
+}
+
+// ---------------------------------------------------------------------------
+// Animated ads
+// ---------------------------------------------------------------------------
+
+const AdSceneSchema = z.object({
+  type: z.string().describe(`One of: ${SCENE_TYPES.join(', ')}`),
+  headline: z.string().describe('Main on-screen text, max 7 words, no emoji. For "stat" include the number; for "review" the exact quote'),
+  subline: z.string().describe('Smaller supporting line, max 8 words, or empty'),
+  items: z.array(z.string()).describe('"features": 2–4 short bullet points (max 5 words each). "cta": one button label like "Book now". Otherwise empty'),
+  photo: z.number().describe('1-based photo number shown behind this scene, or 0 for the animated background'),
+  animation: z.string().describe(`How the headline enters. One of: ${ANIMATIONS.join(', ')}`),
+  duration: z.number().describe('Seconds on screen, 1.5–5'),
+});
+
+const AdSchema = z.object({
+  title: z.string().describe('Short name for this ad'),
+  angle: z.string().describe('The persuasion angle, e.g. "Offer", "Trust", "Problem → solution", "Showcase", "Social proof"'),
+  why_it_works: z.string().describe('One or two sentences: why this ad should get attention and customers for THIS business'),
+  theme: z.string().describe(`Visual look. One of: ${Object.keys(AD_THEMES).join(', ')}`),
+  accent_color: z.string().describe('Brand accent colour as #rrggbb if known from the logo or photos, else empty string'),
+  music_track: z.string().describe('Exact name of a song from the MUSIC LIBRARY, or "auto" if none is given'),
+  music_mood: z.string().describe('One of: energetic, chill, build'),
+  scenes: z.array(AdSceneSchema).describe('Scenes in order. Start with a scroll-stopping hook, end with a "cta" scene'),
+  post_caption: z.string().describe('Ready-to-post caption for this ad, may include emoji'),
+  hashtags: z.array(z.string()),
+});
+
+const AdPlanSchema = z.object({
+  strategy: z.string().describe('2–3 sentences: what will make this business stand out in an ad, and how the ads differ'),
+  ads: z.array(AdSchema),
+});
+
+const themeBriefs = () => Object.entries(AD_THEMES).map(([id, t]) => `- "${id}": ${t.brief}`).join('\n');
+
+function adSystem() {
+  return `You are a performance-marketing creative director who makes short animated (motion-graphics) video ads for local businesses. Your storyboards are rendered exactly as written by an animation engine, so be precise.
+
+${PLAYBOOK}
+
+How these ads work:
+- Each scene is one screen: big animated headline, optional small subline, optional photo behind it.
+- Scene types: "hook" (big text, opener), "photo" (a photo with a caption box; needs a photo), "features" (headline plus 2–4 ticked bullet points), "offer" (big pulsing badge with the deal), "stat" (a big number that counts up), "review" (5 stars and a customer quote), "cta" (call to action with a button; always the last scene).
+- Text must be short and readable in under a second: headlines max 7 words, no emoji, no hashtags.
+- Be specific to this business: use its name, suburb, services and offer. Never write vague filler like "Quality service".
+- NEVER invent facts: no made-up reviews, prices, discounts, statistics, years in business or guarantees. Only use an "offer" scene if an offer is given, a "review" scene if a real review is given, and a "stat" scene if a real number is given.
+- Use photos where they help (the money shot, the result); a photo can appear more than once.
+- Pick the theme that suits the business and the angle; make each ad clearly different (angle, structure, theme).
+
+Visual themes:
+${themeBriefs()}`;
+}
+
+async function imageContent(photos, logo) {
+  const content = [];
+  for (const [i, p] of photos.entries()) {
+    content.push({ type: 'text', text: `Photo ${i + 1}:` });
+    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: (await fs.readFile(p)).toString('base64') } });
+  }
+  if (logo) {
+    content.push({ type: 'text', text: 'The business logo (shown automatically in every ad):' });
+    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: (await fs.readFile(logo)).toString('base64') } });
+  }
+  return content;
+}
+
+export async function planAds(p) {
+  const { business, profile, count, seconds, format, theme, accent, instructions, photos, logo, tracks } = p;
+  const content = [{
+    type: 'text',
+    text: `${businessBlock(business, profile)}
+
+DELIVERABLE: ${count} animated ad${count > 1 ? 's' : ''}, each about ${seconds} seconds (scene durations should add up to that), format ${format}.
+${theme !== 'auto' ? `Use the "${theme}" theme for every ad.` : 'Choose the best theme for each ad.'}${accent ? ` The brand colour is ${accent}; use it as accent_color.` : ''}
+PHOTOS: ${photos.length ? `${photos.length} (shown below, numbered from 1)` : 'none, so use the animated background (photo = 0) in every scene'}.
+${tracks.length ? `\nMUSIC LIBRARY (pick one song per ad by its exact name; the mood label was set by the creator. Use a different song per ad when there are enough):\n${libraryList(tracks)}\n` : ''}${instructions ? `\nINSTRUCTIONS FROM THE CREATOR (follow these closely):\n${instructions}\n` : ''}
+First decide what will make people stop and act for THIS business, then write ${count > 1 ? `${count} ads with different angles` : 'the ad'}.`,
+  }];
+  content.push(...(await imageContent(photos, logo)));
+  return structuredCall({ system: adSystem(), content, schema: AdPlanSchema, effort: 'high' });
+}
+
+const AdRevisionSchema = z.object({
+  reply: z.string().describe('One or two sentences to the creator saying exactly what you changed (or why something is not possible)'),
+  ads: z.array(AdSchema.extend({
+    ad_number: z.number().describe('1-based number of the existing ad'),
+    changed: z.boolean().describe('true if anything about this ad changed'),
+    target_seconds: z.number().describe('Length of this ad in seconds'),
+  })).describe('Every existing ad, in order, revised or unchanged'),
+});
+
+export async function reviseAds(p) {
+  const { business, profile, plan, request, adNumber, tracks, format, photos, logo } = p;
+  const current = plan.ads.map((a, i) => ({
+    ad_number: i + 1,
+    title: a.title,
+    angle: a.angle,
+    theme: a.theme,
+    accent_color: a.accent || '',
+    music: a.music ? a.music.name : 'none',
+    length_seconds: a.targetSeconds,
+    scenes: a.scenes.map((s) => ({ type: s.type, headline: s.headline, subline: s.subline, items: s.items, photo: s.photo + 1, animation: s.animation, duration: s.duration })),
+  }));
+  const content = [{
+    type: 'text',
+    text: `${businessBlock(business, profile)}
+
+FORMAT: ${format}. PHOTOS: ${photos.length ? `${photos.length} (shown below, numbered from 1)` : 'none'}.
+MUSIC LIBRARY:
+${tracks.length ? libraryList(tracks) : 'empty'}
+For music_track use "keep" to keep the current song, "none" for no music, or a song's exact name.
+
+THE CURRENT ADS:
+${JSON.stringify(current, null, 1)}
+
+THE CREATOR'S REQUEST${adNumber ? ` (about ad ${adNumber})` : ''}:
+"${request}"
+
+Apply the request:
+- ${adNumber ? `Change only ad ${adNumber}.` : 'If the request names ads, change those; otherwise apply it to every ad.'}
+- Make the change clearly visible. Set changed=true on every ad you modify; ads you leave alone come back exactly as given with changed=false.
+- Keep everything the creator did not ask to change, including the length (target_seconds = length_seconds unless asked).
+- The reply says exactly what you changed, in plain words.`,
+  }];
+  content.push(...(await imageContent(photos, logo)));
+  return structuredCall({ system: adSystem(), content, schema: AdRevisionSchema, effort: 'medium' });
 }

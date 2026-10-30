@@ -78,6 +78,43 @@ function revisionFor(text) {
   return { reply: `Mock: changed clip ${focus} for "${request}".`, clips };
 }
 
+// Animated ads: loose labels on purpose (the app must normalise them).
+function adPlanFor(text) {
+  const count = Number(text.match(/DELIVERABLE: (\d+) animated ad/)?.[1] || 1);
+  const photos = Number(text.match(/PHOTOS: (\d+)/)?.[1] || 0);
+  const library = [...text.matchAll(/^- "(.+?)": ([\w-]+), /gm)].map((m) => ({ name: m[1], mood: m[2] }));
+  const song = (library.find((t) => t.mood === 'energetic') || library[0])?.name || 'auto';
+  const ads = Array.from({ length: count }, (_, k) => ({
+    title: `Mock ad ${k + 1}`, angle: k ? 'Trust' : 'Offer', why_it_works: 'Mock: the offer is specific.',
+    theme: k ? 'Luxury' : 'Neon', accent_color: k ? '' : 'FF3366', music_track: song, music_mood: 'energetic',
+    scenes: [
+      { type: 'Hook', headline: 'Your car deserves this 🔥', subline: 'Mock subline', items: [], photo: photos ? 1 : 0, animation: 'Words', duration: 2 },
+      { type: 'features', headline: 'Why us', subline: '', items: ['Mobile', 'Insured', 'Fast'], photo: 0, animation: 'pop', duration: 3 },
+      { type: 'photo', headline: 'Bad photo number', subline: '', items: [], photo: 99, animation: 'slide', duration: 2 },
+      { type: 'offer', headline: '20% off this week', subline: '', items: [], photo: 0, animation: 'pop', duration: 2 },
+      { type: 'CTA', headline: 'Book now', subline: 'Parramatta', items: ['Link in bio'], photo: 0, animation: 'pop', duration: 2 },
+    ],
+    post_caption: 'Mock ad caption ✨', hashtags: ['mock', '#ads'],
+  }));
+  return { strategy: 'Mock ad strategy.', ads };
+}
+
+function adRevisionFor(text) {
+  const current = JSON.parse(text.match(/THE CURRENT ADS:\n([\s\S]+?)\n\nTHE CREATOR'S REQUEST/)[1]);
+  const focus = Number(text.match(/THE CREATOR'S REQUEST \(about ad (\d+)\)/)?.[1] || 1);
+  const request = text.match(/THE CREATOR'S REQUEST[^\n]*:\n"([\s\S]*?)"\n/)[1];
+  const ads = current.map((a) => {
+    const changed = a.ad_number === focus;
+    return {
+      ad_number: a.ad_number, changed, title: a.title, angle: a.angle, why_it_works: 'Mock', theme: changed ? 'clean' : a.theme,
+      accent_color: a.accent_color, music_track: changed && /no music/i.test(request) ? 'none' : 'keep', music_mood: 'chill',
+      scenes: changed ? [{ ...a.scenes[0], headline: 'Revised ad' }, a.scenes.at(-1)] : a.scenes,
+      post_caption: 'Mock', hashtags: [], target_seconds: a.length_seconds,
+    };
+  });
+  return { reply: `Mock: changed ad ${focus}.`, ads };
+}
+
 function sse(res, event, data) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
@@ -111,7 +148,9 @@ export function startMock(port = 4555, { rejectFallbacks = false } = {}) {
 
       const props = Object.keys(body.output_config?.format?.schema?.properties || {});
       const text = body.messages[0].content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-      const out = props.includes('reply') ? revisionFor(text) : planFor(text);
+      const out = props.includes('reply')
+        ? (props.includes('ads') ? adRevisionFor(text) : revisionFor(text))
+        : props.includes('ads') ? adPlanFor(text) : planFor(text);
       const json = JSON.stringify(out);
 
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'request-id': 'req_mock' });
