@@ -18,7 +18,13 @@ fi
 echo "  Installing anything new…"
 npm install --no-audit --no-fund || { echo "  npm install failed. See the message above."; read -r -p "  Press Enter to close."; exit 1; }
 
-(sleep 4; open "http://127.0.0.1:3000") &
+# Open the browser only once Cutline answers (starting can take a minute).
+(for i in $(seq 1 180); do
+  curl -s -o /dev/null http://127.0.0.1:3000/api/status && break
+  sleep 1
+done
+open "http://127.0.0.1:3000") &
 echo ""
+echo "  Starting… the site opens by itself when it is ready (up to a minute)."
 echo "  Leave this window open while you use Cutline. Close it to stop Cutline."
 npm start
