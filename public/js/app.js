@@ -4,7 +4,7 @@ import { RECIPES } from '/engine/recipes.js';
 
 // Must match package.json. If the server reports a different version, an
 // old copy of Cutline is still running and new features won't work.
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.1.0';
 
 const ROLE_COLORS = { hook: '#ffb03d', setup: '#6aa8ff', process: '#6aa8ff', reveal: '#3ddc97', payoff: '#3ddc97', cta: '#c79bff' };
 const DEFAULTS = {
@@ -103,7 +103,7 @@ function renderAlerts() {
 
 function route() {
   const name = location.hash.replace(/^#\/?/, '') || 'home';
-  const page = ['home', 'ads', 'clients', 'music', 'settings'].includes(name) ? name : 'home';
+  const page = ['home', 'ads', 'requests', 'clients', 'music', 'settings'].includes(name) ? name : 'home';
   $$('.page').forEach((p) => (p.hidden = p.id !== `page-${page}`));
   $$('.nav a').forEach((a) => a.classList.toggle('active', a.dataset.page === page));
   if (page === 'music') renderMusicPage();
@@ -111,6 +111,7 @@ function route() {
   if (page === 'home') renderHome();
   if (page === 'ads') renderAds();
   if (page === 'clients') renderClients();
+  if (page === 'requests') renderRequests();
 }
 
 // ---------------------------------------------------------------------------
@@ -1439,6 +1440,133 @@ async function handleMusicFiles(files) {
 }
 
 // ---------------------------------------------------------------------------
+// Google Form requests
+// ---------------------------------------------------------------------------
+
+const REQ_STATUS = {
+  waiting: ['Waiting for you', 'warn'], queued: ['In the queue', 'info'], preparing: ['Getting files', 'info'], making: ['Making videos', 'info'],
+  done: ['Videos ready', 'good'], error: ['Problem', 'bad'], dismissed: ['Dismissed', 'muted'],
+};
+const ASPECT_NAMES = { '9:16': 'Vertical', '4:5': 'Feed', '1:1': 'Square', '16:9': 'Landscape' };
+
+async function loadRequests() {
+  try {
+    state.intake = await api('/api/intake');
+  } catch {
+    state.intake = null;
+  }
+  const waiting = (state.intake?.requests || []).filter((r) => ['waiting', 'error'].includes(r.status)).length;
+  $('#nav-req-count').textContent = waiting ? String(waiting) : '';
+  return state.intake;
+}
+
+async function renderRequests() {
+  const it = await loadRequests();
+  if (!it) return;
+  const tag = $('#req-tag');
+  const okConn = it.configured && !it.lastError && it.lastCheck;
+  tag.className = `tag ${okConn ? 'on' : 'off'}`;
+  tag.textContent = !it.configured ? 'Not connected' : it.lastError ? 'Problem' : it.lastCheck ? 'Connected' : 'Not checked yet';
+  const st = $('#req-status');
+  st.className = `small ${it.lastError ? 'bad' : 'muted'}`;
+  st.textContent = !it.configured ? 'Connect your Google Form and new requests turn into videos automatically. Follow the steps below.'
+    : it.lastError ? it.lastError
+      : it.lastCheck ? `"${it.formTitle || 'Your form'}" · checked ${timeAgo(it.lastCheck)} · checks every ${it.checkEveryMinutes} min while Cutline is open.` : 'Saved. Click Check now.';
+  if (document.activeElement !== $('#req-url')) $('#req-url').value = it.url || '';
+  $('#req-key').placeholder = it.key ? `Saved: ${it.key}` : 'The long code from the Apps Script log';
+  $('#req-auto').checked = it.auto;
+  $('#req-voice').checked = it.voiceover;
+  if (document.activeElement !== $('#req-limit')) $('#req-limit').value = it.dailyLimit;
+  seg($('#req-mode-seg'), [['ai', `Claude AI${it.ai ? '' : ' (no key)'}`], ['auto', 'Free (no AI)']], it.mode, (v) => saveIntake({ mode: v }));
+  for (const id of ['req-url', 'req-key', 'req-save', 'req-disconnect', 'req-auto', 'req-voice', 'req-limit']) $(`#${id}`).disabled = !it.editable;
+  $('#req-disconnect').disabled = !it.editable || !it.configured;
+  $('#req-check').disabled = !it.configured;
+  $('#req-guide').open = !it.configured;
+  $('.req-setup').classList.toggle('first', !it.configured);
+
+  const list = it.requests.filter((r) => r.status !== 'dismissed' || state.showDismissed);
+  $('#req-count').textContent = it.requests.length ? String(it.requests.length) : '';
+  const box = $('#req-list');
+  if (!list.length) {
+    box.replaceChildren(h('div', { class: 'panel req-empty' },
+      icon('inbox'),
+      h('p', {}, it.configured ? 'No requests yet. When a client fills in your form, it shows up here and Cutline starts making their videos.' : 'Form requests will show up here once your Google Form is connected.'),
+      it.formUrl ? h('button', { class: 'btn btn-sm', type: 'button', onclick: async () => { await copyText(it.formUrl); toast('Form link copied: send it to your clients'); } }, icon('copy'), 'Copy the form link for clients') : null));
+  } else {
+    box.replaceChildren(...[
+      it.formUrl ? h('div', { class: 'req-formlink' }, h('span', { class: 'muted small' }, 'Link for clients:'), h('a', { href: it.formUrl, target: '_blank', rel: 'noopener', class: 'small' }, it.formUrl.replace(/^https:\/\//, '').slice(0, 48) + '…'), h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: async () => { await copyText(it.formUrl); toast('Form link copied'); } }, icon('copy'), 'Copy')) : null,
+      ...list.map(requestCard)].filter(Boolean));
+  }
+  clearTimeout(state.reqTimer);
+  if (location.hash.startsWith('#/requests')) state.reqTimer = setTimeout(() => location.hash.startsWith('#/requests') && renderRequests(), it.requests.some((r) => ['queued', 'preparing', 'making'].includes(r.status)) ? 3000 : 20000);
+}
+
+function requestCard(r) {
+  const [statusLabel, tone] = REQ_STATUS[r.status] || [r.status, 'muted'];
+  const s = r.summary;
+  const label = (list, id) => (state.status?.ads?.[list] || []).find((x) => x.id === id)?.label || id;
+  const facts = [
+    s.objective !== 'auto' ? label('objectives', s.objective) : null,
+    `${s.seconds}s`,
+    s.formats.map((f) => ASPECT_NAMES[f] || f).join(' + '),
+    s.direction !== 'auto' ? label('directions', s.direction) : null,
+    `${s.count} version${s.count > 1 ? 's' : ''}`,
+    [s.photos ? `${s.photos} photo${s.photos === 1 ? '' : 's'}` : 'no photos sent', s.logo ? 'logo' : null, s.clips ? `${s.clips} clip${s.clips > 1 ? 's' : ''}` : null].filter(Boolean).join(' + '),
+    s.voiceover ? 'voiceover' : null,
+  ].filter(Boolean);
+  const busy = ['queued', 'preparing', 'making'].includes(r.status);
+  const act = async (path, msg) => {
+    try {
+      await api(`/api/intake/requests/${r.id}/${path}`, { method: 'POST' });
+      if (msg) toast(msg);
+      renderRequests();
+    } catch (err) {
+      toast(err.message, { error: true });
+    }
+  };
+  return h('div', { class: `panel req-card req-${r.status}` },
+    h('div', { class: 'req-top' },
+      h('div', {}, h('b', {}, r.name), h('div', { class: 'muted small' }, [r.email, `sent ${timeAgo(r.submittedAt)}`, s.deadline ? `needed by ${new Date(s.deadline).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : null].filter(Boolean).join(' · '))),
+      h('span', { class: `badge qa ${tone}` }, statusLabel)),
+    h('div', { class: 'badges' }, facts.map((f) => h('span', { class: 'badge' }, f))),
+    busy && r.stage ? h('div', { class: 'job' }, h('div', { class: 'job-top' }, h('span', {}, r.stage), h('span', {}, r.progress != null ? `${Math.round(r.progress * 100)}%` : '')), h('div', { class: 'bar' }, h('i', { style: { width: `${Math.round((r.progress || 0) * 100)}%` } }))) : null,
+    r.error ? h('p', { class: 'small bad' }, r.error) : null,
+    r.notes.length ? h('ul', { class: 'req-notes small muted' }, r.notes.map((n) => h('li', {}, n))) : null,
+    h('details', { class: 'req-answers' }, h('summary', { class: 'small' }, 'Their answers'),
+      h('dl', {}, r.answers.map((a) => [h('dt', {}, a.title), h('dd', {}, a.answer)]))),
+    h('div', { class: 'req-actions' },
+      r.projectId ? h('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: async () => { await openProject(r.projectId); location.hash = '#/ads'; } }, icon('film'), r.status === 'done' ? `Open the videos${r.sizes.length ? ` (${ASPECT_NAMES[s.format] || s.format})` : ''}` : 'Open project') : null,
+      ...r.sizes.map((z) => h('button', { class: 'btn btn-sm', type: 'button', onclick: async () => { await openProject(z.projectId); location.hash = '#/ads'; } }, icon('film'), `${ASPECT_NAMES[z.format] || z.format} size`)),
+      ['waiting', 'error', 'dismissed', 'done'].includes(r.status) ? h('button', { class: `btn btn-sm${r.projectId ? '' : ' btn-primary'}`, type: 'button', onclick: () => {
+        if (r.status === 'done' && !confirm('Make this request\'s videos again? The current ones are kept as earlier versions.')) return;
+        act('make', 'Added to the queue');
+      } }, icon('sparkle'), r.status === 'error' ? 'Try again' : r.status === 'done' ? 'Make again' : 'Make videos') : null,
+      !busy && r.status !== 'dismissed' ? h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => act('dismiss') }, 'Dismiss') : null));
+}
+
+async function saveIntake(body, okMsg) {
+  try {
+    await api('/api/intake/settings', { method: 'POST', body });
+    if (okMsg) toast(okMsg);
+  } catch (err) {
+    toast(err.message, { error: true });
+  }
+  await renderRequests();
+}
+
+async function checkRequests() {
+  const btn = $('#req-check');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/intake/check', { method: 'POST' });
+    toast(r.message, { error: !r.ok });
+  } catch (err) {
+    toast(err.message, { error: true });
+  }
+  await renderRequests();
+}
+
+// ---------------------------------------------------------------------------
 // Settings page
 // ---------------------------------------------------------------------------
 
@@ -1657,13 +1785,38 @@ function wire() {
   });
   $('#openai-remove').addEventListener('click', () => saveKey('openaiKey', '', 'OpenAI key'));
   $('#opt-text').addEventListener('change', (e) => setSetting('onScreenText')(e.target.checked));
+
+  // Google Form requests
+  $('#req-save').addEventListener('click', async () => {
+    const url = $('#req-url').value.trim();
+    const key = $('#req-key').value.trim();
+    if (!url) return toast('Paste the Web app URL first.', { error: true });
+    if (!key && !state.intake?.key) return toast('Paste the connection code too.', { error: true });
+    await saveIntake(key ? { url, key } : { url }, 'Saved. Checking your form…');
+    $('#req-key').value = '';
+    if (state.intake?.configured) checkRequests();
+  });
+  $('#req-disconnect').addEventListener('click', () => confirm('Disconnect the Google Form? Requests already here are kept.') && saveIntake({ url: '', key: '' }, 'Form disconnected'));
+  $('#req-check').addEventListener('click', checkRequests);
+  $('#req-auto').addEventListener('change', (e) => saveIntake({ auto: e.target.checked }));
+  $('#req-voice').addEventListener('change', (e) => saveIntake({ voiceover: e.target.checked }));
+  $('#req-limit').addEventListener('change', (e) => saveIntake({ dailyLimit: Number(e.target.value) }));
+  $('#req-copy').addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/intake/script');
+      await copyText(await res.text());
+      toast('Script copied. Now paste it into script.google.com');
+    } catch (err) {
+      toast(err.message, { error: true });
+    }
+  });
   $('#opt-speech').addEventListener('change', (e) => setSetting('speechSubtitles')(e.target.checked));
 }
 
 async function init() {
   wire();
   await refreshStatus();
-  await Promise.all([loadTracks(), loadServerSettings(), loadClients()]);
+  await Promise.all([loadTracks(), loadServerSettings(), loadClients(), loadRequests()]);
   const saved = store.get('project', null);
   if (saved && state.status) {
     try {
@@ -1678,6 +1831,7 @@ async function init() {
     const before = JSON.stringify([state.status?.version, state.status?.ai?.configured, Boolean(state.status)]);
     await refreshStatus();
     if (JSON.stringify([state.status?.version, state.status?.ai?.configured, Boolean(state.status)]) !== before) route();
+    if (!location.hash.startsWith('#/requests')) loadRequests();
   }, 15000);
 }
 

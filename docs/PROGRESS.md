@@ -2,7 +2,7 @@
 
 Read `docs/ROADMAP.md` first (audit, technology decisions, plan). This file records what is done and what is next, so a new session can continue.
 
-## Status: v3.0.0 (2026-10-31)
+## Status: v3.1.0 (2026-10-31)
 
 ### Done
 - **Foundations:** cross-site/Host request guard; persistent job records with logs, interrupted-job detection and retry (`RUNNERS` registry in `server/index.js`); `project.prev.json` backups; `data/logs/cutline.log`; "Try again" in the UI.
@@ -27,6 +27,14 @@ Read `docs/ROADMAP.md` first (audit, technology decisions, plan). This file reco
   - text unit bug; safe-zone auto-fit allowing for camera moves; camera-aware QA boxes
   - logo plates; claim-style hooks filtered; frozen list scenes; loudness parsing
 - **Automatic corrections** before rendering (`autoFix` in `ads.js`); final report in `docs/REPORT.md`.
+
+- **Google Form requests (v3.1):**
+  - `integrations/google-form/Code.gs` is an Apps Script. `setupCutline()` builds the "Video request" form and a connection code; `doGet` serves answers and chunked uploads to holders of the code, and only for files attached to that answer.
+  - `server/lib/intake.js` checks every 2 minutes and maps answers by question title. Each request becomes a client (matched by email, then name), a project with only that request's photos (falling back to the client's library), and an `ads` job.
+  - Extra sizes are made by the `ads-size` job, which copies the project and re-renders the same storyboards with no AI.
+  - Safeguards: a daily limit, answers sent before connecting wait for the owner, and the URL must be a script.google.com address.
+  - UI: the **Requests** page. Tests: `npm run test:form` (a stand-in Apps Script, 34 checks), plus the script itself run against fake Google services.
+  - Limits: it only runs while Cutline is open on the Mac. Google can't create file upload questions from a script, so the owner adds 3 by hand. Uploads over 50 MB stay in Drive.
 
 ### Owner decisions
 - Approved: Claude photo analysis and frame review; OpenAI voiceover.

@@ -24,6 +24,7 @@ import {
 } from './lib/store.js';
 import { transcriptionConfigured } from './lib/transcribe.js';
 import { log, LOG_PATH } from './lib/log.js';
+import { checkNow, dismissRequest, intakeStatus, listRequests, makeRequest, makeSize, saveIntakeOptions, SCRIPT_FILE, startIntake, validFormUrl } from './lib/intake.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const APP_VERSION = createRequire(import.meta.url)('../package.json').version;
@@ -80,6 +81,7 @@ const RUNNERS = {
   'ads-revise': (pid, a, ctx) => reviseAdsJob(pid, a, ctx),
   'ad-render': (pid, a, ctx) => saveBoard(pid, a.index, a.board || {}, ctx),
   'ad-scene': (pid, a, ctx) => regenerateScene(pid, a, ctx),
+  'ads-size': (pid, a, ctx) => makeSize(pid, a, ctx),
 };
 
 function startJob(projectId, kind, args) {
@@ -491,6 +493,37 @@ app.post('/api/settings/check', wrap(async (req, res) => {
   res.json(await checkKey());
 }));
 
+// --- Google Form requests -------------------------------------------------------
+
+app.get('/api/intake', wrap(async (req, res) => res.json({ ...(await intakeStatus()), editable: isLocal(req), requests: await listRequests() })));
+
+app.post('/api/intake/settings', wrap(async (req, res) => {
+  if (!isLocal(req)) throw Object.assign(new Error('The form connection can only be changed on the computer running Cutline.'), { status: 403 });
+  const b = req.body || {};
+  const updates = {};
+  if (typeof b.url === 'string') {
+    const url = b.url.trim();
+    if (url && !validFormUrl(url)) throw Object.assign(new Error('That is not an Apps Script Web app URL. It should start with https://script.google.com/macros/s/ and end with /exec.'), { status: 400 });
+    updates.GOOGLE_FORM_URL = url;
+  }
+  if (typeof b.key === 'string') {
+    const key = b.key.trim();
+    if (key && !/^[a-f0-9]{32,80}$/i.test(key)) throw Object.assign(new Error('That connection code does not look right. Copy the long code from the Apps Script log.'), { status: 400 });
+    updates.GOOGLE_FORM_KEY = key;
+  }
+  const changedConnection = Object.keys(updates).length > 0;
+  if (changedConnection) await saveSettings(updates);
+  await saveIntakeOptions({ ...b, resetConnection: changedConnection && b.url !== undefined });
+  res.json(await intakeStatus());
+}));
+
+app.post('/api/intake/check', wrap(async (req, res) => res.json(await checkNow())));
+app.post('/api/intake/requests/:rid/make', wrap(async (req, res) => res.json(await makeRequest(req.params.rid))));
+app.post('/api/intake/requests/:rid/dismiss', wrap(async (req, res) => res.json(await dismissRequest(req.params.rid))));
+app.get('/api/intake/script', wrap(async (req, res) => {
+  res.type('text/plain').set('Content-Disposition', req.query.download ? 'attachment; filename="Cutline-Google-Form.gs"' : 'inline').send(await fs.readFile(SCRIPT_FILE, 'utf8'));
+}));
+
 // --- errors ---------------------------------------------------------------
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
@@ -512,6 +545,7 @@ const server = app.listen(PORT, HOST, async () => {
   console.log(`  FFmpeg:        ${ff.available ? `ok (${ff.version})` : 'NOT FOUND — install FFmpeg to edit videos'}`);
   console.log(`  Claude AI:     ${aiConfigured() ? `ok (${getModel()})` : 'off: add your key on the Settings page'}`);
   console.log(`  Transcription: ${transcriptionConfigured() ? 'ok (Whisper)' : 'off — optional, add OPENAI_API_KEY for spoken subtitles'}\n`);
+  startIntake(startJob);
 });
 
 server.on('error', (err) => {

@@ -1,13 +1,14 @@
 {
   "name": "cutline",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Personal AI video editing and marketing dashboard for local businesses",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node scripts/smoke-test.mjs",
-    "test:edge": "node scripts/edge-test.mjs"
+    "test:edge": "node scripts/edge-test.mjs",
+    "test:form": "node scripts/form-script-test.mjs && node scripts/form-test.mjs"
   },
   "repository": {
     "type": "git",

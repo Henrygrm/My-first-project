@@ -394,3 +394,30 @@ select { appearance: none; padding-right: 28px !important; background-image: lin
 .services .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: var(--dim); }
 .services .dot.on { background: var(--ok); }
 .services .dot.off { background: var(--warn); }
+
+/* Requests (Google Form) */
+.req-layout { display: grid; grid-template-columns: 1fr 380px; gap: 16px; align-items: start; }
+.req-list { display: grid; gap: 10px; min-width: 0; }
+.req-card { display: grid; gap: 10px; }
+.req-card.req-dismissed { opacity: .6; }
+.req-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.req-top b { font-size: 15px; }
+.req-top .badge { white-space: nowrap; }
+#req-status { margin: 0 0 14px; }
+.badge.qa.info { color: var(--text); background: var(--panel-3); }
+.badge.qa.muted { color: var(--dim); }
+.req-notes { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.req-answers summary { cursor: pointer; color: var(--muted); }
+.req-answers dl { margin: 8px 0 0; display: grid; grid-template-columns: minmax(120px, 38%) 1fr; gap: 4px 12px; font-size: 13px; }
+.req-answers dt { color: var(--muted); }
+.req-answers dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.req-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.req-empty { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 32px 16px; color: var(--muted); }
+.req-empty .ic { width: 32px; height: 32px; }
+.req-formlink { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.req-setup input[type=url], .req-setup input[type=password] { width: 100%; }
+.req-setup .narrow { width: 90px; }
+.req-setup .sep { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+.req-guide summary { cursor: pointer; font-weight: 600; font-size: 13.5px; margin-top: 6px; }
+.req-guide ol { padding-left: 20px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.45; }
+@media (max-width: 980px) { .req-layout { grid-template-columns: 1fr; } .req-setup.first { order: -1; } }

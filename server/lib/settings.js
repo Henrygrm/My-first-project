@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ENV_FILE = path.resolve(ROOT, process.env.ENV_FILE || '.env');
 
-export const EDITABLE = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CLAUDE_MODEL'];
-const LABELS = { ANTHROPIC_API_KEY: 'Claude key', OPENAI_API_KEY: 'OpenAI key', CLAUDE_MODEL: 'model name' };
+export const EDITABLE = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CLAUDE_MODEL', 'GOOGLE_FORM_URL', 'GOOGLE_FORM_KEY'];
+const LABELS = { ANTHROPIC_API_KEY: 'Claude key', OPENAI_API_KEY: 'OpenAI key', CLAUDE_MODEL: 'model name', GOOGLE_FORM_URL: 'Web app URL', GOOGLE_FORM_KEY: 'connection code' };
 
 const mask = (v) => (v ? `${v.slice(0, 7)}…${v.slice(-4)}` : '');
 

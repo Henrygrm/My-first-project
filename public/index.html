@@ -41,6 +41,7 @@
       <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
       <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
       <symbol id="i-dup" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13h5l1.5 3h5L16 13h5M5.5 5h13L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z"/></symbol>
       <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
     </defs>
   </svg>
@@ -53,6 +54,7 @@
     <nav class="nav" aria-label="Pages">
       <a href="#/" data-page="home"><svg class="ic"><use href="#i-home"/></svg><span>Home</span></a>
       <a href="#/ads" data-page="ads"><svg class="ic"><use href="#i-ad"/></svg><span>Ads</span></a>
+      <a href="#/requests" data-page="requests"><svg class="ic"><use href="#i-inbox"/></svg><span>Requests</span><em class="count" id="nav-req-count"></em></a>
       <a href="#/clients" data-page="clients"><svg class="ic"><use href="#i-users"/></svg><span>Clients</span></a>
       <a href="#/music" data-page="music"><svg class="ic"><use href="#i-music"/></svg><span>Music</span><em class="count" id="nav-music-count"></em></a>
       <a href="#/settings" data-page="settings"><svg class="ic"><use href="#i-gear"/></svg><span>Settings</span></a>
@@ -227,6 +229,55 @@
       <div class="clients-layout">
         <ul class="client-list" id="client-list"></ul>
         <div class="panel client-detail" id="client-detail"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-requests" hidden>
+      <div class="page-head">
+        <h1>Requests <small class="muted" id="req-count"></small></h1>
+        <button class="btn" id="req-check" type="button"><svg class="ic"><use href="#i-refresh"/></svg> Check now</button>
+      </div>
+      <div class="req-layout">
+        <div class="req-list" id="req-list"></div>
+        <div class="panel settings req-setup">
+          <h2>Google Form <span class="tag" id="req-tag"></span></h2>
+          <p class="muted small" id="req-status"></p>
+          <div class="set-row">
+            <label class="label" for="req-url">Web app URL</label>
+            <input id="req-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="set-row">
+            <label class="label" for="req-key">Connection code</label>
+            <input id="req-key" type="password" placeholder="The long code from the Apps Script log" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="key-row">
+            <button class="btn btn-primary" id="req-save" type="button">Save</button>
+            <button class="btn btn-ghost" id="req-disconnect" type="button">Disconnect</button>
+          </div>
+          <hr class="sep" />
+          <label class="toggle"><input type="checkbox" id="req-auto" /><span></span> Make videos automatically when a form comes in</label>
+          <div class="set-row"><span class="label">Engine for form requests</span><div class="seg" id="req-mode-seg"></div></div>
+          <label class="toggle"><input type="checkbox" id="req-voice" /><span></span> Add a voiceover when the client asks for one <small class="muted">(OpenAI, about 1–2c)</small></label>
+          <div class="set-row">
+            <label class="label" for="req-limit">Most automatic requests per day</label>
+            <input id="req-limit" type="number" min="0" max="100" step="1" class="narrow" />
+            <p class="muted small">Protects your AI credit if the form link gets shared or spammed. Extra requests wait for you to press Make videos.</p>
+          </div>
+          <details class="req-guide" id="req-guide">
+            <summary>How to connect your form (5 minutes)</summary>
+            <ol>
+              <li><button class="btn btn-sm" id="req-copy" type="button"><svg class="ic"><use href="#i-copy"/></svg> Copy the Google script</button></li>
+              <li>Go to <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com</a> (a new project opens). Delete the text there and paste.</li>
+              <li>Click the save icon. At the top, choose <b>setupCutline</b> and click <b>Run</b>. Allow access. (If Google says "app isn't verified", click <i>Advanced</i> → <i>Go to … (unsafe)</i>: it's your own script.)</li>
+              <li>The <b>Execution log</b> at the bottom shows your new form's link and your <b>connection code</b>.</li>
+              <li>Open the form and add 3 <b>File upload</b> questions in the "Your photos and logo" section: logo, photos and video clips (Google can't add those automatically).</li>
+              <li>Back in Apps Script: <b>Deploy</b> → <b>New deployment</b> → gear icon → <b>Web app</b>. Execute as <b>Me</b>, Who has access <b>Anyone</b>. Click <b>Deploy</b> and copy the <b>Web app URL</b>.</li>
+              <li>Paste the URL and code here, click <b>Save</b>, then <b>Check now</b>.</li>
+            </ol>
+            <p class="muted small">Already made your own form? Paste its edit link into the top line of the script (EXISTING_FORM_URL) before step 3. Keep the question wording close to Cutline's so the answers are understood.</p>
+            <p class="muted small">Cutline checks every few minutes while it is running on this Mac. Requests sent while it is closed are picked up the next time you open it.</p>
+          </details>
+        </div>
       </div>
     </section>
 

@@ -140,15 +140,19 @@ export async function deleteClientMedia(id, mediaId) {
   return c;
 }
 
-/** Start a project for a client: business details, brand and media come along. */
-export async function newProjectForClient(id, name) {
+/**
+ * Start a project for a client: business details, brand and media come along.
+ * `mediaIds` limits the photos to those (the logo always comes).
+ */
+export async function newProjectForClient(id, name, { mediaIds = null } = {}) {
   const c = await loadClient(id);
   if (!c) throw Object.assign(new Error('Client not found'), { status: 404 });
   const project = await createProject(name || `${c.name} ${new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`);
   const pdir = path.join(projectDir(project.id), 'ad-assets');
   await fs.mkdir(pdir, { recursive: true });
   const assets = [];
-  for (const m of [...(c.logo ? [c.logo] : []), ...c.media]) {
+  const media = mediaIds ? c.media.filter((m) => mediaIds.includes(m.id)) : c.media;
+  for (const m of [...(c.logo ? [c.logo] : []), ...media]) {
     const copy = { ...m, id: newId('i'), cut: null };
     copy.file = `${copy.id}${path.extname(m.file)}`;
     copy.thumb = `${copy.id}-t${path.extname(m.thumb)}`;

@@ -18,7 +18,7 @@ import { loadAssets, makeEnv, registerFonts } from './engine/node.js';
 import { renderComposition } from './engine/render.js';
 import { FFMPEG, frameAt, run } from './ffmpeg.js';
 import { log } from './log.js';
-import { findTrack, getTrack, listTracks, MUSIC_DIR, pickTrack } from './music.js';
+import { findTrack, getTrack, listTracks, MOODS, MUSIC_DIR, pickTrack } from './music.js';
 import { cleanProfile } from './pipeline.js';
 import { checkRender } from './qa.js';
 import { loadProject, newId, projectDir, updateProject } from './store.js';
@@ -478,6 +478,8 @@ export async function generateAds(projectId, opts, ctx) {
   // Music per ad (different songs when possible), beat grid for the engine.
   const used = [];
   for (const b of plan.ads) {
+    // A mood the client asked for (e.g. from a request form) wins over the plan's.
+    if (MOODS.includes(opts.musicMood)) b.musicMood = opts.musicMood;
     const track = await chooseTrack(b, musicChoice, tracks, used);
     if (track) used.push(track.id);
     b.music = track ? { id: track.id, name: track.name, bpm: track.bpm } : null;
@@ -514,6 +516,27 @@ export async function generateAds(projectId, opts, ctx) {
   });
   await fs.rm(outDir(projectId), { recursive: true, force: true });
   await renderAll(projectId, plan.ads.map((_, i) => i), ctx, 0.4);
+  return { projectId };
+}
+
+/**
+ * Re-render a project's ads in another size (same storyboards, no AI). Used on
+ * a copy of the project, so each size keeps its own versions.
+ */
+export async function resizeAds(projectId, { format }, ctx) {
+  if (!FORMATS[format]) throw new Error('Unknown size');
+  const project = await loadProject(projectId);
+  if (!project?.adPlan?.ads?.length) throw new Error('There are no ads to resize. Make the main videos first.');
+  await updateProject(projectId, (q) => {
+    q.adPlan.format = format;
+    q.adSettings = { ...(q.adSettings || {}), format };
+    q.adRenders = [];
+    q.adVersions = [];
+    addAdChat(q, 'cutline', `Re-made the ads in ${FORMATS[format].label}.`);
+  });
+  await fs.rm(outDir(projectId), { recursive: true, force: true });
+  ctx.stage(`Rendering the ${format} versions`, 0.05);
+  await renderAll(projectId, project.adPlan.ads.map((_, i) => i), ctx, 0.05);
   return { projectId };
 }
 

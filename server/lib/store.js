@@ -136,7 +136,7 @@ function persist(job, force = false) {
   job.savedAt = now;
   try {
     fsSync.mkdirSync(JOBS_DIR, { recursive: true });
-    const rec = Object.fromEntries([...PUBLIC_FIELDS, 'args'].map((k) => [k, job[k]]));
+    const rec = Object.fromEntries([...PUBLIC_FIELDS, 'args', 'result'].map((k) => [k, job[k]]));
     fsSync.writeFileSync(`${jobFile(job.id)}.tmp`, JSON.stringify(rec));
     fsSync.renameSync(`${jobFile(job.id)}.tmp`, jobFile(job.id));
   } catch {}
