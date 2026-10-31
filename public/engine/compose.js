@@ -39,7 +39,9 @@ export function compose(board, assets, industry = 'other') {
   const direction = { ...getDirection(board.direction), id: board.direction };
   const seed = board.seed ?? 1;
   const r = rng(seed * 7 + 3);
-  const W = fmt.w, H = fmt.h;
+  // Layout is all fractions of the frame, so a preview can run at lower resolution.
+  const scale = board.scale || 1;
+  const W = Math.round((fmt.w * scale) / 2) * 2, H = Math.round((fmt.h * scale) / 2) * 2;
   const kit = {
     W, H, square: H / W < 1.5, safe: fmt.safe, palette: board.palette, direction, industry, assets,
     logo: board.logo || null, logoNeedsPlate: Boolean(board.logoNeedsPlate), fonts: direction.fonts, seed,

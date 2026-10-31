@@ -36,7 +36,11 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /** Convert an uploaded image (JPG, PNG, WebP, HEIC…) to a web-friendly file plus a thumbnail, and analyse it. */
 export async function addAsset(projectId, tmpPath, originalName, kind) {
-  const dir = assetDir(projectId);
+  return convertImage(assetDir(projectId), tmpPath, originalName, kind);
+}
+
+/** The same conversion into any folder (client media libraries use it too). */
+export async function convertImage(dir, tmpPath, originalName, kind) {
   await fs.mkdir(dir, { recursive: true });
   const id = newId('i');
   const isLogo = kind === 'logo';
@@ -361,7 +365,9 @@ export async function generateAds(projectId, opts, ctx) {
   const count = clamp(Math.round(Number(opts.count) || 2), 1, 3);
   const seconds = AD_LENGTHS.includes(Number(opts.seconds)) ? Number(opts.seconds) : 15;
   const format = FORMATS[opts.format] ? opts.format : '9:16';
-  const direction = DIRECTIONS[opts.direction] ? opts.direction : 'auto';
+  let direction = DIRECTIONS[opts.direction] ? opts.direction : 'auto';
+  // A client's saved creative direction applies when "auto" is chosen.
+  if (direction === 'auto' && DIRECTIONS[project.brand?.direction]) direction = project.brand.direction;
   const objective = OBJECTIVES[opts.objective] ? opts.objective : 'auto';
   const musicChoice = opts.music || 'auto';
   const mode = opts.mode === 'auto' ? 'auto' : 'ai';
@@ -398,6 +404,7 @@ export async function generateAds(projectId, opts, ctx) {
     const ads = (res.data.ads || []).slice(0, count).map((raw, i) => ({
       ...normalizeBoard(raw, { assetIds: photos.map((a) => a.id), videoIds: prepared.footage.map((f) => f.id), seconds, defaults: { direction: direction === 'auto' ? 'commercial' : direction, ...d } }),
       ...(direction !== 'auto' ? { direction } : {}),
+      ...(project.brand?.tone && project.brand.tone !== 'auto' ? { tone: project.brand.tone } : {}),
       seed: seed + i * 7919,
     }));
     if (!ads.length) throw new Error('The AI did not return any ads. Try again.');
@@ -709,5 +716,5 @@ export async function previewKit(projectId, index) {
   const business = getBusiness(project.adPlan.business, project.businessCustom);
   const kit = kitFor(project, board, business);
   const videos = Object.fromEntries((project.videos || []).map((v) => [v.id, { src: `/media/${projectId}/videos/${v.file}`, w: v.meta.width, h: v.meta.height }]));
-  return { board, format: project.adPlan.format, palette: kit.palette, info: kit.info, urls: kit.urls, videos, logo: kit.logo, logoNeedsPlate: kit.logoNeedsPlate, industry: kit.industry, music: board.music };
+  return { board, format: project.adPlan.format, palette: kit.palette, brandColors: brandColors(project, board), info: kit.info, urls: kit.urls, videos, logo: kit.logo, logoNeedsPlate: kit.logoNeedsPlate, industry: kit.industry, music: board.music };
 }

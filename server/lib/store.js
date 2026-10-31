@@ -101,6 +101,8 @@ export async function listProjects() {
     projects.push({
       id: p.id,
       name: p.name,
+      clientId: p.clientId || null,
+      adCount: (p.adRenders || []).filter(Boolean).length,
       business: p.business,
       businessCustom: p.businessCustom,
       platform: p.platform,

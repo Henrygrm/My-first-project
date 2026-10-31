@@ -33,6 +33,14 @@
       <symbol id="i-ad" viewBox="0 0 24 24"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1zM16 8.5a4.5 4.5 0 0 1 0 7M18.5 6a8 8 0 0 1 0 12"/></symbol>
       <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7L20 8.5M20 4v4.5h-4.5"/></symbol>
       <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6"/></symbol>
+      <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+      <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+      <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+      <symbol id="i-dup" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
       <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
     </defs>
   </svg>
@@ -45,6 +53,7 @@
     <nav class="nav" aria-label="Pages">
       <a href="#/" data-page="home"><svg class="ic"><use href="#i-home"/></svg><span>Home</span></a>
       <a href="#/ads" data-page="ads"><svg class="ic"><use href="#i-ad"/></svg><span>Ads</span></a>
+      <a href="#/clients" data-page="clients"><svg class="ic"><use href="#i-users"/></svg><span>Clients</span></a>
       <a href="#/music" data-page="music"><svg class="ic"><use href="#i-music"/></svg><span>Music</span><em class="count" id="nav-music-count"></em></a>
       <a href="#/settings" data-page="settings"><svg class="ic"><use href="#i-gear"/></svg><span>Settings</span></a>
     </nav>
@@ -135,29 +144,30 @@
     <section class="page" id="page-ads" hidden>
       <div class="home-grid">
         <aside class="panel side">
-          <div class="block">
+          <div class="client-card" id="ad-client-card"></div>
+
+          <div class="block" id="ad-biz-block">
             <label class="label" for="ad-biz-type">Business</label>
             <select id="ad-biz-type"></select>
+            <details class="block" id="ad-profile-box" open>
+              <summary>Business details <small class="muted" id="ad-profile-summary"></small></summary>
+              <div class="profile-fields">
+                <input data-profile="name" placeholder="Name, e.g. Gloss Boss Detailing" maxlength="80" />
+                <input data-profile="services" placeholder="What they sell, e.g. ceramic coating, interior cleans" maxlength="300" />
+                <input data-profile="location" placeholder="Suburb / city" maxlength="80" />
+                <input data-profile="offer" placeholder="Current offer (optional), e.g. 20% off this week" maxlength="120" />
+                <input data-profile="contact" placeholder="Phone, website or @handle (optional)" maxlength="80" />
+                <input data-profile="review" placeholder="A real customer review (optional)" maxlength="200" />
+              </div>
+            </details>
           </div>
-
-          <details class="block" id="ad-profile-box" open>
-            <summary>Business details <small class="muted" id="ad-profile-summary"></small></summary>
-            <div class="profile-fields">
-              <input data-profile="name" placeholder="Name, e.g. Gloss Boss Detailing" maxlength="80" />
-              <input data-profile="services" placeholder="What they sell, e.g. ceramic coating, interior cleans" maxlength="300" />
-              <input data-profile="location" placeholder="Suburb / city" maxlength="80" />
-              <input data-profile="offer" placeholder="Current offer (optional), e.g. 20% off this week" maxlength="120" />
-              <input data-profile="contact" placeholder="Phone, website or @handle (optional)" maxlength="80" />
-              <input data-profile="review" placeholder="A real customer review (optional)" maxlength="200" />
-            </div>
-          </details>
 
           <div class="block">
             <div class="label-row"><span class="label">Photos and logo</span><span class="muted small" id="ad-asset-count"></span></div>
             <label class="dropzone" id="ad-dropzone">
               <input type="file" id="ad-file-input" accept="image/*,.heic,.heif" multiple hidden />
               <svg class="ic"><use href="#i-image"/></svg>
-              <span>Drop photos or <u>browse</u></span>
+              <span>Drop product photos or <u>browse</u></span>
               <span class="dz-progress" hidden><i></i><em></em></span>
             </label>
             <div class="asset-grid" id="ad-assets"></div>
@@ -168,14 +178,17 @@
           </div>
 
           <div class="block opts">
+            <div class="opt-2">
+              <div><label class="label" for="ad-objective">Goal</label><select id="ad-objective"></select></div>
+              <div><label class="label" for="ad-direction">Look</label><select id="ad-direction"></select></div>
+            </div>
             <div class="opt"><span class="label">Format</span><div class="seg" id="ad-format-seg"></div></div>
             <div class="opt"><span class="label">Length</span><div class="seg" id="ad-length-seg"></div></div>
             <div class="opt"><span class="label">Ads</span><div class="seg" id="ad-count-seg"></div></div>
-            <div class="opt-2">
-              <div><label class="label" for="ad-theme-select">Look</label><select id="ad-theme-select"></select></div>
-              <div><label class="label" for="ad-music-select">Music</label><select id="ad-music-select"></select></div>
-            </div>
-            <div class="accent-row"><label class="toggle"><input type="checkbox" id="ad-accent-on" /><span></span> Use a brand colour</label><input type="color" id="ad-accent" value="#ffb03d" aria-label="Brand colour" /></div>
+            <div><label class="label" for="ad-music-select">Music</label><select id="ad-music-select"></select></div>
+            <label class="toggle"><input type="checkbox" id="ad-voice-on" /><span></span> Voiceover <select id="ad-voice" class="inline-select" aria-label="Voice"></select></label>
+            <p class="muted small" id="ad-voice-note"></p>
+            <label class="toggle" id="ad-review-row"><input type="checkbox" id="ad-review-on" checked /><span></span> AI checks each scene before rendering</label>
           </div>
 
           <div class="block" id="ad-notes-block">
@@ -202,6 +215,18 @@
           <div id="ad-strategy"></div>
           <div id="ads"></div>
         </section>
+      </div>
+    </section>
+
+    <!-- CLIENTS --------------------------------------------------------------->
+    <section class="page" id="page-clients" hidden>
+      <div class="page-head">
+        <h1>Clients <small class="muted" id="clients-count"></small></h1>
+        <button class="btn btn-primary" id="client-new" type="button"><svg class="ic"><use href="#i-plus"/></svg> New client</button>
+      </div>
+      <div class="clients-layout">
+        <ul class="client-list" id="client-list"></ul>
+        <div class="panel client-detail" id="client-detail"></div>
       </div>
     </section>
 
@@ -290,6 +315,30 @@
     <div class="dialog-body"><video id="video-dialog-player" controls playsinline></video><p class="muted small" id="video-dialog-note" hidden>This browser can't preview this format (common with iPhone HEVC in Chrome). It still edits fine.</p></div>
   </dialog>
 
+
+  <dialog class="studio" id="studio">
+    <div class="studio-head">
+      <div class="studio-title"><svg class="ic"><use href="#i-film"/></svg><b id="studio-title">Studio</b><span class="muted small" id="studio-sub"></span></div>
+      <div class="studio-actions">
+        <select id="studio-versions" aria-label="Versions"></select>
+        <button class="btn btn-sm" id="studio-close" type="button">Close</button>
+        <button class="btn btn-sm btn-primary" id="studio-save" type="button"><svg class="ic"><use href="#i-refresh"/></svg> Save and render</button>
+      </div>
+    </div>
+    <div class="studio-body">
+      <div class="studio-stage">
+        <div class="stage-frame" id="stage-frame"><canvas id="studio-canvas"></canvas><video id="studio-video" playsinline controls hidden></video></div>
+        <div class="stage-controls">
+          <button class="icon-btn" id="studio-play" type="button" aria-label="Play"><svg class="ic"><use href="#i-play"/></svg></button>
+          <input type="range" id="studio-scrub" min="0" max="1000" value="0" aria-label="Time" />
+          <span class="muted small mono" id="studio-time">0.0s</span>
+          <div class="seg seg-sm" id="studio-mode"></div>
+        </div>
+        <div class="timeline" id="studio-timeline"></div>
+      </div>
+      <div class="studio-inspector" id="studio-inspector"></div>
+    </div>
+  </dialog>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <script type="module" src="/js/app.js"></script>
 </body>

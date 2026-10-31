@@ -17,6 +17,7 @@ import { DIRECTIONS } from '../public/engine/styles.js';
 import { AD_LENGTHS, addAsset, deleteAsset, generateAds, previewKit, regenerateScene, restoreVersion, reviseAdsJob, rotateAsset, saveBoard, stillsFromFootage } from './lib/ads.js';
 import { OBJECTIVES } from './lib/director.js';
 import { providerStatus } from './providers/index.js';
+import { addClientMedia, CLIENTS_DIR, createClient, deleteClient, deleteClientMedia, duplicateProject, listClients, loadClient, newProjectForClient, patchClient, syncProjectBrand } from './lib/clients.js';
 import {
   activeJobFor, createProject, DATA_DIR, deleteProject, enqueueJob, getJob, jobView, lastJobFor, listProjects,
   loadProject, newId, projectDir, PROJECTS_DIR, updateProject,
@@ -63,6 +64,7 @@ app.use(express.static(path.join(ROOT, 'public')));
 // Uploaded footage and rendered clips (supports range requests for scrubbing).
 app.use('/media', express.static(PROJECTS_DIR, { dotfiles: 'deny', index: false, fallthrough: false }));
 app.use('/music-files', express.static(MUSIC_DIR, { dotfiles: 'deny', index: false, fallthrough: false }));
+app.use('/client-files', express.static(CLIENTS_DIR, { dotfiles: 'deny', index: false, fallthrough: false }));
 // Typefaces for the live ad preview (same files the renderer uses).
 app.use('/fonts', express.static(path.join(ROOT, 'assets', 'fonts'), { index: false, fallthrough: false, maxAge: '7d' }));
 
@@ -370,6 +372,7 @@ app.post('/api/projects/:id/ads/generate', wrap(async (req, res) => {
   const project = await requireProject(req);
   noJob(project);
   const opts = req.body || {};
+  await syncProjectBrand(project.id);
   const job = startJob(project.id, 'ads', opts);
   res.json({ jobId: job.id });
 }));
@@ -413,6 +416,41 @@ app.post('/api/projects/:id/ads/:index/restore', wrap(async (req, res) => {
 app.get('/api/projects/:id/ads/:index/kit', wrap(async (req, res) => {
   await requireProject(req);
   res.json(await previewKit(req.params.id, Number(req.params.index)));
+}));
+
+// --- clients and brand kits ---------------------------------------------------
+
+app.get('/api/clients', wrap(async (req, res) => res.json(await listClients())));
+app.post('/api/clients', wrap(async (req, res) => res.json(await createClient(req.body || {}))));
+app.get('/api/clients/:cid', wrap(async (req, res) => {
+  const c = await loadClient(req.params.cid);
+  if (!c) throw Object.assign(new Error('Client not found'), { status: 404 });
+  const projects = (await listProjects()).filter((p) => p.clientId === c.id);
+  res.json({ ...c, projects });
+}));
+app.patch('/api/clients/:cid', wrap(async (req, res) => res.json(await patchClient(req.params.cid, req.body || {}))));
+app.delete('/api/clients/:cid', wrap(async (req, res) => {
+  await deleteClient(req.params.cid);
+  res.json({ ok: true });
+}));
+app.post('/api/clients/:cid/media', (req, res, next) => {
+  const kind = req.query.kind === 'logo' ? 'logo' : 'photo';
+  imageUpload.array('images', kind === 'logo' ? 1 : 30)(req, res, async (err) => {
+    if (err) return next(Object.assign(err, { status: err.status || 400 }));
+    try {
+      const out = await addClientMedia(req.params.cid, req.files || [], kind);
+      for (const f of req.files || []) await fs.rm(f.path, { force: true });
+      res.json(out);
+    } catch (e) {
+      next(e);
+    }
+  });
+});
+app.delete('/api/clients/:cid/media/:mid', wrap(async (req, res) => res.json(await deleteClientMedia(req.params.cid, req.params.mid))));
+app.post('/api/clients/:cid/projects', wrap(async (req, res) => res.json(await newProjectForClient(req.params.cid, req.body?.name))));
+app.post('/api/projects/:id/duplicate', wrap(async (req, res) => {
+  await requireProject(req);
+  res.json(await duplicateProject(req.params.id));
 }));
 
 // --- ask for changes --------------------------------------------------------
