@@ -27,11 +27,22 @@ const form = {
 };
 for (const [m, t] of Object.entries({ addSectionHeaderItem: 'SECTION_HEADER', addTextItem: 'TEXT', addMultipleChoiceItem: 'MULTIPLE_CHOICE', addParagraphTextItem: 'PARAGRAPH_TEXT', addPageBreakItem: 'PAGE_BREAK', addCheckboxItem: 'CHECKBOX', addDateItem: 'DATE' })) form[m] = () => item('', t);
 let created = 0;
+const drive = { folders: {}, files: [], sent: [] };
+const folder = (path) => ({
+  getFoldersByName: (n) => { const k = `${path}/${n}`; let done = !drive.folders[k]; return { hasNext: () => !done, next: () => { done = true; return folder(k); } }; },
+  createFolder: (n) => { drive.folders[`${path}/${n}`] = true; return folder(`${path}/${n}`); },
+  createFile: (blob) => { const f = { path, ...blob, id: `D${drive.files.length + 1}`, sharing: null }; drive.files.push(f); return { getId: () => f.id, getUrl: () => `https://drive.google.com/file/d/${f.id}/view`, setSharing: (a, p) => { f.sharing = [a, p]; } }; },
+});
 const ctx = {
   FormApp: { create: () => { created++; return form; }, openById: (id) => { if (id !== 'FORM1') throw new Error('bad'); return form; }, openByUrl: () => form, getActiveForm: () => null },
-  DriveApp: { getFileById: (id) => { const f = files[id]; if (!f) throw new Error('no file'); return { getName: () => f.name, getSize: () => f.bytes.length, getMimeType: () => f.type, getBlob: () => ({ getBytes: () => f.bytes }) }; } },
+  MailApp: { sendEmail: (o) => drive.sent.push(o), getRemainingDailyQuota: () => 99 },
+  DriveApp: { Access: { ANYONE_WITH_LINK: 'ANYONE_WITH_LINK' }, Permission: { VIEW: 'VIEW' }, getRootFolder: () => folder(''), getFileById: (id) => { const f = files[id]; if (!f) throw new Error('no file'); return { getName: () => f.name, getSize: () => f.bytes.length, getMimeType: () => f.type, getBlob: () => ({ getBytes: () => f.bytes }) }; } },
   PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] ?? null, setProperty: (k, v) => { props[k] = v; } }) },
-  Utilities: { getUuid: () => crypto.randomUUID(), base64Encode: (b) => Buffer.from(b.map((x) => x & 255)).toString('base64') },
+  Utilities: {
+    getUuid: () => crypto.randomUUID(), base64Encode: (b) => Buffer.from(b.map((x) => x & 255)).toString('base64'),
+    base64Decode: (s) => [...Buffer.from(s, 'base64')].map((x) => (x > 127 ? x - 256 : x)),
+    newBlob: (bytes, type, name) => ({ bytes, type, name }),
+  },
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ text: t, setMimeType() { return this; } }) },
   Logger: { log: (s) => logs.push(s) },
 };
@@ -62,5 +73,24 @@ ok(got === 12 * 1024 * 1024 && pieces === 3, `big file in ${pieces} pieces`);
 ok(call({ key: props.CUTLINE_KEY, response: 'R2', file: 'secret' }).error, 'other Drive files refused');
 ok(call({ key: props.CUTLINE_KEY, response: 'R1', file: 'f1' }).error, 'file from another answer refused');
 ok(call({ key: props.CUTLINE_KEY, response: 'nope', file: 'f1' }).error, 'unknown response → error, not crash');
+
+// Saving approved videos to Drive and emailing the client (doPost).
+const post = (b) => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify(b) } }).text);
+const K = props.CUTLINE_KEY;
+ok(post({ key: 'wrong', action: 'email', to: 'a@b.co' }).error && !drive.sent.length, 'POST with the wrong code refused');
+const up = post({ key: K, action: 'upload', folder: 'Bean There', name: 'Bean There - Version 1.mp4', type: 'video/mp4', data: Buffer.from('MP4DATA').toString('base64') });
+const f = drive.files[0];
+ok(up.ok && up.shared && f.path === '/Cutline videos/Bean There' && f.name.endsWith('.mp4') && Buffer.from(f.bytes.map((x) => x & 255)).toString() === 'MP4DATA', 'video saved to Drive › Cutline videos › client');
+ok(f.sharing?.[0] === 'ANYONE_WITH_LINK' && f.sharing[1] === 'VIEW' && up.url.includes(f.id), 'shared as view-only link');
+post({ key: K, action: 'upload', folder: 'Bean There', name: 'v2.mp4', data: 'AA==' });
+ok(Object.keys(drive.folders).length === 2, 'folders reused, not duplicated');
+ok(post({ key: K, action: 'email', to: 'not an email', body: 'x' }).error && !drive.sent.length, 'bad address refused');
+const em = post({ key: K, action: 'email', to: 'hello@bean.au', subject: 'Your video', senderName: 'Henry', body: 'Hi <Bean>,\n\n{links}\n\nThanks', links: [{ name: 'Version 1', url: up.url }, { name: 'Bad', url: 'javascript:alert(1)' }] });
+const m = drive.sent[0];
+ok(em.ok && m.to === 'hello@bean.au' && m.subject === 'Your video' && m.name === 'Henry', 'email sent with subject and sender name');
+ok(m.body.includes(`Version 1: ${up.url}`) && !m.body.includes('{links}') && !m.body.includes('javascript'), 'plain text has the link; unsafe links dropped');
+ok(m.htmlBody.includes(`href="${up.url}"`) && m.htmlBody.includes('&lt;Bean&gt;') && !m.htmlBody.includes('<Bean>'), 'HTML has a button and escapes text');
+ok(post({ key: K, action: 'nope' }).error, 'unknown action refused');
+ok(call({ key: K }).version === 2, 'reports version 2 (can email)');
 console.log(out.join('\n'));
 process.exit(out.some((x) => x.startsWith('FAIL')) ? 1 : 0);

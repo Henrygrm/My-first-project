@@ -7,6 +7,9 @@
  *  - Once deployed as a web app, Cutline (on your Mac) asks this script for new
  *    form answers every couple of minutes, using that code. Nobody without the
  *    code can read anything.
+ *  - When you approve a client's videos in Cutline, it sends them here: they are
+ *    saved in your Google Drive ("Cutline videos" folder) and emailed to the
+ *    client from your Gmail with watch/download links.
  *
  * Setup (Cutline's Requests page walks you through it):
  *  1. script.google.com → New project → delete what's there → paste this file.
@@ -21,6 +24,7 @@ const EXISTING_FORM_URL = '';
 const CHUNK = 5 * 1024 * 1024; // bytes per download piece
 const MAX_FILE = 50 * 1024 * 1024; // bigger uploads stay in Google Drive
 const MAX_RESPONSES = 20; // per check; Cutline asks again for the rest
+const SCRIPT_VERSION = 2; // 2: can save videos to Drive and email clients
 
 function setupCutline() {
   const props = PropertiesService.getScriptProperties();
@@ -73,7 +77,7 @@ function doGet(e) {
     all.sort(function (a, b) { return a.getTimestamp().getTime() - b.getTimestamp().getTime(); });
     return out_({
       ok: true,
-      version: 1,
+      version: SCRIPT_VERSION,
       form: { title: form.getTitle(), url: form.getPublishedUrl() },
       responses: all.slice(0, MAX_RESPONSES).map(response_),
       more: all.length > MAX_RESPONSES,
@@ -81,6 +85,63 @@ function doGet(e) {
   } catch (err) {
     return out_({ error: String((err && err.message) || err) });
   }
+}
+
+/** Called by Cutline after you approve videos: save to Drive, then email the client. */
+function doPost(e) {
+  try {
+    const b = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const key = PropertiesService.getScriptProperties().getProperty('CUTLINE_KEY');
+    if (!key || b.key !== key) return out_({ error: 'The connection code is wrong. Copy it again from the Apps Script log (run setupCutline).' });
+    if (b.action === 'upload') return out_(upload_(b));
+    if (b.action === 'email') return out_(email_(b));
+    return out_({ error: 'Unknown action' });
+  } catch (err) {
+    return out_({ error: String((err && err.message) || err) });
+  }
+}
+
+function folderNamed_(parent, name) {
+  const found = parent.getFoldersByName(name);
+  return found.hasNext() ? found.next() : parent.createFolder(name);
+}
+
+function upload_(b) {
+  const root = folderNamed_(DriveApp.getRootFolder(), 'Cutline videos');
+  const folder = b.folder ? folderNamed_(root, String(b.folder).slice(0, 80)) : root;
+  const blob = Utilities.newBlob(Utilities.base64Decode(String(b.data || '')), String(b.type || 'video/mp4'), String(b.name || 'video.mp4').slice(0, 120));
+  const file = folder.createFile(blob);
+  let shared = true;
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (err) {
+    shared = false; // some work accounts don't allow link sharing
+  }
+  return { ok: true, id: file.getId(), url: file.getUrl(), shared: shared };
+}
+
+function esc_(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function email_(b) {
+  const to = String(b.to || '').trim();
+  if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(to)) return { error: 'That email address does not look right.' };
+  const links = (b.links || []).map(function (l) { return { name: String(l.name || 'Video'), url: String(l.url || '') }; })
+    .filter(function (l) { return /^https:\/\//.test(l.url); });
+  let body = String(b.body || '');
+  if (body.indexOf('{links}') < 0) body += '\n\n{links}';
+  const parts = body.split('{links}');
+  const text = parts.join(links.map(function (l) { return l.name + ': ' + l.url; }).join('\n'));
+  const buttons = links.map(function (l) {
+    return '<p style="margin:10px 0"><a href="' + esc_(l.url) + '" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#111;color:#fff;text-decoration:none;font-weight:600">&#9654; ' + esc_(l.name) + '</a></p>';
+  }).join('');
+  const html = '<div style="font:15px/1.5 Arial,sans-serif;color:#222">' +
+    parts.map(function (p) { return esc_(p).replace(/\n/g, '<br>'); }).join(buttons) + '</div>';
+  const opts = { to: to, subject: String(b.subject || 'Your video is ready').slice(0, 150), body: text, htmlBody: html };
+  if (b.senderName) opts.name = String(b.senderName).slice(0, 60);
+  MailApp.sendEmail(opts);
+  return { ok: true, remaining: MailApp.getRemainingDailyQuota() };
 }
 
 function form_() {

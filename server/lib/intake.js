@@ -26,7 +26,13 @@ const CHECK_EVERY_MS = Number(process.env.CUTLINE_FORM_CHECK_MS || 2 * 60_000);
 const MAX_FILE = 50 * 1024 * 1024;
 const LENGTHS = [10, 15, 20, 30];
 
-const DEFAULTS = { auto: true, mode: 'ai', dailyLimit: 10, voiceover: true, since: 0, connectedAt: null, lastCheck: null, lastError: null, formTitle: '', formUrl: '' };
+const DEFAULT_MESSAGE = 'Hi {name},\n\nYour new video is ready! Watch and download it here:\n\n{links}\n\nIf you would like any changes, just reply to this email.\n\nThanks,\n{sender}';
+const DEFAULTS = {
+  auto: true, mode: 'ai', dailyLimit: 10, voiceover: true, since: 0, connectedAt: null, lastCheck: null, lastError: null, formTitle: '', formUrl: '',
+  scriptVersion: 0, senderName: '', emailSubject: 'Your new video is ready', emailMessage: DEFAULT_MESSAGE,
+};
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+const MAX_SEND = 40 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // Storage
@@ -107,6 +113,30 @@ async function callScript(params) {
     // A sign-in page instead of JSON means the web app isn't open to "Anyone".
     throw new Error(/<html/i.test(text)
       ? 'Google answered with a web page instead of form answers. In Apps Script, deploy it again with "Who has access: Anyone", and paste the new Web app URL.'
+      : `Unexpected answer from Google (HTTP ${res.status}).`);
+  }
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** POST to the script (saving videos to Drive, sending email). */
+async function postScript(body) {
+  let res;
+  try {
+    res = await fetch(process.env.GOOGLE_FORM_URL, {
+      method: 'POST', redirect: 'follow', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...body, key: process.env.GOOGLE_FORM_KEY }), signal: AbortSignal.timeout(300_000),
+    });
+  } catch (err) {
+    throw new Error(`Could not reach Google (${err.cause?.code || err.message}). Check the internet connection.`);
+  }
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(/doPost/.test(text)
+      ? 'Your Google script is the old version. Update it (Requests page → "Update your Google script").'
       : `Unexpected answer from Google (HTTP ${res.status}).`);
   }
   if (data.error) throw new Error(data.error);
@@ -311,6 +341,7 @@ async function doCheck() {
       const data = await callScript(cfg.since ? { since: cfg.since - 1000 } : {});
       more = Boolean(data.more);
       cfg.formTitle = data.form?.title || cfg.formTitle;
+      cfg.scriptVersion = Number(data.version) || 1;
       cfg.formUrl = data.form?.url || cfg.formUrl;
       const first = !cfg.connectedAt;
       if (first) cfg.connectedAt = Date.now();
@@ -534,8 +565,28 @@ export async function makeSize(projectId, { format }, ctx) {
 // ---------------------------------------------------------------------------
 
 /** Request list with live job status (finished jobs are written back). */
+const fill = (t, vars) => String(t).replace(/\{(name|sender)\}/g, (_, k) => vars[k] || '');
+
+/** Every finished video of a request (all versions, all sizes). */
+async function requestVideos(r) {
+  const out = [];
+  const projects = [[r.projectId, null], ...(r.extras || []).filter((e) => e.projectId).map((e) => [e.projectId, e.format])];
+  for (const [pid, extraFormat] of projects) {
+    const p = pid && (await loadProject(pid).catch(() => null));
+    if (!p) continue;
+    const format = extraFormat || p.adPlan?.format || '9:16';
+    const size = { '9:16': 'Vertical', '4:5': 'Feed', '1:1': 'Square', '16:9': 'Landscape' }[format] || format;
+    (p.adRenders || []).forEach((v, i) => {
+      if (!v?.file) return;
+      out.push({ key: `${pid}/${v.file}`, projectId: pid, file: v.file, thumb: v.thumb || null, format, label: `Version ${i + 1}${projects.length > 1 ? ` · ${size}` : ''}` });
+    });
+  }
+  return out;
+}
+
 export async function listRequests() {
-  return withRequests((list) => {
+  const cfg = await loadConfig();
+  return withRequests(async (list) => {
     for (const r of list) {
       if (r.status !== 'making') continue;
       const job = r.jobId && getJob(r.jobId);
@@ -563,21 +614,29 @@ export async function listRequests() {
       }
       if (pending) Object.assign(r, pending);
       else {
-        Object.assign(r, { status: 'done', stage: null, progress: null, finishedAt: Date.now() });
+        // Ready for the owner to check; nothing is sent until they approve.
+        Object.assign(r, { status: 'review', stage: null, progress: null, finishedAt: Date.now() });
         for (const e of (r.extras || []).filter((x) => x.status === 'error')) r.notes = [...(r.notes || []), `The ${e.format} size could not be made: ${e.error}`];
       }
     }
-    return list.map((r) => {
+    const views = [];
+    for (const r of list) {
       const m = mapAnswers(r.answers, r.email);
-      return {
+      const ready = ['review', 'done', 'sending', 'sent'].includes(r.status);
+      const vars = { name: m.profile.name || r.name, sender: cfg.senderName };
+      views.push({
         id: r.id, name: r.name, email: r.email, status: r.status, stage: r.stage || null, progress: r.progress ?? null,
         error: r.error || null, notes: r.notes || [], submittedAt: r.submittedAt, receivedAt: r.receivedAt, finishedAt: r.finishedAt || null,
         projectId: r.projectId || null, clientId: r.clientId || null,
         sizes: (r.extras || []).filter((e) => e.projectId).map((e) => ({ format: e.format, projectId: e.projectId })),
         summary: { business: m.business, businessCustom: m.businessCustom, objective: m.objective, direction: m.direction, format: m.format, formats: m.formats, seconds: m.seconds, count: m.count, voiceover: m.voiceover, deadline: m.deadline, photos: m.files.photos.length, logo: m.files.logo.length > 0, clips: m.files.clips.length },
         answers: r.answers.filter((a) => a.type !== 'FILE_UPLOAD').map((a) => ({ title: a.title, answer: asText(a.answer) })),
-      };
-    });
+        videos: ready ? await requestVideos(r) : [],
+        draft: r.lastEmail || { to: r.email || '', subject: fill(cfg.emailSubject, vars), message: fill(cfg.emailMessage, vars) },
+        sendError: r.sendError || null, sentAt: r.sentAt || null, sentTo: r.sentTo || null, links: r.links || [],
+      });
+    }
+    return views;
   });
 }
 
@@ -589,6 +648,7 @@ export async function intakeStatus() {
     key: process.env.GOOGLE_FORM_KEY ? `${process.env.GOOGLE_FORM_KEY.slice(0, 4)}…${process.env.GOOGLE_FORM_KEY.slice(-4)}` : '',
     auto: cfg.auto, mode: cfg.mode, dailyLimit: cfg.dailyLimit, voiceover: cfg.voiceover,
     connectedAt: cfg.connectedAt, lastCheck: cfg.lastCheck, lastError: cfg.lastError, formTitle: cfg.formTitle, formUrl: cfg.formUrl,
+    scriptVersion: cfg.scriptVersion, canEmail: cfg.scriptVersion >= 2, senderName: cfg.senderName, emailSubject: cfg.emailSubject, emailMessage: cfg.emailMessage, defaultMessage: DEFAULT_MESSAGE,
     checkEveryMinutes: Math.round(CHECK_EVERY_MS / 60000),
     ai: aiConfigured(), voice: voiceConfigured(),
   };
@@ -600,6 +660,9 @@ export async function saveIntakeOptions(b = {}) {
   if (b.mode === 'ai' || b.mode === 'auto') cfg.mode = b.mode;
   if (b.dailyLimit !== undefined) cfg.dailyLimit = Math.max(0, Math.min(100, Math.round(Number(b.dailyLimit) || 0)));
   if (typeof b.voiceover === 'boolean') cfg.voiceover = b.voiceover;
+  if (typeof b.senderName === 'string') cfg.senderName = b.senderName.trim().slice(0, 60);
+  if (typeof b.emailSubject === 'string') cfg.emailSubject = b.emailSubject.trim().slice(0, 150) || DEFAULTS.emailSubject;
+  if (typeof b.emailMessage === 'string') cfg.emailMessage = b.emailMessage.slice(0, 5000).trim() || DEFAULT_MESSAGE;
   if (b.resetConnection) Object.assign(cfg, { since: 0, connectedAt: null, lastError: null, formTitle: '', formUrl: '' });
   await saveConfig(cfg);
 }
@@ -608,12 +671,63 @@ export async function makeRequest(id) {
   const r = await withRequests((list) => {
     const x = list.find((y) => y.id === id);
     if (!x) throw Object.assign(new Error('Request not found'), { status: 404 });
-    if (['queued', 'preparing', 'making'].includes(x.status)) throw Object.assign(new Error('This request is already being made.'), { status: 409 });
+    if (['queued', 'preparing', 'making', 'sending'].includes(x.status)) throw Object.assign(new Error('This request is already being made.'), { status: 409 });
     Object.assign(x, { status: 'queued', error: null });
     return x;
   });
   runQueue();
   return r;
+}
+
+/**
+ * The owner approved: upload the chosen videos to their Google Drive and email
+ * the client links, through their Google script. Runs in the background.
+ */
+export async function sendRequest(id, b = {}) {
+  const cfg = await loadConfig();
+  if (!formConfigured()) throw Object.assign(new Error('Connect your Google Form first.'), { status: 400 });
+  if (cfg.scriptVersion < 2) throw Object.assign(new Error('Your Google script needs updating before it can email clients. See "Update your Google script" on this page.'), { status: 400 });
+  const to = String(b.to || '').trim();
+  if (!EMAIL_RE.test(to)) throw Object.assign(new Error('Type the client\'s email address.'), { status: 400 });
+  const subject = String(b.subject || '').trim().slice(0, 150) || cfg.emailSubject;
+  const message = String(b.message || '').slice(0, 5000).trim();
+  if (!message) throw Object.assign(new Error('Write a message for the email.'), { status: 400 });
+  const view = (await listRequests()).find((r) => r.id === id);
+  if (!view) throw Object.assign(new Error('Request not found'), { status: 404 });
+  if (!['review', 'done', 'sent'].includes(view.status)) throw Object.assign(new Error(view.status === 'sending' ? 'Already sending.' : 'The videos are not ready yet.'), { status: 409 });
+  const keys = Array.isArray(b.videos) ? b.videos.map(String) : [];
+  const chosen = view.videos.filter((v) => keys.includes(v.key));
+  if (!chosen.length) throw Object.assign(new Error('Tick at least one video to send.'), { status: 400 });
+  for (const v of chosen) {
+    const st = await fs.stat(path.join(projectDir(v.projectId), 'ad-output', path.basename(v.file))).catch(() => null);
+    if (!st) throw Object.assign(new Error(`${v.label} is missing. Make the videos again.`), { status: 400 });
+    if (st.size > MAX_SEND) throw Object.assign(new Error(`${v.label} is too big to send (over 40 MB).`), { status: 400 });
+  }
+  const before = view.status === 'sent' ? 'sent' : 'review';
+  const lastEmail = { to, subject, message };
+  await patchRequest(id, { status: 'sending', stage: 'Saving the videos to your Google Drive', sendError: null, lastEmail });
+
+  (async () => {
+    try {
+      const links = [];
+      const base = (view.name || 'Video').replace(/[\\/:*?"<>|]+/g, '').slice(0, 50).trim() || 'Video';
+      for (const [i, v] of chosen.entries()) {
+        await patchRequest(id, { stage: `Saving video ${i + 1} of ${chosen.length} to your Google Drive` });
+        const data = (await fs.readFile(path.join(projectDir(v.projectId), 'ad-output', path.basename(v.file)))).toString('base64');
+        const up = await postScript({ action: 'upload', folder: base, name: `${base} - ${v.label.replace(/ · /g, ' ')}.mp4`, type: 'video/mp4', data });
+        if (up.shared === false) throw new Error('Google Drive would not make a shareable link (your account blocks link sharing).');
+        links.push({ name: v.label, url: up.url });
+      }
+      await patchRequest(id, { stage: `Emailing ${to}` });
+      await postScript({ action: 'email', to, subject, body: message, links, senderName: cfg.senderName });
+      await patchRequest(id, { status: 'sent', stage: null, sentAt: Date.now(), sentTo: to, links });
+      log('info', `form request ${id}: emailed ${chosen.length} video(s) to ${to}`);
+    } catch (err) {
+      log('warn', `form request ${id}: send failed: ${err.message}`);
+      await patchRequest(id, { status: before, stage: null, sendError: `Not sent: ${err.message}` });
+    }
+  })();
+  return { ok: true };
 }
 
 export async function dismissRequest(id) {
@@ -627,7 +741,10 @@ export function startIntake(run) {
   startJob = run;
   // Requests caught mid-way by a restart go back in the queue.
   withRequests((list) => {
-    for (const r of list) if (r.status === 'preparing') Object.assign(r, { status: 'queued', stage: null });
+    for (const r of list) {
+      if (r.status === 'preparing') Object.assign(r, { status: 'queued', stage: null });
+      if (r.status === 'sending') Object.assign(r, { status: r.sentAt ? 'sent' : 'review', stage: null, sendError: 'Not sent: Cutline was closed while sending. Press Approve and send again.' });
+    }
   }).then(() => runQueue()).catch(() => {});
   const tick = () => formConfigured() && checkNow().catch(() => {});
   setTimeout(tick, 5000).unref();

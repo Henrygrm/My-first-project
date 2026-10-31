@@ -37,9 +37,27 @@ for (const [id, name, type] of [['F1', 'p1.jpg', 'image/jpeg'], ['F2', 'p2.jpg',
 const info = (id) => ({ id, name: FILES[id].name, size: FILES[id].size, type: FILES[id].type });
 
 // --- stand-in Apps Script web app ------------------------------------------
-const form = { responses: [], key: KEY, calls: 0 };
+const form = { responses: [], key: KEY, calls: 0, version: 1, uploads: [], emails: [], failEmail: false };
 const CHUNK = 64 * 1024; // small, so downloads take several pieces
-http.createServer((req, res) => {
+http.createServer(async (req, res) => {
+  if (req.method === 'POST') {
+    let raw = '';
+    for await (const c of req) raw += c;
+    const b = JSON.parse(raw);
+    const send = (o) => res.end(JSON.stringify(o));
+    if (form.version < 2) return send({ error: 'Script function not found: doPost' }); // what an old script does (as an HTML page really)
+    if (b.key !== form.key) return send({ error: 'The connection code is wrong.' });
+    if (b.action === 'upload') {
+      form.uploads.push({ name: b.name, folder: b.folder, bytes: Buffer.from(b.data, 'base64').length });
+      return send({ ok: true, id: `D${form.uploads.length}`, url: `https://drive.google.com/file/d/D${form.uploads.length}/view`, shared: true });
+    }
+    if (b.action === 'email') {
+      if (form.failEmail) return send({ error: 'Service invoked too many times for one day: email.' });
+      form.emails.push(b);
+      return send({ ok: true, remaining: 99 });
+    }
+    return send({ error: 'Unknown action' });
+  }
   const u = new URL(req.url, 'http://x');
   const p = Object.fromEntries(u.searchParams);
   form.calls++;
@@ -57,7 +75,7 @@ http.createServer((req, res) => {
   }
   const since = Number(p.since) || 0;
   const list = form.responses.filter((r) => r.time > since).sort((a, b) => a.time - b.time);
-  send({ ok: true, version: 1, form: { title: 'Video request', url: 'https://docs.google.com/forms/d/e/TEST/viewform' }, responses: list.slice(0, 20), more: list.length > 20 });
+  send({ ok: true, version: form.version, form: { title: 'Video request', url: 'https://docs.google.com/forms/d/e/TEST/viewform' }, responses: list.slice(0, 20), more: list.length > 20 });
 }).listen(FORM_PORT, '127.0.0.1');
 await startMock(MOCK_PORT);
 
@@ -151,8 +169,8 @@ try {
   // A full request arrives: the background check picks it up and makes everything.
   form.responses.push({ id: 'R1', time: Date.now(), email: 'hello@beanthere.au', answers: cafeAnswers('Bean There Café') });
   const t0 = Date.now();
-  const r1 = await waitFor(async () => (await intake()).requests.find((r) => r.name === 'Bean There Café' && ['done', 'error'].includes(r.status)), 'request 1');
-  ok(r1.status === 'done', `request made automatically in ${Math.round((Date.now() - t0) / 1000)}s (${r1.status}${r1.error ? ': ' + r1.error : ''})`);
+  const r1 = await waitFor(async () => (await intake()).requests.find((r) => r.name === 'Bean There Café' && ['review', 'error'].includes(r.status)), 'request 1');
+  ok(r1.status === 'review', `request made automatically, waiting for approval in ${Math.round((Date.now() - t0) / 1000)}s (${r1.status}${r1.error ? ': ' + r1.error : ''})`);
   ok(r1.notes.some((n) => /voiceover/i.test(n) && /OpenAI/.test(n)), 'voiceover asked for without an OpenAI key is explained');
   ok(r1.summary.formats.join() === '9:16,4:5' && r1.sizes.length === 1 && r1.sizes[0].format === '4:5', 'second size (4:5 feed) made as its own project');
 
@@ -178,11 +196,42 @@ try {
   ok(cl.brand.colors[0] === '#1b2a4a' && cl.brand.colors[1] === '#d4a017' && cl.brand.direction === 'premium', `brand colours from "Navy and gold" (${cl.brand.colors})`);
   ok(cl.business === 'cafe' && cl.profile.location === 'Glebe' && cl.profile.review.startsWith('Best coffee'), 'business details saved');
 
+  // Approve and email.
+  ok(r1.videos.length === 2 && r1.videos.map((v) => v.format).join() === '9:16,4:5', `both sizes offered for approval (${r1.videos.map((v) => v.label).join(', ')})`);
+  ok(r1.draft.to === 'hello@beanthere.au' && r1.draft.message.includes('Bean There Café') && r1.draft.message.includes('{links}'), 'email draft filled in');
+  ok(form.uploads.length === 0 && form.emails.length === 0, 'nothing sent before approval');
+  const sendBody = { ...r1.draft, subject: 'Your breakfast video', videos: r1.videos.map((v) => v.key) };
+  let sr = await j(`/api/intake/requests/${r1.id}/send`, { method: 'POST', body: sendBody });
+  ok(sr.status === 400 && /needs updating/.test(sr.data.error), 'old Google script: asked to update it first');
+  form.version = 2;
+  await j('/api/intake/check', { method: 'POST' });
+  ok((await intake()).canEmail, 'updated script detected');
+  ok((await j(`/api/intake/requests/${r1.id}/send`, { method: 'POST', body: { ...sendBody, to: 'not-an-email' } })).status === 400, 'bad email address refused');
+  ok((await j(`/api/intake/requests/${r1.id}/send`, { method: 'POST', body: { ...sendBody, videos: [] } })).status === 400, 'must pick a video');
+  ok((await j(`/api/intake/requests/${r1.id}/send`, { method: 'POST', body: { ...sendBody, videos: ['../../etc/passwd'] } })).status === 400, 'unknown video refused');
+  ok((await j(`/api/intake/requests/${r1.id}/send`, { method: 'POST', body: sendBody, headers: { origin: 'https://evil.example.com' } })).status === 403, 'other websites cannot send email');
+  form.failEmail = true;
+  await j(`/api/intake/requests/${r1.id}/send`, { method: 'POST', body: sendBody });
+  let after = await waitFor(async () => (await intake()).requests.find((r) => r.id === r1.id && r.status !== 'sending'), 'failed send');
+  ok(after.status === 'review' && /Not sent: Service invoked too many times/.test(after.sendError), `Gmail refusing is explained and nothing marked sent ("${after.sendError}")`);
+  form.failEmail = false;
+  form.uploads = [];
+  sr = await j(`/api/intake/requests/${r1.id}/send`, { method: 'POST', body: sendBody });
+  ok(sr.status === 200, 'approved and sending');
+  after = await waitFor(async () => (await intake()).requests.find((r) => r.id === r1.id && r.status !== 'sending'), 'send');
+  ok(after.status === 'sent' && after.sentTo === 'hello@beanthere.au' && after.links.length === 2, `sent (${after.status}${after.sendError ? ': ' + after.sendError : ''})`);
+  const sizes = [];
+  for (const v of r1.videos) sizes.push((await fs.stat(path.join(TMP, 'data', 'projects', v.projectId, 'ad-output', v.file))).size);
+  ok(form.uploads.length === 2 && form.uploads.every((u, i) => u.bytes === sizes[i] && u.folder === 'Bean There Café' && u.name.endsWith('.mp4')), `both MP4s uploaded whole to Drive (${form.uploads.map((u) => u.name).join(', ')})`);
+  const em = form.emails.at(-1);
+  ok(form.emails.length === 1 && em.to === 'hello@beanthere.au' && em.subject === 'Your breakfast video' && em.links.length === 2 && em.links.every((l) => l.url.startsWith('https://drive.google.com/')) && em.body.includes('{links}'), 'one email with both links');
+  ok(after.draft.subject === 'Your breakfast video', 'sent email remembered for "Send again"');
+
   // Same client again (same email, name typed differently), free engine this time.
   await j('/api/intake/settings', { method: 'POST', body: { mode: 'auto' } });
   form.responses.push({ id: 'R2', time: Date.now(), email: 'hello@beanthere.au', answers: [T('Business name', 'bean there cafe'), T('What do you sell or offer?', 'Coffee'), T('How long should the video be?', 'Not sure, you decide'), T('How many versions would you like to choose from?', '1')] });
-  const r2 = await waitFor(async () => (await intake()).requests.find((r) => r.name === 'bean there cafe' && ['done', 'error'].includes(r.status)), 'request 2');
-  ok(r2.status === 'done' && r2.clientId === r1.clientId && (await j('/api/clients')).data.length === 1, 'returning client recognised (no duplicate)');
+  const r2 = await waitFor(async () => (await intake()).requests.find((r) => r.name === 'bean there cafe' && ['review', 'error'].includes(r.status)), 'request 2');
+  ok(r2.status === 'review' && r2.clientId === r1.clientId && (await j('/api/clients')).data.length === 1, 'returning client recognised (no duplicate)');
   const p2 = (await j(`/api/projects/${r2.projectId}`)).data;
   ok(p2.adPlan.source === 'auto' && p2.adPlan.seconds === 15, 'free engine used; "not sure" length → 15s');
   ok(p2.adAssets.filter((a) => a.kind === 'photo').length === 2 && p2.adAssets.some((a) => a.kind === 'logo'), 'no new photos sent → their saved photos and logo used');
@@ -205,6 +254,7 @@ try {
   await start();
   it = await intake();
   ok(it.configured && it.requests.length === 4 && it.requests.find((r) => r.id === r1.id).sizes.length === 1, 'requests, links and connection survive a restart');
+  ok(it.requests.find((r) => r.id === r1.id).status === 'sent', 'sent status survives a restart');
   const gs = await fetch(B + '/api/intake/script');
   ok((await gs.text()).includes('function setupCutline'), 'the Google script can be copied from Cutline');
   await j('/api/intake/settings', { method: 'POST', body: { url: '', key: '' } });

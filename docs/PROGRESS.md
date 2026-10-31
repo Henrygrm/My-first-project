@@ -2,7 +2,7 @@
 
 Read `docs/ROADMAP.md` first (audit, technology decisions, plan). This file records what is done and what is next, so a new session can continue.
 
-## Status: v3.1.0 (2026-10-31)
+## Status: v3.2.0 (2026-10-31)
 
 ### Done
 - **Foundations:** cross-site/Host request guard; persistent job records with logs, interrupted-job detection and retry (`RUNNERS` registry in `server/index.js`); `project.prev.json` backups; `data/logs/cutline.log`; "Try again" in the UI.
@@ -35,6 +35,13 @@ Read `docs/ROADMAP.md` first (audit, technology decisions, plan). This file reco
   - Safeguards: a daily limit, answers sent before connecting wait for the owner, and the URL must be a script.google.com address.
   - UI: the **Requests** page. Tests: `npm run test:form` (a stand-in Apps Script, 34 checks), plus the script itself run against fake Google services.
   - Limits: it only runs while Cutline is open on the Mac. Google can't create file upload questions from a script, so the owner adds 3 by hand. Uploads over 50 MB stay in Drive.
+
+- **Approve and email (v3.2):**
+  - Finished requests wait at **Check and approve**. The owner watches the videos, ticks which to send and edits the email, then clicks **Approve and send**.
+  - Cutline POSTs each MP4 to the script's `doPost` (`upload`), which saves it to Drive › Cutline videos › client and shares it as a view-only link. Then `email` sends from the owner's Gmail (MailApp) with button links.
+  - Script version 2 is needed; the page shows update steps when an older one is detected.
+  - Nothing is ever sent automatically. A failed send returns to review with the reason.
+  - Gmail limit: about 100 emails a day on a personal account.
 
 ### Owner decisions
 - Approved: Claude photo analysis and frame review; OpenAI voiceover.

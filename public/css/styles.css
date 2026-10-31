@@ -421,3 +421,23 @@ select { appearance: none; padding-right: 28px !important; background-image: lin
 .req-guide summary { cursor: pointer; font-weight: 600; font-size: 13.5px; margin-top: 6px; }
 .req-guide ol { padding-left: 20px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.45; }
 @media (max-width: 980px) { .req-layout { grid-template-columns: 1fr; } .req-setup.first { order: -1; } }
+
+.req-review { display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+.req-videos { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.req-video { display: grid; gap: 6px; flex: none; }
+.req-video video { height: 260px; max-width: 70vw; border-radius: 10px; background: #000; display: block; }
+.req-pick { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.req-email { display: grid; gap: 10px; }
+.req-email .label { display: grid; gap: 4px; }
+.req-email input, .req-email textarea, #req-email-box textarea, #req-email-box input { width: 100%; }
+.req-email textarea, #req-email-box textarea { resize: vertical; font: inherit; }
+.req-sentline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--ok); }
+.req-sentline .ic { width: 15px; height: 15px; }
+.req-sentline a { color: inherit; }
+.req-again summary { cursor: pointer; color: var(--muted); }
+.req-again[open] .req-review { margin-top: 10px; }
+.req-update { background: rgba(255,204,102,.08); border: 1px solid rgba(255,204,102,.3); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; margin-top: 12px; }
+.req-update ol { padding-left: 18px; display: grid; gap: 6px; margin: 8px 0 0; }
+.req-h3 { margin: 0 0 4px; font-size: 14.5px; }
+#req-email-box > p { margin: 0 0 12px; }
+@media (max-width: 560px) { .req-video video { height: 200px; } }

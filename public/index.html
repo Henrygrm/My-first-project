@@ -263,6 +263,26 @@
             <input id="req-limit" type="number" min="0" max="100" step="1" class="narrow" />
             <p class="muted small">Protects your AI credit if the form link gets shared or spammed. Extra requests wait for you to press Make videos.</p>
           </div>
+          <div class="req-update" id="req-update" hidden>
+            <b>Update your Google script</b> so Cutline can email clients:
+            <ol>
+              <li><button class="btn btn-sm req-copy-script" type="button"><svg class="ic"><use href="#i-copy"/></svg> Copy the new script</button></li>
+              <li>Open your Cutline project at <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a>. Select all the text, paste over it, and click save.</li>
+              <li>Choose <b>setupCutline</b> → <b>Run</b>, and allow the new permission (sending email as you).</li>
+              <li><b>Deploy</b> → <b>Manage deployments</b> → pencil icon → Version: <b>New version</b> → <b>Deploy</b>. The URL stays the same.</li>
+              <li>Click <b>Check now</b> here.</li>
+            </ol>
+          </div>
+          <hr class="sep" />
+          <div id="req-email-box">
+            <h3 class="req-h3">Emails to clients</h3>
+            <p class="muted small">After you approve a request's videos, Cutline emails the client links to watch and download them. Nothing is sent without your click.</p>
+            <div class="set-row"><label class="label" for="req-sender">Your name or business (shown as the sender)</label><input id="req-sender" type="text" maxlength="60" placeholder="e.g. Henry from Cutline Media" /></div>
+            <div class="set-row"><label class="label" for="req-subject">Subject</label><input id="req-subject" type="text" maxlength="150" /></div>
+            <div class="set-row"><label class="label" for="req-message">Message</label><textarea id="req-message" rows="8" maxlength="5000"></textarea>
+              <p class="muted small">{name} = the client's business, {sender} = your name, {links} = the video buttons. You can still edit each email before sending.</p></div>
+            <div class="key-row"><button class="btn" id="req-email-save" type="button">Save email settings</button><button class="btn btn-ghost" id="req-email-reset" type="button">Reset message</button></div>
+          </div>
           <details class="req-guide" id="req-guide">
             <summary>How to connect your form (5 minutes)</summary>
             <ol>
