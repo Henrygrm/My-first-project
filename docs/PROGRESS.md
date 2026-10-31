@@ -22,7 +22,11 @@ Read `docs/ROADMAP.md` first (audit, technology decisions, plan). This file reco
 - **Clients** (`server/lib/clients.js`): brand kits, logo-derived colours, media library, new project per client, duplicate project.
 - **UI:** Ads page, Studio (live preview, timeline, inspector, versions), Clients page, Settings services list, phone layout fixes.
 - **Business profiles:** café added (7 types).
-- **Tests:** `npm test` covers all of the above against the mock Claude API (`scripts/mock-anthropic.mjs`).
+- **Tests:** `npm test` covers all of the above against the mock Claude API (`scripts/mock-anthropic.mjs`). `npm run test:edge`: no media, odd image formats, corrupt files, bad requests, junk studio input, hard kill mid-render then retry, Claude unreachable.
+- **Validation:** 2 ads each for café, restaurant, barber, detailing and trades (free mode, test logos and photos); issues found and fixed:
+  - text unit bug; safe-zone auto-fit allowing for camera moves; camera-aware QA boxes
+  - logo plates; claim-style hooks filtered; frozen list scenes; loudness parsing
+- **Automatic corrections** before rendering (`autoFix` in `ads.js`); final report in `docs/REPORT.md`.
 
 ### Owner decisions
 - Approved: Claude photo analysis and frame review; OpenAI voiceover.

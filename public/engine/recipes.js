@@ -54,7 +54,7 @@ function background(kit, r, { photo, prefer } = {}) {
   }
   const layer = { type: 'bg', kind, z: 0.9 };
   switch (kind) {
-    case 'photo': Object.assign(layer, { src: photo, colors: ['bg'], tint: kit.palette.dark ? 0.6 : 0.5, blur: 0.035 }); break;
+    case 'photo': Object.assign(layer, { src: photo, colors: ['bg'], tint: kit.palette.dark ? 0.7 : 0.66, blur: 0.035 }); break;
     case 'studio': Object.assign(layer, { colors: ['bg', 'bg2'], floor: 0.68 }); break;
     case 'spotlight': Object.assign(layer, { colors: ['bg', kit.palette.dark ? 'bg2' : 'surface'], cy: 0.42 }); break;
     case 'radial': Object.assign(layer, { colors: ['bg2', 'bg'], cy: 0.4 }); break;
@@ -118,25 +118,35 @@ function headline(kit, r, spec, { y, size = 0.1, align = 'center', x = 0.5, w = 
   if (spec.headline) {
     layers.push({
       type: 'text', id: 'headline', text: spec.headline, role, size, x, y, w, maxW: w, align, anchor, lines,
-      color, onPhoto, textAnim: spec.textAnim || textAnim(kit, r), in: { type: 'none', at }, textAt: at, box,
+      color, onPhoto, textAnim: spec.textAnim || textAnim(kit, r), in: { type: 'none', at }, textAt: at, box, group: 'head',
       glow: kit.direction.glow && !onPhoto ? true : undefined,
     });
   }
   if (spec.subline) {
     layers.push({
-      type: 'text', id: 'subline', text: spec.subline, role: 'body', size: 0.038, x, y: y + (anchor === 'top' ? size * 1.15 * Math.min(lines, estLines(spec.headline, size, w)) + subGap : size * 0.5 + subGap), w, maxW: w, align, anchor: 'top', lines: 2,
-      color: onPhoto ? '#ffffff' : 'textMuted', onPhoto, textAnim: 'none', in: { type: 'rise', at: at + 0.45, dur: 0.5 },
+      type: 'text', id: 'subline', text: spec.subline, role: 'body', size: 0.038, x, y: y + (anchor === 'top' ? headLines(spec.headline, size, w, kit, lines) * size * lineK(kit) : size * 0.5 * (kit.W / kit.H)) + subGap, w, maxW: w, align, anchor: 'top', lines: 2,
+      color: onPhoto ? '#ffffff' : 'text', opacity: onPhoto ? 1 : 0.85, onPhoto, textAnim: 'none', in: { type: 'rise', at: at + 0.45, dur: 0.5 }, group: 'head',
     });
   }
   return layers;
 }
 
-/** Rough line count estimate so the subline sits under the headline. */
-function estLines(text, size, w) {
+/** Estimated headline line count (display font, size as a fraction of the frame width). */
+function headLines(text, size, w, kit, max = 3) {
   if (!text) return 0;
-  const charsPerLine = Math.max(6, Math.floor((w / size) * 1.9));
-  return clamp(Math.ceil(String(text).length / charsPerLine), 1, 3) * 0.75;
+  const sz = size * (kit.direction?.fonts?.display?.scale || 1);
+  const charsPerLine = Math.max(5, Math.floor(Math.min(w, 0.82) / (sz * 0.6)));
+  return Math.min(max, Math.ceil(String(text).replace(/\*/g, '').length / charsPerLine));
 }
+
+/** One headline line's height as a fraction of the frame HEIGHT, per unit of size (sizes are fractions of the width). */
+const lineK = (kit) => (kit.direction?.fonts?.display?.scale || 1) * (kit.direction?.fonts?.display?.lineHeight || 1.08) * (kit.W / kit.H);
+
+/** Rough height (fraction of frame height) of a headline + subline block. */
+function textBlockHeight(spec, size, w, kit) {
+  return headLines(spec.headline, size, w, kit) * size * lineK(kit) + (spec.subline ? 0.025 + 0.045 * (kit.W / kit.H) : 0);
+}
+
 
 const hasCut = (kit, id) => Boolean(id && kit.assets[id]?.cut);
 const photoOf = (spec, i = 0) => (i === 0 ? spec.main : spec.alt?.[i - 1]) || null;
@@ -150,11 +160,22 @@ function product_hero(spec, kit, r) {
   const dur = spec.duration;
   const main = spec.main;
   const cut = hasCut(kit, main);
-  const layout = spec.layout ?? Math.floor(r() * 3); // 0 text top, 1 text bottom, 2 text overlaps big
+  let layout = spec.layout ?? Math.floor(r() * 3); // 0 text top, 1 text bottom, 2 text overlaps big
   const S = kit.safe;
+  // A long headline can't fit under the product: put it above instead.
+  if (layout === 1 && textBlockHeight(spec, 0.1, 0.84, kit) > 1 - S.bottom - (0.44 + (kit.square ? 0.56 : 0.42) / 2 + 0.04)) layout = 0;
   const layers = [...background(kit, r, { photo: main, prefer: cut ? pick(['studio', 'spotlight', 'radial', 'mesh'].filter((b) => kit.direction.backgrounds.includes(b) || r() < 0.3), r) || 'studio' : undefined })];
-  const prodY = layout === 0 ? 0.58 : layout === 1 ? 0.44 : 0.52;
-  const prodH = kit.square ? 0.56 : 0.42;
+  let prodY = layout === 0 ? 0.58 : layout === 1 ? 0.44 : 0.52;
+  let prodH = kit.square ? 0.56 : 0.42;
+  if (layout === 0) {
+    // Keep clear of the headline block above the product.
+    const top = S.top + 0.05 + textBlockHeight(spec, 0.1, 0.84, kit);
+    if (prodY - prodH / 2 < top) {
+      const bottom = 1 - S.bottom + 0.06;
+      prodH = Math.min(prodH, Math.max(0.24, bottom - top));
+      prodY = top + prodH / 2;
+    }
+  }
   layers.push({ type: 'light', kind: 'glow', x: 0.5, y: prodY, r: 0.55, color: 'accent', strength: kit.palette.dark ? 0.35 : 0.22, pulse: true, z: 0.5 });
   if (kit.direction.id === 'futuristic' || kit.direction.id === 'energetic') layers.push({ type: 'light', kind: 'rays', x: 0.5, y: prodY, r: 1.0, color: 'accent', strength: 0.1, z: 0.6 });
   const entrance = spec.entrance || pick(cut ? ['rise', 'drop', 'zoom', 'tilt', 'blur', 'scaleDown'].filter((e) => kit.direction.motion.entrances.includes(e) || ['rise', 'tilt'].includes(e)) : ['rise', 'zoom', 'blur'], r);
@@ -253,7 +274,7 @@ function kinetic(spec, kit, r) {
     color: 'text', textAnim: spec.textAnim || textAnim(kit, r), textAt: 0.15, stagger: 0.11, underline: layout === 0 ? { color: 'accent' } : undefined,
     glow: kit.direction.glow ? true : undefined, idle: { type: kit.direction.id === 'energetic' ? 'pulse' : 'breathe', amt: 0.5 },
   });
-  if (spec.subline) layers.push({ type: 'text', text: spec.subline, role: 'body', size: 0.04, x: 0.5, y: 0.74, w: 0.84, maxW: 0.84, align: layout === 1 ? 'left' : 'center', anchor: 'top', color: 'textMuted', textAnim: 'none', in: { type: 'rise', at: 0.8, dur: 0.5 } });
+  if (spec.subline) layers.push({ type: 'text', text: spec.subline, role: 'body', size: 0.042, x: 0.5, y: 0.74, w: 0.84, maxW: 0.84, align: layout === 1 ? 'left' : 'center', anchor: 'top', color: 'text', opacity: 0.9, textAnim: 'none', in: { type: 'rise', at: 0.8, dur: 0.5 } });
   layers.push(...particlesFor(kit, r, { x: 0, y: 0, w: 1, h: 1 }, { density: 0.5, z: 0.4 }));
   return { layers, camera: camera(kit, r, dur, spec.camera || kit.direction.motion.camera === 'dynamic' ? 'punch' : 'push'), sfx: [{ t: 0.15, kind: kit.direction.sound === 'punchy' ? 'impact' : 'whoosh' }] };
 }
@@ -285,7 +306,8 @@ function features(spec, kit, r) {
     layers.push({ type: 'icon', icon: icons[i % icons.length], x: 0.13, y, size: 0.04, lineWidth: 2.8, color: 'onAccent', disc: 'accent', in: { type: 'pop', at, dur: 0.4 }, z: -0.1 });
     layers.push({ type: 'text', text: it, role: 'body', size: 0.05, x: 0.56, y, w: 0.66, maxW: 0.66, align: 'left', anchor: 'middle', lines: 2, color: layout === 1 ? 'onSurface' : 'text', textAnim: 'none', in: { type: 'slideR', at: at + 0.05, dur: 0.5 }, z: -0.1 });
   });
-  return { layers, camera: camera(kit, r, dur, spec.camera || 'still'), sfx: items.map((_, i) => ({ t: 0.55 + i * 0.32, kind: 'pop' })) };
+  // A slow push keeps the frame alive after the list has appeared.
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'push'), sfx: items.map((_, i) => ({ t: 0.55 + i * 0.32, kind: 'pop' })) };
 }
 
 function offer(spec, kit, r) {
@@ -351,7 +373,7 @@ function process(spec, kit, r) {
     const label = spec.items?.[i] || `Step ${i + 1}`;
     layers.push({ type: 'text', text: label, role: 'body', size: 0.04, x: 0.81, y, w: 0.3, maxW: 0.3, align: 'left', anchor: 'middle', lines: 3, color: 'text', textAnim: 'none', in: { type: 'fade', at: at + 0.25, dur: 0.4 }, z: 0 });
   });
-  return { layers, camera: camera(kit, r, dur, spec.camera || 'still'), sfx: photos.map((_, i) => ({ t: 0.3 + i * step, kind: 'click' })) };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'pan'), sfx: photos.map((_, i) => ({ t: 0.3 + i * step, kind: 'click' })) };
 }
 
 function footage(spec, kit, r) {
@@ -385,17 +407,18 @@ function cta(spec, kit, r) {
   const logo = kit.logo;
   let y = kit.square ? 0.2 : S.top + 0.08;
   if (logo) {
-    layers.push({ type: 'logo', src: logo, x: 0.5, y: y + 0.05, w: 0.5, h: 0.11, plate: kit.logoNeedsPlate ? 'surface' : undefined, in: { type: 'zoom', at: 0.05, dur: 0.7, ease: 'glide' }, sweep: { at: 0.8, dur: 0.9, strength: 0.7 }, z: 0 });
+    layers.push({ type: 'logo', src: logo, x: 0.5, y: y + 0.05, w: 0.5, h: 0.11, plate: kit.logoPlate || undefined, in: { type: 'zoom', at: 0.05, dur: 0.7, ease: 'glide' }, sweep: { at: 0.8, dur: 0.9, strength: 0.7 }, z: 0 });
     y += 0.16;
   } else if (spec.main && hasCut(kit, spec.main)) {
     layers.push({ type: 'cutout', src: spec.main, x: 0.5, y: y + 0.09, w: 0.6, h: 0.2, in: { type: 'rise', at: 0.05, dur: 0.6 }, idle: { type: 'float' }, sweep: { at: 0.9, dur: 0.8 }, z: -0.05 });
     y += 0.22;
   }
-  layers.push({ type: 'text', id: 'headline', text: spec.headline, role: 'display', size: kit.square ? 0.1 : 0.115, x: 0.5, y, w: 0.86, maxW: 0.86, anchor: 'top', lines: 3, color: 'text', textAnim: spec.textAnim || textAnim(kit, r), textAt: 0.3, glow: kit.direction.glow ? true : undefined });
-  const btnY = Math.min(1 - S.bottom - 0.12, y + 0.115 * 1.1 * Math.min(3, estLines(spec.headline, 0.115, 0.86) + 0.6) + 0.07);
-  layers.push({ type: 'button', text: spec.items?.[0] || 'Book now', x: 0.5, y: btnY, size: 0.042, color: 'accent', in: { type: 'pop', at: 0.75, dur: 0.5 }, z: 0 });
+  layers.push({ type: 'text', id: 'headline', text: spec.headline, role: 'display', size: kit.square ? 0.1 : 0.115, x: 0.5, y, w: 0.86, maxW: 0.86, anchor: 'top', lines: 3, color: 'text', textAnim: spec.textAnim || textAnim(kit, r), textAt: 0.3, glow: kit.direction.glow ? true : undefined, group: 'cta' });
+  const headSize = kit.square ? 0.1 : 0.115;
+  const btnY = Math.min(1 - S.bottom - 0.12, y + headLines(spec.headline, headSize, 0.86, kit) * headSize * lineK(kit) + 0.06);
+  layers.push({ type: 'button', text: spec.items?.[0] || 'Book now', x: 0.5, y: btnY, size: 0.042, color: 'accent', in: { type: 'pop', at: 0.75, dur: 0.5 }, z: 0, group: 'cta' });
   if (spec.subline) {
-    layers.push({ type: 'text', text: spec.subline, role: 'body', size: 0.036, x: 0.5, y: btnY + 0.08, w: 0.84, maxW: 0.84, anchor: 'top', lines: 2, color: 'textMuted', textAnim: 'none', in: { type: 'rise', at: 1.05, dur: 0.5 }, z: 0 });
+    layers.push({ type: 'text', text: spec.subline, role: 'body', size: 0.036, x: 0.5, y: btnY + 0.08, w: 0.84, maxW: 0.84, anchor: 'top', lines: 2, color: 'textMuted', textAnim: 'none', in: { type: 'rise', at: 1.05, dur: 0.5 }, z: 0, group: 'cta' });
   }
   layers.push(...particlesFor(kit, r, { x: 0, y: 0, w: 1, h: 1 }, { density: 0.4, z: 0.5 }));
   return { layers, camera: camera(kit, r, dur, spec.camera || 'push'), sfx: [{ t: 0.05, kind: 'whoosh' }, { t: 0.75, kind: 'pop' }, { t: 0.8, kind: 'shimmer' }] };
@@ -406,7 +429,7 @@ const BUILDERS = { product_hero, photo_full, gallery, compare, kinetic, features
 /**
  * Build one scene. spec: { recipe, duration, headline, subline, items, main, alt[], video, from,
  * layout?, entrance?, textAnim?, transition?, seed? }
- * kit: { W, H, square, safe, palette, direction (with id), industry, assets, logo, logoNeedsPlate, fonts }
+ * kit: { W, H, square, safe, palette, direction (with id), industry, assets, logo, logoPlate, fonts }
  */
 export function buildScene(spec, kit) {
   const r = rng(spec.seed ?? kit.seed ?? 1);

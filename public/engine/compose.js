@@ -31,7 +31,7 @@ export function timeScenes(durations, bpm) {
 }
 
 /**
- * board: { direction, format, palette, scenes: [spec], seed, music?: { bpm }, logo?, logoNeedsPlate? }
+ * board: { direction, format, palette, scenes: [spec], seed, music?: { bpm }, logo?, logoPlate? }
  * assets: { id: { cut: bool, w, h } } (what exists; the renderer loads pixels)
  */
 export function compose(board, assets, industry = 'other') {
@@ -44,7 +44,7 @@ export function compose(board, assets, industry = 'other') {
   const W = Math.round((fmt.w * scale) / 2) * 2, H = Math.round((fmt.h * scale) / 2) * 2;
   const kit = {
     W, H, square: H / W < 1.5, safe: fmt.safe, palette: board.palette, direction, industry, assets,
-    logo: board.logo || null, logoNeedsPlate: Boolean(board.logoNeedsPlate), fonts: direction.fonts, seed,
+    logo: board.logo || null, logoPlate: board.logoPlate || null, fonts: direction.fonts, seed,
   };
   const times = timeScenes(board.scenes.map((s) => s.duration || 2.5), board.music?.bpm);
   const scenes = [];
@@ -73,13 +73,13 @@ export function compose(board, assets, industry = 'other') {
     overlays.push({
       type: 'logo', src: board.logo, x: 0.16, y: fmt.safe.top * 0.62, w: 0.2, h: 0.045, fixed: true, opacity: 0.92,
       start: scenes[1].start + 0.3, end: scenes[scenes.length - 1].start, in: { type: 'fade', at: scenes[1].start + 0.3, dur: 0.4 }, mb: false,
-      plate: board.logoNeedsPlate ? 'surface' : undefined,
+      plate: board.logoPlate || undefined,
     });
   }
 
   return {
     version: 3,
-    width: W, height: H, fps: 30, duration, format: board.format || '9:16',
+    width: W, height: H, fps: 30, duration, format: board.format || '9:16', safe: fmt.safe,
     palette: board.palette, fonts: direction.fonts, direction: board.direction,
     motion: { speed: direction.motion.speed, ease: direction.motion.ease, blur: true },
     shape: direction.shape, emStyle: direction.emStyle,

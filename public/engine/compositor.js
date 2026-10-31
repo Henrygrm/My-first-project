@@ -274,6 +274,8 @@ function drawLayer(ctx, layer, lt, sceneDur, env) {
     ctx.globalAlpha = s.alpha * (samples === 1 ? 1 : 1 / (i + 1)) * (env.alphaMul ?? 1);
     if (layer.blend) ctx.globalCompositeOperation = layer.blend;
     applyCamera(ctx, layer, env);
+    const shift = env.shifts?.get(layer);
+    if (shift) ctx.translate(0, shift);
     if (layer.type !== 'bg') {
       const b = boxOf(layer, env);
       ctx.translate(b.cx + s.dx, b.cy + s.dy);
@@ -614,11 +616,14 @@ function drawSweepOn(ctx, src, rect, lt, sweep, env) {
 
 // --- text -----------------------------------------------------------------------
 
+/** Text never runs wider than 82% of the frame, so camera push-ins can't carry it into the edges. */
+const textMaxW = (layer) => Math.min(layer.maxW ?? 0.84, 0.82);
+
 function drawText(ctx, layer, lt, env, st) {
   const { W, m } = env;
   const role = env.fonts[layer.role || 'display'] || env.fonts.display;
   const size = (layer.size || 0.08) * m * (role.scale || 1);
-  const maxW = (layer.maxW ?? 0.84) * W;
+  const maxW = textMaxW(layer) * W;
   const tracking = layer.tracking ?? role.tracking ?? 0;
   // Numbers count up (layout uses the final number so the block doesn't jump).
   let counted = null;
@@ -990,6 +995,7 @@ function cameraAt(scene, lt) {
 }
 
 function drawScene(ctx, scene, lt, env) {
+  env.shifts = safeShifts(scene, env, ctx);
   env.cam = cameraAt(scene, lt);
   for (const layer of scene.layers) drawLayer(ctx, layer, lt, scene.duration, env);
   env.cam = null;
@@ -1119,6 +1125,69 @@ function transitionComposite(ctx, A, B, type, p, env, dir = 1) {
   ctx.restore();
 }
 
+/**
+ * Keep text inside the platform safe zone. Text blocks (layers sharing a
+ * `group`, e.g. headline + small line) are measured once per scene and moved
+ * up or down together if they would sit under the app's buttons, allowing for
+ * the camera's push-in. Returns Map(layer → dy px).
+ */
+function safeShifts(scene, env, measureCtx) {
+  if (!env.safe) return null;
+  const key = `shift:${scene.id}:${env.W}x${env.H}`;
+  return cached(env, key, () => {
+    const W = env.W, H = env.H, m = env.m;
+    let zmax = 1;
+    for (let k = 0; k <= 6; k++) zmax = Math.max(zmax, sampleTrack(scene.camera?.zoom, (scene.duration * k) / 6, 1));
+    const margin = 0.012 * H;
+    const top = (env.safe.top * H + margin - H / 2) / zmax + H / 2;
+    const bottom = ((1 - env.safe.bottom) * H - margin - H / 2) / zmax + H / 2;
+    const groups = new Map();
+    for (const layer of scene.layers) {
+      if (layer.type !== 'text' && layer.type !== 'button') continue;
+      if (layer.safe === false) continue;
+      const box = measureBox(layer, env, measureCtx);
+      if (!box) continue;
+      const g = layer.group || layer;
+      const cur = groups.get(g) || { layers: [], y0: Infinity, y1: -Infinity };
+      cur.layers.push(layer);
+      cur.y0 = Math.min(cur.y0, box.y);
+      cur.y1 = Math.max(cur.y1, box.y + box.h);
+      groups.set(g, cur);
+    }
+    const out = new Map();
+    for (const g of groups.values()) {
+      let dy = 0;
+      if (g.y1 - g.y0 > bottom - top) dy = top - g.y0; // taller than the zone: align to its top
+      else if (g.y1 > bottom) dy = bottom - g.y1;
+      else if (g.y0 < top) dy = top - g.y0;
+      if (Math.abs(dy) > 0.5) for (const l of g.layers) out.set(l, dy);
+    }
+    void m;
+    return out;
+  });
+}
+
+/** Pixel box of a text or button layer as laid out (no animation, no camera). */
+function measureBox(layer, env, measureCtx) {
+  const { W, H, m } = env;
+  const cx = (layer.x ?? 0.5) * W, cy = (layer.y ?? 0.5) * H;
+  if (layer.type === 'button') {
+    const role = env.fonts[layer.role || 'body'] || env.fonts.body;
+    const size = (layer.size || 0.045) * m;
+    measureCtx.font = fontString({ ...role, weight: role.boldWeight || role.weight }, size);
+    const w = measureCtx.measureText(layer.text).width + size * 3.2;
+    return { x: cx - w / 2, y: cy - size * 1.15, w, h: size * 2.3 };
+  }
+  const role = env.fonts[layer.role || 'display'] || env.fonts.display;
+  const size = (layer.size || 0.08) * m * (role.scale || 1);
+  const lay = layoutText(measureCtx, { text: layer.text, font: role, size, maxW: textMaxW(layer) * W, maxLines: layer.lines || 3, caseMode: layer.case || role.case, tracking: layer.tracking ?? role.tracking ?? 0, lineHeight: layer.lineHeight || role.lineHeight || 1.06, minSize: size * 0.4, align: layer.align || 'center' });
+  if (!lay.words.length) return null;
+  const anchorY = layer.anchor === 'top' ? 0 : layer.anchor === 'bottom' ? -lay.height : -lay.height / 2;
+  const bw = (layer.w ?? 1) * W;
+  const x = layer.align === 'left' ? cx - bw / 2 : layer.align === 'right' ? cx + bw / 2 - lay.width : cx - lay.width / 2;
+  return { x, y: cy + anchorY, w: lay.width, h: lay.height, size: lay.size };
+}
+
 /** Scene index and local time at composition time t. */
 export function sceneAt(comp, t) {
   let i = comp.scenes.findIndex((s) => t < s.start + s.duration);
@@ -1137,7 +1206,7 @@ export function renderFrame(ctx, comp, t, env) {
     palette: comp.palette, fonts: comp.fonts,
     motionSpeed: comp.motion?.speed || 1, ease: comp.motion?.ease || 'outCubic',
     motionBlur: comp.motion?.blur !== false, radius: comp.shape?.radius ?? 0.015,
-    emStyle: comp.emStyle || 'color', flashColor: comp.palette.flash,
+    emStyle: comp.emStyle || 'color', flashColor: comp.palette.flash, safe: comp.safe,
   });
   if (!env.scratch) {
     env._scratch = {};
@@ -1212,31 +1281,26 @@ export function renderFrame(ctx, comp, t, env) {
   ctx.restore();
 }
 
-/** Positions (pixel boxes) where text was laid out at time t: used by QA safe-zone checks. */
+/** Where text is on screen at time t (safe-zone shift and camera included): used by QA. */
 export function textBoxes(comp, t, measureCtx) {
   const { i, lt } = sceneAt(comp, t);
   const scene = comp.scenes[i];
-  const W = comp.width, H = comp.height, m = Math.min(W, H);
+  const W = comp.width, H = comp.height;
+  const env = { W, H, m: Math.min(W, H), fonts: comp.fonts, safe: comp.safe, makeCanvas: () => null };
+  const shifts = safeShifts(scene, env, measureCtx) || new Map();
+  const cam = cameraAt(scene, lt);
   const out = [];
   for (const layer of scene.layers) {
     if (layer.type !== 'text' && layer.type !== 'button') continue;
     if (layer.start !== undefined && lt < layer.start) continue;
-    const role = comp.fonts[layer.role || (layer.type === 'button' ? 'body' : 'display')] || comp.fonts.display;
-    const cx = (layer.x ?? 0.5) * W, cy = (layer.y ?? 0.5) * H;
-    if (layer.type === 'button') {
-      const size = (layer.size || 0.045) * m;
-      measureCtx.font = fontString(role, size);
-      const w = measureCtx.measureText(layer.text).width + size * 3.2;
-      out.push({ id: layer.id, x: cx - w / 2, y: cy - size * 1.15, w, h: size * 2.3, text: layer.text, layer });
-      continue;
-    }
-    const size = (layer.size || 0.08) * m * (role.scale || 1);
-    const lay = layoutText(measureCtx, { text: layer.text, font: role, size, maxW: (layer.maxW ?? 0.84) * W, maxLines: layer.lines || 3, caseMode: layer.case || role.case, tracking: layer.tracking ?? role.tracking ?? 0, lineHeight: layer.lineHeight || role.lineHeight || 1.06, minSize: size * 0.4, align: layer.align || 'center' });
-    if (!lay.words.length) continue;
-    const anchorY = layer.anchor === 'top' ? 0 : layer.anchor === 'bottom' ? -lay.height : -lay.height / 2;
-    const bw = (layer.w ?? 1) * W;
-    const x = layer.align === 'left' ? cx - bw / 2 : layer.align === 'right' ? cx + bw / 2 - lay.width : cx - lay.width / 2;
-    out.push({ id: layer.id, x, y: cy + anchorY, w: lay.width, h: lay.height, size: lay.size, text: layer.text, layer });
+    const box = measureBox(layer, env, measureCtx);
+    if (!box) continue;
+    const dy = shifts.get(layer) || 0;
+    const f = 1 / (1 + Math.max(-0.6, layer.z ?? 0));
+    const z = 1 + (cam.zoom - 1) * f;
+    const tx = (x) => (x - W / 2 - cam.x * W * f) * z + W / 2;
+    const ty = (y) => (y - H / 2 - cam.y * H * f) * z + H / 2;
+    out.push({ id: layer.id, x: tx(box.x), y: ty(box.y + dy), w: box.w * z, h: box.h * z, size: box.size, text: layer.text, layer });
   }
   return out;
 }

@@ -23,8 +23,10 @@ async function probe(file) {
 
 async function audioStats(file) {
   const { stderr } = await run(FFMPEG, ['-hide_banner', '-nostats', '-i', file, '-af', 'ebur128=peak=true', '-f', 'null', '-']).catch((e) => ({ stderr: String(e.message) }));
-  const lufs = Number(stderr.match(/I:\s+(-?[\d.]+) LUFS/)?.[1]);
-  const peak = Number(stderr.match(/Peak:\s+(-?[\d.]+) dBFS/)?.[1]);
+  // Read the final summary (the per-frame lines earlier start at -70 LUFS).
+  const summary = stderr.slice(stderr.lastIndexOf('Summary:'));
+  const lufs = Number(summary.match(/I:\s+(-?[\d.]+) LUFS/)?.[1]);
+  const peak = Number(summary.match(/Peak:\s+(-?[\d.]+) dBFS/)?.[1]);
   return { lufs, peak };
 }
 

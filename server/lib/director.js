@@ -134,10 +134,22 @@ export function planFree({ business, profile, media, videos = [], count = 2, sec
   // Only facts the business gave us: benefits come from its own services.
   const reasons = services.slice(0, 3);
   const hasReasons = reasons.length >= 2;
-  const hooks = [...business.hooks].sort(() => r() - 0.5);
+  // Template hooks that state facts we can't verify ("most-ordered", "years
+  // without a wash", "best…") are left out: free mode only says what's safe.
+  const CLAIMS = /\b(most|best|never|years?|days?|recogni[sz]e|queue|everyone|dirtiest|#1|award|guarantee|nobody|believe|swear)\b/i;
+  const hooks = business.hooks.filter((h) => !CLAIMS.test(h)).sort(() => r() - 0.5);
+  while (hooks.length < 4) hooks.push(business.captions[hooks.length % business.captions.length]);
   const dirs = direction !== 'auto' ? [direction, direction, direction] : [...(INDUSTRY_DIRECTIONS[industry] || INDUSTRY_DIRECTIONS.other)].sort(() => r() - 0.4);
   const at = (i) => photos.length ? photos[i % photos.length] : null;
   const loc = profile.location;
+  // Factual openers for the trust concept (no claims we can't back up).
+  const trustHook = () => {
+    const options = [hooks[1]];
+    if (loc) options.push(`${loc}, *this one's for you*`, `${loc} locals, meet *${profile.name || 'us'}*`);
+    if (loc && services[0]) options.push(`Looking for *${services[0].toLowerCase()}* in ${loc}?`);
+    if (services[0]) options.push(`${services[0]}, *done properly*`);
+    return pick(options, r);
+  };
 
   const concepts = [];
   // A: product showcase.
@@ -156,7 +168,7 @@ export function planFree({ business, profile, media, videos = [], count = 2, sec
   concepts.push({
     title: 'Why us', angle: 'Trust and proof', objective: 'trust',
     scenes: [
-      { recipe: 'kinetic', headline: loc ? `${loc}, *this one's for you*` : hooks[1], subline: profile.name || '', main: at(0) },
+      { recipe: 'kinetic', headline: trustHook(), subline: profile.name || '', main: at(0) },
       // Process steps describe how it's done (the industry's own steps), so
       // they don't repeat the benefits list that may follow.
       ...(photos.length >= 2 ? [{ recipe: 'process', headline: 'How we do it', items: business.captions.slice(1, 4), main: at(0), alt: [at(1), at(2)] }] : photos.length ? [{ recipe: 'photo_full', headline: hooks[2], main: at(0) }] : []),

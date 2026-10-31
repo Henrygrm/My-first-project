@@ -92,12 +92,15 @@ export async function analyzeImage(file, { kind = 'photo' } = {}) {
   return out;
 }
 
-/** Does a logo need a light/dark plate behind it to be visible on background `bg`? */
-export function logoNeedsPlate(analysis, bg) {
-  if (!analysis) return false;
-  if (!analysis.transparent) return false; // has its own background box
-  const main = analysis.allColors?.[0];
-  return main ? contrast(main, bg) < 2.2 : false;
+/**
+ * Plate colour to put behind a logo so it shows on background `bg`, or null.
+ * Dark logos get a white plate, light logos a near-black one.
+ */
+export function logoPlate(analysis, bg) {
+  if (!analysis || !analysis.transparent) return null; // opaque logos carry their own background
+  const ink = (analysis.colors?.[0] || analysis.allColors?.[0]);
+  if (!ink || contrast(ink, bg) >= 2.2) return null;
+  return contrast(ink, '#ffffff') >= contrast(ink, '#111111') ? '#ffffff' : '#111111';
 }
 
 /** Plain-English quality notes for a photo (used by QA and the asset panel). */

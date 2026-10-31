@@ -72,7 +72,7 @@ export class Player {
     if (board.accent) palette.accent = board.accent;
     this.comp = compose({
       direction: board.direction, format: kit.format, palette, seed: board.seed || 1, scale,
-      logo: kit.logo, logoNeedsPlate: kit.logoNeedsPlate, music: board.music?.bpm ? { bpm: board.music.bpm } : null, scenes: board.scenes,
+      logo: kit.logo, logoPlate: kit.logoPlate, music: board.music?.bpm ? { bpm: board.music.bpm } : null, scenes: board.scenes,
     }, kit.info, kit.industry);
     this.env.assets = assets;
     this.env._cache = null;

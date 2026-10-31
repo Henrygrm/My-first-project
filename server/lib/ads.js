@@ -10,7 +10,7 @@ import { renderFrame } from '../../public/engine/compositor.js';
 import { RECIPES } from '../../public/engine/recipes.js';
 import { DIRECTIONS, getDirection } from '../../public/engine/styles.js';
 import { aiConfigured, planAdBoards, reviewAdFrames, reviseAdBoards, SetupError } from './ai.js';
-import { analyzeImage, logoNeedsPlate } from './analyze.js';
+import { analyzeImage, logoPlate } from './analyze.js';
 import { getBusiness } from './businesses.js';
 import { cutout, cutoutsAvailable } from './cutout.js';
 import { adDefaults, mediaSummary, normalizeBoard, OBJECTIVES, planFree } from './director.js';
@@ -231,16 +231,62 @@ export function kitFor(project, board, business) {
   }
   const videoSpec = {};
   for (const v of project.videos || []) videoSpec[v.id] = { path: path.join(projectDir(project.id), 'videos', v.file), w: v.meta.width, h: v.meta.height, hdr: v.meta.hdr, rotation: 0 };
-  return { palette, info, assetSpec, urls, videoSpec, logo: logo ? 'logo' : null, logoNeedsPlate: logo ? logoNeedsPlate(logo.analysis, palette.bg) : false, industry: industryOf(business) };
+  return { palette, info, assetSpec, urls, videoSpec, logo: logo ? 'logo' : null, logoPlate: logo ? logoPlate(logo.analysis, palette.bg) : null, industry: industryOf(business) };
 }
 
 export function compFor(project, board, business, format) {
   const kit = kitFor(project, board, business);
   const comp = compose({
-    direction: board.direction, format, palette: kit.palette, seed: board.seed || 1, logo: kit.logo, logoNeedsPlate: kit.logoNeedsPlate,
+    direction: board.direction, format, palette: kit.palette, seed: board.seed || 1, logo: kit.logo, logoPlate: kit.logoPlate,
     music: board.music?.bpm ? { bpm: board.music.bpm } : null, scenes: board.scenes,
   }, kit.info, kit.industry);
   return { comp, kit };
+}
+
+// ---------------------------------------------------------------------------
+// Automatic corrections before rendering (each one is reported in QA)
+// ---------------------------------------------------------------------------
+
+const FULL_SCREEN = new Set(['photo_full', 'kinetic', 'review', 'stat', 'location']);
+const ALTERNATIVE = { product_hero: 'photo_full', photo_full: 'product_hero', gallery: 'photo_full', kinetic: 'photo_full', features: 'photo_full', process: 'gallery', offer: 'product_hero', review: 'photo_full', stat: 'kinetic', compare: 'photo_full', footage: 'photo_full', location: 'kinetic' };
+
+export function autoFix(board, project) {
+  const photos = Object.fromEntries((project.adAssets || []).filter((a) => a.kind === 'photo').map((a) => [a.id, a]));
+  const good = Object.values(photos).filter((a) => a.analysis && Math.max(a.analysis.w, a.analysis.h) >= 1200 && a.analysis.sharpness >= 60).map((a) => a.id);
+  const fixes = [];
+  const scenes = board.scenes.map((s) => ({ ...s }));
+  scenes.forEach((s, i) => {
+    const a = photos[s.main];
+    const long = a?.analysis ? Math.max(a.analysis.w, a.analysis.h) : 0;
+    // A small photo would look soft full screen: show it as a card/product shot instead.
+    if (s.recipe === 'photo_full' && a && long && long < 900 && i < scenes.length - 1) {
+      s.recipe = 'product_hero';
+      fixes.push(`Scene ${i + 1}: "${a.name}" is too small for full screen, so it is shown as a product shot.`);
+    }
+    // Text-only scenes look template-like: give them a real photo behind when there is a good one.
+    if (s.recipe === 'kinetic' && !s.main && good.length) {
+      s.main = good[i % good.length];
+      fixes.push(`Scene ${i + 1}: added a photo behind the text.`);
+    }
+  });
+  // Neighbouring scenes with the same design feel repetitive.
+  for (let i = 1; i < scenes.length - 1; i++) {
+    if (scenes[i].recipe === scenes[i - 1].recipe) {
+      const alt = ALTERNATIVE[scenes[i].recipe];
+      if (alt && alt !== scenes[i + 1]?.recipe) {
+        fixes.push(`Scene ${i + 1}: changed from ${scenes[i].recipe.replace('_', ' ')} to ${alt.replace('_', ' ')} so neighbouring scenes differ.`);
+        scenes[i].recipe = alt;
+      }
+    }
+  }
+  // Hooks work best short.
+  if (scenes.length > 2 && scenes[0].duration > 3.6) {
+    const extra = scenes[0].duration - 3;
+    scenes[0].duration = 3;
+    scenes[1].duration += extra;
+    fixes.push('Scene 1: shortened the opening to 3 seconds so the hook lands faster.');
+  }
+  return { board: { ...board, scenes, autoFixes: fixes }, fixes };
 }
 
 // ---------------------------------------------------------------------------
@@ -327,6 +373,12 @@ async function renderBoard(projectId, idx, ctx, base, span) {
       voice = { path: vpath, start: 0.35 };
     }
   }
+  // Clear temp folders left by renders that were killed part-way (older than 10 minutes).
+  for (const e of await fs.readdir(outDir(projectId), { withFileTypes: true }).catch(() => [])) {
+    if (!e.isDirectory() || !e.name.startsWith('.')) continue;
+    const st = await fs.stat(path.join(outDir(projectId), e.name)).catch(() => null);
+    if (st && Date.now() - st.mtimeMs > 600_000) await fs.rm(path.join(outDir(projectId), e.name), { recursive: true, force: true });
+  }
   ctx.stage(`Animating ad ${idx + 1}: "${board.title}"`, base);
   const result = await renderComposition({
     comp, assetSpec: kit.assetSpec, videoSpec: kit.videoSpec, outDir: outDir(projectId), baseName,
@@ -337,6 +389,7 @@ async function renderBoard(projectId, idx, ctx, base, span) {
   ctx.stage(`Checking ad ${idx + 1}`, base + span * 0.92);
   const qa = await checkRender({ file: path.join(outDir(projectId), result.file), comp, voice, kit, project, board }).catch((err) => ({ passed: false, score: 0, checks: [{ id: 'qa', level: 'warn', text: `Quality check could not run: ${err.message}` }] }));
   if (notes.length) qa.checks.push(...notes.map((text) => ({ id: 'voice', level: 'warn', text })));
+  for (const f of board.autoFixes || []) qa.checks.push({ id: 'autofix', level: 'info', text: `Fixed automatically: ${f}` });
   const version = { ...result, qa, board: JSON.parse(JSON.stringify(board)), createdAt: new Date().toISOString(), voice: voice ? path.basename(voice.path) : null };
   let drop = [];
   await updateProject(projectId, (p) => {
@@ -429,6 +482,9 @@ export async function generateAds(projectId, opts, ctx) {
     if (track) used.push(track.id);
     b.music = track ? { id: track.id, name: track.name, bpm: track.bpm } : null;
   }
+
+  // Automatic corrections (small photos full screen, repeats, slow hooks).
+  plan.ads = plan.ads.map((b) => autoFix(b, project).board);
 
   // Optional pre-flight review (approved: Claude looks at a still per scene).
   if (mode === 'ai' && opts.review !== false) {
@@ -716,5 +772,5 @@ export async function previewKit(projectId, index) {
   const business = getBusiness(project.adPlan.business, project.businessCustom);
   const kit = kitFor(project, board, business);
   const videos = Object.fromEntries((project.videos || []).map((v) => [v.id, { src: `/media/${projectId}/videos/${v.file}`, w: v.meta.width, h: v.meta.height }]));
-  return { board, format: project.adPlan.format, palette: kit.palette, brandColors: brandColors(project, board), info: kit.info, urls: kit.urls, videos, logo: kit.logo, logoNeedsPlate: kit.logoNeedsPlate, industry: kit.industry, music: board.music };
+  return { board, format: project.adPlan.format, palette: kit.palette, brandColors: brandColors(project, board), info: kit.info, urls: kit.urls, videos, logo: kit.logo, logoPlate: kit.logoPlate, industry: kit.industry, music: board.music };
 }
