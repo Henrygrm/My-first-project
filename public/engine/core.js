@@ -261,7 +261,8 @@ export function layoutText(ctx, { text, font, size, maxW, maxLines = 3, maxH = I
   let s = size;
   for (let guard = 0; guard < 40; guard++) {
     ctx.font = fontString(font, s);
-    const space = ctx.measureText(' ').width + tracking * s;
+    // Negative tracking tightens letters but must never swallow word gaps.
+    const space = Math.max(ctx.measureText(' ').width + tracking * s, s * 0.26);
     const lines = [];
     let cur = [];
     let curW = 0;

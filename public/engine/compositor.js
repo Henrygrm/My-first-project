@@ -125,6 +125,61 @@ export function color(env, c, fallback = 'text') {
 }
 
 // ---------------------------------------------------------------------------
+// Caches: blurred backgrounds and soft shadows are drawn once, at quarter
+// resolution (they are blurry anyway), then reused every frame.
+// ---------------------------------------------------------------------------
+
+function cached(env, key, make) {
+  env._cache = env._cache || new Map();
+  let v = env._cache.get(key);
+  if (!v) {
+    v = make();
+    env._cache.set(key, v);
+    if (env._cache.size > 200) env._cache.delete(env._cache.keys().next().value);
+  }
+  return v;
+}
+
+/** A blurred, cover-fitted copy of an image sized bw×bh (drawn at 1/4 scale). */
+function blurredCover(env, key, img, iw, ih, bw, bh, blurPx, focus) {
+  return cached(env, `blur:${key}:${Math.round(bw)}x${Math.round(bh)}:${Math.round(blurPx)}`, () => {
+    const q = 4;
+    const w = Math.max(2, Math.round(bw / q)), h = Math.max(2, Math.round(bh / q));
+    const c = env.makeCanvas(w, h);
+    const g = c.getContext('2d');
+    const r = fitRect(iw, ih, w, h, 'cover', focus);
+    g.filter = `blur(${Math.max(1, blurPx / q).toFixed(1)}px)`;
+    // Draw slightly larger so the blur doesn't pull in transparent edges.
+    g.drawImage(img, w / 2 + r.x - w * 0.05, h / 2 + r.y - h * 0.05, r.w * 1.1, r.h * 1.1);
+    return c;
+  });
+}
+
+/** Soft shadow sprite for a silhouette (an image's alpha) or a rounded box. */
+function shadowSprite(env, key, w, h, blurPx, drawShape) {
+  return cached(env, `shadow:${key}:${Math.round(w)}x${Math.round(h)}:${Math.round(blurPx)}`, () => {
+    const q = 4;
+    const pad = Math.ceil((blurPx * 2.5) / q) + 2;
+    const sw = Math.max(2, Math.round(w / q)), sh = Math.max(2, Math.round(h / q));
+    const c = env.makeCanvas(sw + pad * 2, sh + pad * 2);
+    const g = c.getContext('2d');
+    g.filter = `blur(${Math.max(1, blurPx / q).toFixed(1)}px)`;
+    g.translate(pad, pad);
+    drawShape(g, sw, sh);
+    return { canvas: c, pad: pad * q, w: (sw + pad * 2) * q, h: (sh + pad * 2) * q };
+  });
+}
+
+function silhouette(src) {
+  return (g, w, h) => {
+    g.drawImage(src, 0, 0, w, h);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = '#000';
+    g.fillRect(-w, -h, w * 3, h * 3);
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Layer drawing
 // ---------------------------------------------------------------------------
 
@@ -371,11 +426,8 @@ function drawBackground(ctx, layer, lt, env) {
       ctx.fillStyle = cols[0];
       ctx.fillRect(X, Y, BW, BH);
       if (a?.img) {
-        ctx.save();
-        ctx.filter = `blur(${Math.round(m * (layer.blur ?? 0.03))}px)`;
-        const r = fitRect(a.w, a.h, BW, BH, 'cover', a.focus);
-        ctx.drawImage(a.img, W / 2 + r.x, H / 2 + r.y, r.w, r.h);
-        ctx.restore();
+        const blurred = blurredCover(env, layer.src, a.img, a.w, a.h, BW, BH, m * (layer.blur ?? 0.03), a.focus);
+        ctx.drawImage(blurred, X, Y, BW, BH);
         ctx.fillStyle = rgba(cols[0], layer.tint ?? 0.55);
         ctx.fillRect(X, Y, BW, BH);
       }
@@ -451,9 +503,11 @@ function drawMedia(ctx, layer, lt, sceneDur, env, st) {
       ctx.fillStyle = g;
       ctx.fillRect(-r.w * 0.6, -r.w * 0.6, r.w * 1.2, r.w * 1.2);
       ctx.restore();
-      ctx.shadowColor = `rgba(0,0,0,${env.palette.dark ? 0.5 : 0.28})`;
-      ctx.shadowBlur = m * 0.04;
-      ctx.shadowOffsetY = m * 0.02;
+      const sp = shadowSprite(env, `cut:${layer.src}`, r.w, r.h, m * 0.04, silhouette(src));
+      ctx.save();
+      ctx.globalAlpha *= env.palette.dark ? 0.5 : 0.3;
+      ctx.drawImage(sp.canvas, dx - sp.pad, dy - sp.pad + m * 0.02, sp.w, sp.h);
+      ctx.restore();
     }
     if (layer.reflection) {
       ctx.save();
@@ -464,17 +518,18 @@ function drawMedia(ctx, layer, lt, sceneDur, env, st) {
       ctx.restore();
     }
     ctx.drawImage(src, dx, dy, r.w, r.h);
-    ctx.shadowColor = 'transparent';
     if (layer.sweep) drawSweepOn(ctx, src, { x: dx, y: dy, w: r.w, h: r.h }, lt, layer.sweep, env);
   } else {
     if (layer.shadow) {
-      ctx.shadowColor = `rgba(0,0,0,${layer.shadow === 'soft' ? 0.3 : 0.5})`;
-      ctx.shadowBlur = m * 0.05;
-      ctx.shadowOffsetY = m * 0.02;
-      ctx.fillStyle = '#000';
-      roundRect(ctx, -b.w / 2, -b.h / 2, b.w, b.h, radius);
-      ctx.fill();
-      ctx.shadowColor = 'transparent';
+      const sp = shadowSprite(env, `box:${radius.toFixed(1)}`, b.w, b.h, m * 0.05, (g, w, h) => {
+        g.fillStyle = '#000';
+        roundRect(g, 0, 0, w, h, radius / 4);
+        g.fill();
+      });
+      ctx.save();
+      ctx.globalAlpha *= layer.shadow === 'soft' ? 0.35 : 0.55;
+      ctx.drawImage(sp.canvas, -b.w / 2 - sp.pad, -b.h / 2 - sp.pad + m * 0.02, sp.w, sp.h);
+      ctx.restore();
     }
     if (isLogo && layer.plate) {
       const pc = color(env, layer.plate, 'surface');
@@ -565,6 +620,16 @@ function drawText(ctx, layer, lt, env, st) {
   const size = (layer.size || 0.08) * m * (role.scale || 1);
   const maxW = (layer.maxW ?? 0.84) * W;
   const tracking = layer.tracking ?? role.tracking ?? 0;
+  // Numbers count up (layout uses the final number so the block doesn't jump).
+  let counted = null;
+  if (layer.countUp) {
+    const mm = String(layer.text).match(/(\d[\d,]*)/);
+    if (mm) {
+      const target = Number(mm[1].replace(/,/g, ''));
+      const k = EASE.outExpo(clamp((lt - (layer.textAt ?? 0)) / 1.4, 0, 1));
+      counted = { from: mm[1], to: Math.round(target * k).toLocaleString('en-US') };
+    }
+  }
   const lay = layoutText(ctx, {
     text: layer.text, font: role, size, maxW, maxLines: layer.lines || 3, caseMode: layer.case || role.case, tracking,
     lineHeight: layer.lineHeight || role.lineHeight || 1.06, minSize: size * 0.4, align: layer.align || 'center',
@@ -640,10 +705,34 @@ function drawText(ctx, layer, lt, env, st) {
       // The layer's own entrance animates the whole block.
     }
     if (alpha <= 0) continue;
+    if (counted && shown.includes(counted.from)) shown = shown.replace(counted.from, counted.to);
     const x = originX + w.x + dx;
     const y = originY + w.y + dy;
     ctx.save();
     ctx.globalAlpha *= alpha;
+    if (blur > 0.3 && !w.em) {
+      // Blur on a small word-sized canvas (a full-frame filter per word is very slow).
+      const pad = Math.ceil(blur * 3);
+      const ww = Math.ceil(w.w + pad * 2), wh = Math.ceil(lay.size * 1.3 + pad * 2);
+      const sc2 = env.scratch(Math.max(64, 2 ** Math.ceil(Math.log2(ww))), Math.max(64, 2 ** Math.ceil(Math.log2(wh))));
+      const g = sc2.getContext('2d');
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.globalAlpha = 1;
+      g.filter = 'none';
+      g.clearRect(0, 0, sc2.width, sc2.height);
+      g.font = ctx.font;
+      g.textBaseline = 'top';
+      g.fillStyle = fg;
+      g.filter = `blur(${blur.toFixed(1)}px)`;
+      drawWord(g, shown, pad, pad, lay.size, tracking);
+      g.filter = 'none';
+      const cx = x + w.w / 2, cy = y + lay.size / 2;
+      ctx.translate(cx, cy);
+      ctx.scale(sc, sc);
+      ctx.drawImage(sc2, -w.w / 2 - pad, -lay.size / 2 - pad);
+      ctx.restore();
+      continue;
+    }
     if (blur > 0.3) ctx.filter = `blur(${blur.toFixed(1)}px)`;
     if (sc !== 1) {
       ctx.translate(x + w.w / 2, y + lay.size / 2);
@@ -1093,7 +1182,9 @@ export function renderFrame(ctx, comp, t, env) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, W, H);
-  ctx.filter = comp.grade?.filter || 'none';
+  // The final render applies the grade and grain in FFmpeg (much faster);
+  // the browser preview applies the grade as a CSS filter on the canvas.
+  ctx.filter = env.externalGrade ? 'none' : comp.grade?.filter || 'none';
   ctx.drawImage(main, 0, 0);
   ctx.filter = 'none';
   if (comp.overlays) {
@@ -1102,7 +1193,7 @@ export function renderFrame(ctx, comp, t, env) {
   }
   if (comp.grade?.leak) drawLightLeak(ctx, W, H, t, comp.grade.leak.color || comp.palette.accent, comp.grade.leak.strength ?? 0.15, 5);
   drawVignette(ctx, W, H, comp.grade?.vignette ?? 0.25);
-  if (comp.grade?.grain) {
+  if (comp.grade?.grain && !env.externalGrade) {
     if (!env.grain) env.grain = makeGrainTile(env.makeCanvas);
     drawGrain(ctx, env.grain, W, H, Math.round(t * (comp.fps || 30)), comp.grade.grain);
   }

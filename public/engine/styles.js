@@ -1,0 +1,239 @@
+// Creative directions: complete design personalities. A direction decides
+// typography, motion feel, backgrounds, transitions, finishing and sound;
+// the brand engine supplies the colours. Directions never fix colours, so two
+// businesses with the same direction still look like themselves.
+
+const F = (family, weight, extra = {}) => ({ family, weight, ...extra });
+
+export const DIRECTIONS = {
+  cinematic: {
+    label: 'Cinematic',
+    brief: 'Film-trailer feel: tall condensed capitals, dark moody grade, slow pushes, blur and fade transitions, light leaks.',
+    fonts: {
+      display: F('Bebas Neue', 400, { case: 'upper', tracking: 0.03, scale: 1.25, lineHeight: 0.95 }),
+      body: F('Inter', 600, { boldWeight: 800, tracking: 0.02 }),
+      accent: F('Playfair Display', 700, { style: 'italic' }),
+    },
+    tone: 'dark',
+    backgrounds: ['photo', 'spotlight', 'mesh'],
+    motion: { speed: 0.85, ease: 'luxe', entrances: ['blur', 'fade', 'reveal', 'zoom'], textAnims: ['lines', 'blurWords'], idle: ['breathe', 'drift'], camera: 'slow' },
+    transitions: { blur: 3, fade: 2, zoom: 2, whip: 1 },
+    grade: { filter: 'contrast(1.12) saturate(0.88) brightness(0.97)', grain: 0.07, vignette: 0.5, leak: { strength: 0.12 } },
+    shape: { radius: 0.004 },
+    emStyle: 'color',
+    particles: ['dust', 'bokeh'],
+    sound: 'cinematic',
+    mood: 'build',
+  },
+  luxury: {
+    label: 'Luxury',
+    brief: 'High-end and calm: elegant serif, widely spaced small capitals, deep blacks or soft champagne, slow fades, gold-like accents.',
+    fonts: {
+      display: F('Cormorant Garamond', 700, { scale: 1.12, lineHeight: 1.0 }),
+      body: F('Manrope', 500, { boldWeight: 700, case: 'upper', tracking: 0.2 }),
+      accent: F('Playfair Display', 700, { style: 'italic' }),
+    },
+    tone: 'dark',
+    backgrounds: ['spotlight', 'studio', 'radial'],
+    motion: { speed: 0.7, ease: 'luxe', entrances: ['fade', 'blur', 'reveal'], textAnims: ['lines', 'blurWords'], idle: ['breathe', 'float'], camera: 'slow' },
+    transitions: { fade: 3, blur: 2, iris: 1 },
+    grade: { filter: 'contrast(1.06) saturate(0.85)', grain: 0.04, vignette: 0.42 },
+    shape: { radius: 0.002 },
+    emStyle: 'italic',
+    particles: ['sparkle', 'dust'],
+    sound: 'soft',
+    mood: 'chill',
+  },
+  minimalist: {
+    label: 'Minimalist',
+    brief: 'Clean and confident: lots of space, one idea per scene, crisp sans-serif, soft light backgrounds, quiet slides and wipes.',
+    fonts: {
+      display: F('Manrope', 800, { tracking: -0.02, scale: 1.0, lineHeight: 1.02 }),
+      body: F('Inter', 400, { boldWeight: 600 }),
+      accent: F('Manrope', 500),
+    },
+    tone: 'light',
+    backgrounds: ['solid', 'paper', 'studio'],
+    motion: { speed: 1, ease: 'glide', entrances: ['rise', 'fade', 'wipe'], textAnims: ['words', 'lines'], idle: ['float', 'breathe'], camera: 'slow' },
+    transitions: { push: 3, wipe: 2, fade: 2 },
+    grade: { filter: 'none', grain: 0, vignette: 0.06 },
+    shape: { radius: 0.02 },
+    emStyle: 'color',
+    particles: [],
+    sound: 'soft',
+    mood: 'chill',
+  },
+  futuristic: {
+    label: 'Futuristic',
+    brief: 'Tech and speed: geometric type, dark backgrounds with glowing grid, neon accents, whip pans, flashes and light streaks.',
+    fonts: {
+      display: F('Syne', 800, { tracking: 0.0, scale: 1.0, lineHeight: 1.0, case: 'upper' }),
+      body: F('Space Grotesk', 500, { boldWeight: 700, tracking: 0.04 }),
+      accent: F('Orbitron', 700, { tracking: 0.08 }),
+    },
+    tone: 'dark',
+    backgrounds: ['grid', 'mesh', 'spotlight'],
+    motion: { speed: 1.25, ease: 'outExpo', entrances: ['whip', 'scaleDown', 'blur', 'slideR'], textAnims: ['blurWords', 'chars', 'slideWords'], idle: ['float', 'pulse'], camera: 'dynamic' },
+    transitions: { whip: 3, zoom: 2, flash: 1, split: 1 },
+    grade: { filter: 'contrast(1.15) saturate(1.2)', grain: 0.03, vignette: 0.5 },
+    shape: { radius: 0.01 },
+    emStyle: 'color',
+    glow: true,
+    particles: ['streaks', 'dust', 'sparkle'],
+    sound: 'tech',
+    mood: 'energetic',
+  },
+  energetic: {
+    label: 'Energetic',
+    brief: 'Loud and fast: heavy condensed capitals, bold colour blocks, pops and drops on the beat, whips and brand-colour wipes.',
+    fonts: {
+      display: F('Anton', 400, { case: 'upper', tracking: 0.01, scale: 1.12, lineHeight: 0.98 }),
+      body: F('Poppins', 700, { boldWeight: 800 }),
+      accent: F('Poppins', 800),
+    },
+    tone: 'any',
+    backgrounds: ['stripes', 'gradient', 'mesh'],
+    motion: { speed: 1.35, ease: 'snappy', entrances: ['pop', 'slideL', 'slideR', 'drop', 'scaleDown'], textAnims: ['pop', 'words'], idle: ['pulse', 'sway'], camera: 'dynamic' },
+    transitions: { whip: 3, brand: 2, push: 2, flash: 1, zoom: 1 },
+    grade: { filter: 'contrast(1.12) saturate(1.25)', grain: 0.02, vignette: 0.2 },
+    shape: { radius: 0.02 },
+    emStyle: 'box',
+    particles: ['confetti', 'streaks', 'sparkle'],
+    sound: 'punchy',
+    mood: 'energetic',
+  },
+  editorial: {
+    label: 'Editorial',
+    brief: 'Magazine layout: display serif headlines with italic accents, generous margins, framed photos, clean wipes and pushes.',
+    fonts: {
+      display: F('DM Serif Display', 400, { scale: 1.08, lineHeight: 1.02 }),
+      body: F('DM Sans', 500, { boldWeight: 700, case: 'upper', tracking: 0.12 }),
+      accent: F('Playfair Display', 700, { style: 'italic' }),
+    },
+    tone: 'light',
+    backgrounds: ['paper', 'solid', 'photo'],
+    motion: { speed: 0.9, ease: 'smooth', entrances: ['reveal', 'wipe', 'fade', 'rise'], textAnims: ['lines', 'words'], idle: ['drift', 'breathe'], camera: 'slow' },
+    transitions: { wipe: 3, push: 2, split: 1, fade: 1 },
+    grade: { filter: 'contrast(1.04) saturate(0.95)', grain: 0.05, vignette: 0.12 },
+    shape: { radius: 0.004 },
+    emStyle: 'italic',
+    particles: [],
+    sound: 'soft',
+    mood: 'chill',
+  },
+  commercial: {
+    label: 'Modern commercial',
+    brief: 'Polished TV-ad feel: bold geometric sans, bright studio light, products front and centre, smooth pushes and zooms.',
+    fonts: {
+      display: F('Montserrat', 800, { tracking: -0.01, scale: 0.98, lineHeight: 1.02 }),
+      body: F('Montserrat', 500, { boldWeight: 700 }),
+      accent: F('Montserrat', 700),
+    },
+    tone: 'light',
+    backgrounds: ['studio', 'gradient', 'radial'],
+    motion: { speed: 1.1, ease: 'glide', entrances: ['rise', 'pop', 'slideR', 'zoom'], textAnims: ['words', 'slideWords'], idle: ['float', 'breathe'], camera: 'smooth' },
+    transitions: { push: 3, zoom: 2, brand: 1, wipe: 1 },
+    grade: { filter: 'contrast(1.06) saturate(1.1)', grain: 0, vignette: 0.12 },
+    shape: { radius: 0.025 },
+    emStyle: 'color',
+    particles: ['sparkle', 'bokeh'],
+    sound: 'punchy',
+    mood: 'energetic',
+  },
+  playful: {
+    label: 'Playful',
+    brief: 'Fun and friendly: rounded type, bright colour, wobbly blobs, bouncy pops and drops, confetti and bubbles.',
+    fonts: {
+      display: F('Fredoka', 700, { scale: 1.05, lineHeight: 1.0 }),
+      body: F('Poppins', 500, { boldWeight: 700 }),
+      accent: F('Caveat', 700, { scale: 1.2 }),
+    },
+    tone: 'bright',
+    backgrounds: ['mesh', 'gradient', 'blob'],
+    motion: { speed: 1.2, ease: 'outBack', entrances: ['pop', 'drop', 'spin', 'rise'], textAnims: ['pop', 'words'], idle: ['float', 'sway', 'pulse'], camera: 'dynamic' },
+    transitions: { zoom: 2, iris: 2, brand: 2, push: 1 },
+    grade: { filter: 'saturate(1.15)', grain: 0, vignette: 0.05 },
+    shape: { radius: 0.05 },
+    emStyle: 'box',
+    particles: ['confetti', 'bubbles', 'sparkle'],
+    sound: 'playful',
+    mood: 'energetic',
+  },
+  premium: {
+    label: 'Premium',
+    brief: 'Apple-like modern premium: tight bold sans, product-first studio lighting, soft blur reveals, slow zooms, restrained.',
+    fonts: {
+      display: F('Inter', 800, { tracking: -0.035, scale: 1.0, lineHeight: 1.0 }),
+      body: F('Inter', 600, { boldWeight: 800 }),
+      accent: F('Inter', 400),
+    },
+    tone: 'dark',
+    backgrounds: ['studio', 'spotlight', 'radial'],
+    motion: { speed: 0.9, ease: 'glide', entrances: ['blur', 'rise', 'zoom'], textAnims: ['blurWords', 'lines'], idle: ['float', 'breathe'], camera: 'smooth' },
+    transitions: { blur: 3, zoom: 2, fade: 2 },
+    grade: { filter: 'contrast(1.08) saturate(1.04)', grain: 0.015, vignette: 0.3 },
+    shape: { radius: 0.03 },
+    emStyle: 'color',
+    particles: ['sparkle', 'dust'],
+    sound: 'soft',
+    mood: 'build',
+  },
+  industrial: {
+    label: 'Industrial',
+    brief: 'Tough and practical: condensed capitals, steel and safety colours, hard wipes and pushes, sparks and dust, gritty grade.',
+    fonts: {
+      display: F('Oswald', 700, { case: 'upper', tracking: 0.02, scale: 1.12, lineHeight: 1.0 }),
+      body: F('DM Sans', 700, { boldWeight: 700, case: 'upper', tracking: 0.06 }),
+      accent: F('Archivo Black', 400, { case: 'upper' }),
+    },
+    tone: 'dark',
+    backgrounds: ['photo', 'stripes', 'grid'],
+    motion: { speed: 1.15, ease: 'outExpo', entrances: ['slideL', 'wipe', 'scaleDown', 'drop'], textAnims: ['lines', 'words'], idle: ['drift', 'pulse'], camera: 'dynamic' },
+    transitions: { push: 3, whip: 2, split: 1, flash: 1 },
+    grade: { filter: 'contrast(1.15) saturate(0.9)', grain: 0.06, vignette: 0.4 },
+    shape: { radius: 0 },
+    emStyle: 'box',
+    particles: ['embers', 'dust'],
+    sound: 'punchy',
+    mood: 'energetic',
+  },
+};
+
+export const DIRECTION_IDS = Object.keys(DIRECTIONS);
+
+/** Directions that tend to suit each industry (first = most typical). */
+export const INDUSTRY_DIRECTIONS = {
+  cafe: ['editorial', 'minimalist', 'premium', 'playful', 'cinematic'],
+  restaurant: ['cinematic', 'commercial', 'editorial', 'energetic', 'premium'],
+  barber: ['cinematic', 'industrial', 'luxury', 'energetic', 'premium'],
+  detailing: ['premium', 'futuristic', 'cinematic', 'energetic', 'commercial'],
+  trades: ['industrial', 'commercial', 'minimalist', 'energetic'],
+  gym: ['energetic', 'futuristic', 'industrial', 'cinematic'],
+  other: ['commercial', 'minimalist', 'premium', 'playful', 'editorial'],
+};
+
+/** Particle kinds that fit an industry's subject matter. */
+export const INDUSTRY_PARTICLES = {
+  cafe: ['steam', 'bokeh', 'dust'],
+  restaurant: ['steam', 'embers', 'bokeh'],
+  barber: ['dust', 'sparkle', 'streaks'],
+  detailing: ['droplets', 'bubbles', 'sparkle', 'foam'],
+  trades: ['embers', 'dust'],
+  gym: ['streaks', 'dust', 'embers'],
+  other: ['bokeh', 'sparkle'],
+};
+
+/** Industry icons for feature lists. */
+export const INDUSTRY_ICONS = {
+  cafe: ['cup', 'leaf', 'clock', 'heart', 'pin'],
+  restaurant: ['fork', 'leaf', 'star', 'clock', 'pin'],
+  barber: ['scissors', 'star', 'calendar', 'clock', 'pin'],
+  detailing: ['drop', 'sparkle', 'shield', 'car', 'truck'],
+  trades: ['wrench', 'shield', 'clock', 'home', 'truck'],
+  gym: ['dumbbell', 'bolt', 'heart', 'clock', 'calendar'],
+  other: ['star', 'check', 'heart', 'clock', 'pin'],
+};
+
+export function getDirection(id) {
+  return DIRECTIONS[id] || DIRECTIONS.commercial;
+}
