@@ -7,6 +7,7 @@ const F = (family, weight, extra = {}) => ({ family, weight, ...extra });
 
 export const DIRECTIONS = {
   cinematic: {
+    voiceStyle: 'Deep, unhurried, cinematic trailer delivery with dramatic pauses.',
     label: 'Cinematic',
     brief: 'Film-trailer feel: tall condensed capitals, dark moody grade, slow pushes, blur and fade transitions, light leaks.',
     fonts: {
@@ -26,6 +27,7 @@ export const DIRECTIONS = {
     mood: 'build',
   },
   luxury: {
+    voiceStyle: 'Calm, elegant and slow; soft-spoken and refined.',
     label: 'Luxury',
     brief: 'High-end and calm: elegant serif, widely spaced small capitals, deep blacks or soft champagne, slow fades, gold-like accents.',
     fonts: {
@@ -45,6 +47,7 @@ export const DIRECTIONS = {
     mood: 'chill',
   },
   minimalist: {
+    voiceStyle: 'Clear, relaxed and confident; simple and friendly.',
     label: 'Minimalist',
     brief: 'Clean and confident: lots of space, one idea per scene, crisp sans-serif, soft light backgrounds, quiet slides and wipes.',
     fonts: {
@@ -64,6 +67,7 @@ export const DIRECTIONS = {
     mood: 'chill',
   },
   futuristic: {
+    voiceStyle: 'Crisp, confident and modern; slightly fast.',
     label: 'Futuristic',
     brief: 'Tech and speed: geometric type, dark backgrounds with glowing grid, neon accents, whip pans, flashes and light streaks.',
     fonts: {
@@ -84,6 +88,7 @@ export const DIRECTIONS = {
     mood: 'energetic',
   },
   energetic: {
+    voiceStyle: 'Upbeat, punchy and excited, like a hype ad; fast pace.',
     label: 'Energetic',
     brief: 'Loud and fast: heavy condensed capitals, bold colour blocks, pops and drops on the beat, whips and brand-colour wipes.',
     fonts: {
@@ -103,6 +108,7 @@ export const DIRECTIONS = {
     mood: 'energetic',
   },
   editorial: {
+    voiceStyle: 'Warm, thoughtful and articulate, like a magazine feature.',
     label: 'Editorial',
     brief: 'Magazine layout: display serif headlines with italic accents, generous margins, framed photos, clean wipes and pushes.',
     fonts: {
@@ -122,6 +128,7 @@ export const DIRECTIONS = {
     mood: 'chill',
   },
   commercial: {
+    voiceStyle: 'Bright, friendly and persuasive, like a polished TV ad.',
     label: 'Modern commercial',
     brief: 'Polished TV-ad feel: bold geometric sans, bright studio light, products front and centre, smooth pushes and zooms.',
     fonts: {
@@ -141,6 +148,7 @@ export const DIRECTIONS = {
     mood: 'energetic',
   },
   playful: {
+    voiceStyle: 'Cheerful, bubbly and fun; smiling while speaking.',
     label: 'Playful',
     brief: 'Fun and friendly: rounded type, bright colour, wobbly blobs, bouncy pops and drops, confetti and bubbles.',
     fonts: {
@@ -160,6 +168,7 @@ export const DIRECTIONS = {
     mood: 'energetic',
   },
   premium: {
+    voiceStyle: 'Smooth, confident and understated; premium brand tone.',
     label: 'Premium',
     brief: 'Apple-like modern premium: tight bold sans, product-first studio lighting, soft blur reveals, slow zooms, restrained.',
     fonts: {
@@ -179,6 +188,7 @@ export const DIRECTIONS = {
     mood: 'build',
   },
   industrial: {
+    voiceStyle: 'Strong, direct and no-nonsense; down-to-earth tradie tone.',
     label: 'Industrial',
     brief: 'Tough and practical: condensed capitals, steel and safety colours, hard wipes and pushes, sparks and dust, gritty grade.',
     fonts: {

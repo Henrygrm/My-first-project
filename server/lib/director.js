@@ -21,6 +21,13 @@ const CAMERAS = ['push', 'pull', 'pan', 'rise', 'orbit', 'punch', 'still'];
 const BASE_DUR = { product_hero: 2.8, photo_full: 2.3, gallery: 2.8, compare: 3.2, kinetic: 2.0, features: 3.4, offer: 2.6, review: 3.4, stat: 2.4, process: 3.6, footage: 2.6, location: 2.4, cta: 3.0 };
 
 const pick = (list, r) => list[Math.floor(r() * list.length) % list.length];
+/** Loose label → known id ("Product Hero" → product_hero, "Slide L" → slideL). */
+const norm = (v, list) => {
+  const raw = String(v || '').trim();
+  if (list.includes(raw)) return raw;
+  const k = raw.toLowerCase().replace(/[\s-]+/g, '_');
+  return list.find((x) => x.toLowerCase() === k || x.toLowerCase() === k.replace(/_/g, '')) || null;
+};
 const clean = (t, n = 90) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, n);
 const titleCase = (s) => s.replace(/^./, (c) => c.toUpperCase());
 
@@ -39,9 +46,9 @@ export function mediaSummary(assets) {
 export function normalizeBoard(raw, { assetIds, videoIds, seconds, defaults }) {
   const known = new Set(assetIds);
   const vids = new Set(videoIds);
-  const direction = DIRECTIONS[raw.direction] ? raw.direction : defaults.direction;
+  const direction = norm(raw.direction, Object.keys(DIRECTIONS)) || defaults.direction;
   let scenes = (raw.scenes || []).slice(0, 12).map((s, i) => {
-    const recipe = RECIPES[s.recipe] ? s.recipe : 'kinetic';
+    const recipe = norm(s.recipe, Object.keys(RECIPES)) || 'kinetic';
     const main = known.has(s.main_asset || s.main) ? (s.main_asset || s.main) : null;
     const alt = (s.other_assets || s.alt || []).filter((id) => known.has(id) && id !== main).slice(0, 3);
     const video = vids.has(s.video) ? s.video : null;
@@ -56,10 +63,10 @@ export function normalizeBoard(raw, { assetIds, videoIds, seconds, defaults }) {
       main, alt, video,
       from: Math.max(0, Number(s.video_from ?? s.from) || 0),
       layout: Number.isInteger(s.layout) && s.layout >= 0 ? s.layout : undefined,
-      entrance: ENTRANCES.includes(s.entrance) ? s.entrance : undefined,
-      textAnim: TEXT_ANIMS.includes(s.text_animation || s.textAnim) ? (s.text_animation || s.textAnim) : undefined,
-      camera: CAMERAS.includes(s.camera) ? s.camera : undefined,
-      transition: TRANSITIONS.includes(s.transition) ? s.transition : undefined,
+      entrance: norm(s.entrance, ENTRANCES) || undefined,
+      textAnim: norm(s.text_animation || s.textAnim, TEXT_ANIMS) || undefined,
+      camera: norm(s.camera, CAMERAS) || undefined,
+      transition: norm(s.transition, TRANSITIONS) || undefined,
       sfx: s.sfx === 'none' ? 'none' : undefined,
       seed: Number.isInteger(s.seed) ? s.seed : undefined,
     };
@@ -71,7 +78,7 @@ export function normalizeBoard(raw, { assetIds, videoIds, seconds, defaults }) {
   return {
     title: clean(raw.title || 'Ad', 60),
     angle: clean(raw.angle, 80),
-    objective: OBJECTIVES[raw.objective] ? raw.objective : 'bookings',
+    objective: norm(raw.objective, Object.keys(OBJECTIVES)) || 'bookings',
     why: clean(raw.why_it_works || raw.why, 400),
     direction,
     brandColors: (raw.brand_colors || raw.brandColors || []).filter((c) => /^#?[0-9a-f]{6}$/i.test(c)).map((c) => `#${c.replace('#', '').toLowerCase()}`).slice(0, 4),

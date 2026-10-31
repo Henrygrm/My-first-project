@@ -78,41 +78,47 @@ function revisionFor(text) {
   return { reply: `Mock: changed clip ${focus} for "${request}".`, clips };
 }
 
-// Animated ads: loose labels on purpose (the app must normalise them).
-function adPlanFor(text) {
-  const count = Number(text.match(/DELIVERABLE: (\d+) animated ad/)?.[1] || 1);
-  const photos = Number(text.match(/PHOTOS: (\d+)/)?.[1] || 0);
+// Ad storyboards (motion engine v3). Loose labels on purpose: the app must normalise them.
+function boardsFor(text) {
+  const count = Number(text.match(/DELIVERABLE: (\d+) ad/)?.[1] || 1);
+  const seconds = Number(text.match(/each (\d+) seconds/)?.[1] || 15);
+  const photos = [...text.matchAll(/Photo "([^"]+)"( \(cut-out available\))?/g)].map((m) => ({ id: m[1], cut: Boolean(m[2]) }));
+  const footage = [...text.matchAll(/Footage "([^"]+)"/g)].map((m) => m[1]);
   const library = [...text.matchAll(/^- "(.+?)": ([\w-]+), /gm)].map((m) => ({ name: m[1], mood: m[2] }));
   const song = (library.find((t) => t.mood === 'energetic') || library[0])?.name || 'auto';
+  const p = (i) => photos[i % Math.max(1, photos.length)]?.id || '';
   const ads = Array.from({ length: count }, (_, k) => ({
-    title: `Mock ad ${k + 1}`, angle: k ? 'Trust' : 'Offer', why_it_works: 'Mock: the offer is specific.',
-    theme: k ? 'Luxury' : 'Neon', accent_color: k ? '' : 'FF3366', music_track: song, music_mood: 'energetic',
+    title: `Mock ad ${k + 1}`, angle: k ? 'Trust' : 'Product showcase', objective: k ? 'Trust' : 'showcase', why_it_works: 'Mock: the product leads.',
+    direction: k ? 'Luxury' : 'premium', brand_colors: ['#C0392B', 'nonsense'], music_track: song, music_mood: 'energetic',
+    voiceover_script: /VOICEOVER/.test(text) ? 'Fresh coffee, made properly. Visit us today.' : '',
     scenes: [
-      { type: 'Hook', headline: 'Your car deserves this 🔥', subline: 'Mock subline', items: [], photo: photos ? 1 : 0, animation: 'Words', duration: 2 },
-      { type: 'features', headline: 'Why us', subline: '', items: ['Mobile', 'Insured', 'Fast'], photo: 0, animation: 'pop', duration: 3 },
-      { type: 'photo', headline: 'Bad photo number', subline: '', items: [], photo: 99, animation: 'slide', duration: 2 },
-      { type: 'offer', headline: '20% off this week', subline: '', items: [], photo: 0, animation: 'pop', duration: 2 },
-      { type: 'CTA', headline: 'Book now', subline: 'Parramatta', items: ['Link in bio'], photo: 0, animation: 'pop', duration: 2 },
+      { recipe: 'Product Hero', purpose: 'Hook with the product', duration: 3, headline: 'Your morning, *perfected* 🔥', subline: 'Mock', items: [], main_asset: p(0), other_assets: [], video: '', video_from: 0, camera: 'Push', entrance: 'Drop', text_animation: 'words', transition: '' },
+      { recipe: 'photo_full', purpose: 'Desire', duration: 3, headline: 'Made fresh daily', subline: '', items: [], main_asset: 'missing-photo', other_assets: [], video: '', video_from: 0, camera: '', entrance: '', text_animation: '', transition: 'Whip' },
+      ...(footage.length ? [{ recipe: 'footage', purpose: 'Real process', duration: 3, headline: 'Watch it happen', subline: '', items: [], main_asset: '', other_assets: [], video: footage[0], video_from: 1, camera: '', entrance: '', text_animation: '', transition: 'zoom' }] : []),
+      { recipe: 'features', purpose: 'Value', duration: 3, headline: 'Why locals come back', subline: '', items: ['Roasted on site', 'Open early', 'Oat milk free'], main_asset: p(1), other_assets: [], video: '', video_from: 0, camera: '', entrance: '', text_animation: '', transition: '' },
+      { recipe: 'cta', purpose: 'Action', duration: 3, headline: 'Visit *us* today', subline: 'Newtown', items: ['Order ahead'], main_asset: '', other_assets: [], video: '', video_from: 0, camera: '', entrance: '', text_animation: '', transition: '' },
     ],
-    post_caption: 'Mock ad caption ✨', hashtags: ['mock', '#ads'],
+    post_caption: 'Mock caption ✨', hashtags: ['mock', '#ads'],
   }));
-  return { strategy: 'Mock ad strategy.', ads };
+  return { strategy: 'Mock strategy: lead with the product.', photo_notes: photos.map((x) => ({ asset: x.id, description: 'a test photo', best_use: 'supporting' })), ads };
 }
 
-function adRevisionFor(text) {
+function boardRevisionFor(text) {
   const current = JSON.parse(text.match(/THE CURRENT ADS:\n([\s\S]+?)\n\nTHE CREATOR'S REQUEST/)[1]);
-  const focus = Number(text.match(/THE CREATOR'S REQUEST \(about ad (\d+)\)/)?.[1] || 1);
+  const focus = Number(text.match(/THE CREATOR'S REQUEST \(about ad (\d+)/)?.[1] || 1);
+  const scene = Number(text.match(/, scene (\d+)\)/)?.[1] || 1);
   const request = text.match(/THE CREATOR'S REQUEST[^\n]*:\n"([\s\S]*?)"\n/)[1];
   const ads = current.map((a) => {
     const changed = a.ad_number === focus;
-    return {
-      ad_number: a.ad_number, changed, title: a.title, angle: a.angle, why_it_works: 'Mock', theme: changed ? 'clean' : a.theme,
-      accent_color: a.accent_color, music_track: changed && /no music/i.test(request) ? 'none' : 'keep', music_mood: 'chill',
-      scenes: changed ? [{ ...a.scenes[0], headline: 'Revised ad' }, a.scenes.at(-1)] : a.scenes,
-      post_caption: 'Mock', hashtags: [], target_seconds: a.length_seconds,
-    };
+    const scenes = a.scenes.map((s, i) => (changed && i === scene - 1 ? { ...s, headline: 'Revised by the AI' } : s));
+    return { ...a, changed, scenes, music_track: changed && /no music/i.test(request) ? 'none' : 'keep' };
   });
   return { reply: `Mock: changed ad ${focus}.`, ads };
+}
+
+function reviewFor(text) {
+  const n = [...text.matchAll(/^Scene (\d+):/gm)].length;
+  return { verdict: 'fix', summary: 'Mock review.', scenes: Array.from({ length: n }, (_, i) => ({ scene: i + 1, ok: i !== 1, problem: i === 1 ? 'Headline is generic' : '', fix_headline: i === 1 ? 'Reviewed headline' : '', fix_recipe: '', fix_asset: '' })) };
 }
 
 function sse(res, event, data) {
@@ -148,9 +154,10 @@ export function startMock(port = 4555, { rejectFallbacks = false } = {}) {
 
       const props = Object.keys(body.output_config?.format?.schema?.properties || {});
       const text = body.messages[0].content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-      const out = props.includes('reply')
-        ? (props.includes('ads') ? adRevisionFor(text) : revisionFor(text))
-        : props.includes('ads') ? adPlanFor(text) : planFor(text);
+      const out = props.includes('verdict') ? reviewFor(text)
+        : props.includes('photo_notes') ? boardsFor(text)
+        : props.includes('reply') ? (props.includes('ads') ? boardRevisionFor(text) : revisionFor(text))
+        : planFor(text);
       const json = JSON.stringify(out);
 
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'request-id': 'req_mock' });

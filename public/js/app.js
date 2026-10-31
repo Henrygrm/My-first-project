@@ -4,7 +4,7 @@ import { RECIPES } from '/engine/recipes.js';
 
 // Must match package.json. If the server reports a different version, an
 // old copy of Cutline is still running and new features won't work.
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '3.0.0';
 
 const ROLE_COLORS = { hook: '#ffb03d', setup: '#6aa8ff', process: '#6aa8ff', reveal: '#3ddc97', payoff: '#3ddc97', cta: '#c79bff' };
 const DEFAULTS = {
@@ -908,6 +908,7 @@ function adCard(ad, rendered, i, format) {
       qaDetails(rendered?.qa, ad.review),
       h('div', { class: 'clip-actions' },
         rendered ? h('a', { class: 'btn btn-sm btn-primary', href: `/media/${pid}/ad-output/${rendered.file}`, download: `${slug(state.project.name)}-ad-${i + 1}.mp4` }, icon('download'), 'MP4') : null,
+        rendered ? h('a', { class: 'btn btn-sm', href: `/media/${pid}/ad-output/${rendered.thumb}`, download: `${slug(state.project.name)}-ad-${i + 1}-cover.jpg`, title: 'Cover image for the post' }, icon('image'), 'Cover') : null,
         postText ? h('button', { class: 'btn btn-sm', onclick: () => copyText(postText), title: 'Copy post caption + hashtags' }, icon('copy'), 'Caption') : null,
         h('button', { class: 'btn btn-sm', disabled: busy, onclick: () => openStudio(i) }, icon('film'), 'Studio'))));
 }
@@ -1480,6 +1481,11 @@ function renderSettings() {
   $('#opt-speech').disabled = !speechOk;
   $('#opt-speech').checked = speechOk && s.speechSubtitles;
   $('#openai-status').textContent = srv?.openaiKey ? `Saved key: ${srv.openaiKey}` : 'No key saved.';
+  const prov = state.status?.providers || {};
+  $('#services').replaceChildren(...Object.values(prov).map((p) => h('li', {},
+    h('span', { class: `dot ${p.configured ? 'on' : p.approved ? 'off' : 'na'}` }),
+    h('b', {}, p.name),
+    h('span', { class: 'muted small' }, ` · ${p.configured ? 'on' : p.approved ? 'not set up' : 'not enabled'} · ${p.cost}`))));
   $('#about').textContent = `Cutline ${APP_VERSION}${state.status ? ` · server ${state.status.version || 'old'} · FFmpeg ${state.status.ffmpeg.version || 'missing'}` : ''}${srv?.logFile ? ` · Log file: ${srv.logFile}` : ''}`;
 }
 

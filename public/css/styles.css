@@ -389,3 +389,8 @@ select { appearance: none; padding-right: 28px !important; background-image: lin
   .ai-pill .label { display: none; }
   .ai-pill { padding: 6px 8px; margin-left: auto; }
 }
+
+.services { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.services .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: var(--dim); }
+.services .dot.on { background: var(--ok); }
+.services .dot.off { background: var(--warn); }

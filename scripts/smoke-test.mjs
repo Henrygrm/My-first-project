@@ -1,7 +1,8 @@
 // End-to-end smoke test: generates sample footage with FFmpeg, starts the app
 // against a mock Claude API, and runs the whole workflow through the HTTP API:
 // upload → music → auto-edit → AI edit → re-render → ask for changes (AI and
-// rules) → settings → no-key setup errors.
+// rules) → ads (AI director, review, QA, versions, studio, free mode) →
+// clients → settings → no-key setup errors.
 //
 //   npm test
 import assert from 'node:assert/strict';
@@ -42,7 +43,8 @@ async function startServer(port, env) {
   const child = spawn(process.execPath, ['server/index.js'], {
     cwd: ROOT,
     // ENV_FILE keeps the Settings tests away from the real .env.
-    env: { ...process.env, ANTHROPIC_AUTH_TOKEN: '', OPENAI_API_KEY: '', CLAUDE_MODEL: '', PORT: String(port), DATA_DIR: path.join(TMP, `data-${port}`), ENV_FILE: path.join(TMP, `env-${port}`), ...env },
+    // Small cut-out model (4.5 MB) so tests exercise real background removal quickly.
+    env: { ...process.env, ANTHROPIC_AUTH_TOKEN: '', OPENAI_API_KEY: '', CLAUDE_MODEL: '', PORT: String(port), DATA_DIR: path.join(TMP, `data-${port}`), ENV_FILE: path.join(TMP, `env-${port}`), CUTLINE_CUTOUT_MODEL: 'u2netp', CUTLINE_MODEL_DIR: process.env.CUTLINE_MODEL_DIR || path.join(TMP, 'models'), ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   children.push(child);
@@ -115,7 +117,8 @@ async function main() {
   const status = (await call(base, '/api/status')).data;
   assert.equal(status.ai.configured, true);
   assert.equal(status.ffmpeg.available, true);
-  assert.equal(status.businesses.length, 6);
+  assert.equal(status.businesses.length, 7);
+  assert.ok(status.ads.directions.length >= 10 && status.providers.voice, 'directions and providers listed');
   assert.equal(status.version, VERSION, 'status reports the app version (the page uses it to spot an old server)');
   log('status ok', status.ai.model, status.ffmpeg.version);
 
@@ -267,9 +270,11 @@ async function main() {
   log('ask for changes (AI): clip 2 revised and re-rendered, clip 1 untouched');
   assert.equal((await call(base, `/api/projects/${project.id}/revise`, { method: 'POST', body: { request: '  ' } })).status, 400);
 
-  // Animated ads (AI): photos, logo, storyboard normalisation, song pick, render
+  // Ads (AI director): photos, logo, cut-outs, storyboard normalisation, frame review, render, QA
   const imgDir = path.join(TMP, 'img');
   await fs.mkdir(imgDir, { recursive: true });
+  // A "product": an orange disc on a light background (clear subject for the cut-out model).
+  ffmpeg(['-f', 'lavfi', '-i', 'color=c=0xeeeeee:s=1400x1400', '-vf', "geq=r='if(lt(hypot(X-W/2,Y-H/2),420),235,238)':g='if(lt(hypot(X-W/2,Y-H/2),420),130,238)':b='if(lt(hypot(X-W/2,Y-H/2),420),40,238)'", '-frames:v', '1', path.join(imgDir, 'product.jpg')]);
   ffmpeg(['-f', 'lavfi', '-i', 'testsrc2=s=1600x1200', '-frames:v', '1', path.join(imgDir, 'shop.jpg')]);
   ffmpeg(['-f', 'lavfi', '-i', 'color=c=0xd22b2b:s=400x160', '-frames:v', '1', path.join(imgDir, 'logo.png')]);
   const upImg = async (b, pid, file, kind) => {
@@ -277,61 +282,89 @@ async function main() {
     f.append('images', new Blob([await fs.readFile(file)]), path.basename(file));
     return (await fetch(`${b}/api/projects/${pid}/ad-assets${kind ? `?kind=${kind}` : ''}`, { method: 'POST', body: f })).json();
   };
-  let ia = await upImg(base, project.id, path.join(imgDir, 'shop.jpg'));
+  let ia = await upImg(base, project.id, path.join(imgDir, 'product.jpg'));
   assert.equal(ia.added.length, 1, JSON.stringify(ia));
+  assert.ok(ia.added[0].analysis?.w === 1400 && ia.added[0].analysis.colors.length, 'photo analysed on upload');
+  ia = await upImg(base, project.id, path.join(imgDir, 'shop.jpg'));
   ia = await upImg(base, project.id, path.join(imgDir, 'logo.png'), 'logo');
-  assert.deepEqual(ia.adAssets.map((x) => x.kind), ['photo', 'logo']);
+  assert.deepEqual(ia.adAssets.map((x) => x.kind), ['photo', 'photo', 'logo']);
   const notImg = new FormData();
   notImg.append('images', new Blob([Buffer.from('nope')]), 'fake.jpg');
   assert.equal((await (await fetch(`${base}/api/projects/${project.id}/ad-assets`, { method: 'POST', body: notImg })).json()).failed.length, 1, 'bad image rejected');
   const adProfile = { name: 'Gloss Boss', services: 'ceramic coating, interiors', location: 'Parramatta', offer: '20% off this week' };
-  job = (await call(base, `/api/projects/${project.id}/ads/generate`, { method: 'POST', body: { mode: 'ai', business: 'detailing', profile: adProfile, count: 2, seconds: 10, format: '9:16', theme: 'auto', music: 'auto' } })).data;
+  job = (await call(base, `/api/projects/${project.id}/ads/generate`, { method: 'POST', body: { mode: 'ai', business: 'detailing', profile: adProfile, count: 2, seconds: 10, format: '9:16', direction: 'auto', objective: 'auto', music: 'auto', review: true } })).data;
   t = Date.now();
   await waitJob(base, job.jobId);
   let ap = (await call(base, `/api/projects/${project.id}`)).data;
   assert.equal(ap.adPlan.source, 'ai');
-  assert.deepEqual(ap.adPlan.ads.map((a) => a.theme), ['neon', 'luxury'], 'theme labels normalised');
-  assert.equal(ap.adPlan.ads[0].accent, '#ff3366', 'brand colour normalised');
-  assert.ok(ap.adPlan.ads.every((a) => a.music?.name === 'hype anthem'), 'AI song pick used for ads');
-  const sc = ap.adPlan.ads[0].scenes;
-  assert.deepEqual(sc.map((x) => x.type), ['hook', 'features', 'hook', 'offer', 'cta'], 'scene types normalised; photo scene with a bad photo number falls back');
-  assert.equal(sc[0].photo, 0, '1-based photo number converted');
-  assert.equal(sc[2].photo, -1, 'bad photo number dropped');
-  assert.ok(!sc[0].headline.includes('🔥'), 'emoji stripped');
-  const adReq = requests.at(-1).body;
-  assert.equal(adReq.messages[0].content.filter((x) => x.type === 'image').length, 2, 'photo and logo sent to Claude');
+  assert.deepEqual(ap.adPlan.ads.map((a) => a.direction), ['premium', 'luxury'], 'direction labels normalised');
+  assert.equal(ap.adPlan.ads[1].objective, 'trust');
+  const b0 = ap.adPlan.ads[0];
+  assert.equal(b0.scenes[0].recipe, 'product_hero');
+  assert.equal(b0.scenes[0].transition, undefined);
+  assert.equal(b0.scenes[0].entrance, 'drop');
+  assert.equal(b0.scenes[1].main, null, 'unknown photo id dropped');
+  assert.equal(b0.scenes[1].transition, 'whip');
+  assert.ok(b0.scenes.some((x) => x.recipe === 'footage' && ap.videos.some((v) => v.id === x.video)), 'footage scene uses a real video');
+  assert.equal(b0.scenes[1].headline, 'Reviewed headline', 'AI frame review applied its fix');
+  assert.ok(b0.review?.fixes?.length, 'review recorded');
+  assert.deepEqual(b0.brandColors, ['#c0392b'], 'brand colours validated');
+  assert.ok(ap.adPlan.ads.every((a) => a.music?.name === 'hype anthem'), 'AI song pick used');
+  assert.ok(ap.adAssets.filter((a) => a.kind === 'photo').every((a) => a.cut === null || typeof a.cut?.usable === 'boolean'), 'cut-outs attempted');
+  assert.ok(ap.adAssets.some((a) => a.notes === 'a test photo (supporting)'), 'photo notes kept');
+  const adReq = requests.findLast((r) => r.body.output_config?.format?.schema?.properties?.photo_notes).body;
+  assert.equal(adReq.messages[0].content.filter((x) => x.type === 'image').length, 2 + 1 + ap.videos.length, 'photos, logo and a frame per video sent to Claude');
   assert.match(adReq.system, /NEVER invent facts/);
+  assert.ok(requests.some((r) => r.body.output_config?.format?.schema?.properties?.verdict), 'review request sent');
   for (const [i, r] of ap.adRenders.entries()) {
     const info = probe(path.join(dataDir, 'projects', project.id, 'ad-output', r.file));
     const v = info.streams.find((x) => x.codec_type === 'video');
     assert.equal(`${v.width}x${v.height}`, '1080x1920');
     assert.ok(info.streams.some((x) => x.codec_type === 'audio'));
-    assert.ok(Math.abs(Number(info.format.duration) - 10) <= 1, `ad ${i + 1} is ${info.format.duration}s for a 10s target`);
+    assert.ok(Math.abs(Number(info.format.duration) - r.duration) < 0.1, `ad ${i + 1} length matches its plan`);
+    assert.ok(r.duration >= 9 && r.duration <= 11, `ad ${i + 1} is ${r.duration}s for a 10s target`);
+    assert.ok(r.qa?.checks?.length >= 10, 'quality report attached');
+    assert.equal(r.qa.errors, 0, `no QA errors: ${JSON.stringify(r.qa.checks.filter((c) => c.level === 'error'))}`);
+    assert.equal(ap.adVersions[i].length, 1);
     assert.equal((await fetch(`${base}/media/${project.id}/ad-output/${r.thumb}`)).status, 200);
   }
-  log(`AI ads rendered: ${ap.adRenders.map((r) => `${r.duration}s`).join(', ')} in ${((Date.now() - t) / 1000).toFixed(1)}s`);
+  log(`AI ads rendered: ${ap.adRenders.map((r) => `${r.duration}s (QA ${r.qa.score})`).join(', ')} in ${((Date.now() - t) / 1000).toFixed(1)}s`);
+
+  const kitRes = (await call(base, `/api/projects/${project.id}/ads/0/kit`)).data;
+  assert.ok(kitRes.urls.logo && kitRes.palette.accent && kitRes.brandColors.length, 'preview kit');
 
   const adPrior = ap;
   job = (await call(base, `/api/projects/${project.id}/ads/revise`, { method: 'POST', body: { request: 'no music on this one', adIndex: 1 } })).data;
   await waitJob(base, job.jobId);
   ap = (await call(base, `/api/projects/${project.id}`)).data;
-  assert.equal(ap.adPlan.ads[1].scenes[0].headline, 'Revised ad');
-  assert.equal(ap.adPlan.ads[1].theme, 'clean');
+  assert.equal(ap.adPlan.ads[1].scenes[0].headline, 'Revised by the AI');
   assert.equal(ap.adPlan.ads[1].music, null);
   assert.equal(ap.adRenders[0].file, adPrior.adRenders[0].file, 'other ad untouched');
   assert.notEqual(ap.adRenders[1].file, adPrior.adRenders[1].file, 'changed ad re-rendered');
+  assert.equal(ap.adVersions[1].length, 2, 'earlier version kept');
   assert.match(ap.adChat.at(-1).text, /Mock: changed ad 2/);
-  log('ads change bar (AI): ad 2 revised and re-rendered, ad 1 untouched');
+  log('ads change bar (AI): ad 2 revised and re-rendered as a new version, ad 1 untouched');
 
-  const edAd = { ...ap.adPlan.ads[0], scenes: ap.adPlan.ads[0].scenes.slice(0, 2).map((x, i) => ({ ...x, headline: i ? x.headline : 'Hand edited', duration: 2.5 })), music: 'none' };
-  job = (await call(base, `/api/projects/${project.id}/ads/0/render`, { method: 'POST', body: { ad: edAd } })).data;
+  job = (await call(base, `/api/projects/${project.id}/ads/0/scenes/2/regenerate`, { method: 'POST', body: {} })).data;
+  await waitJob(base, job.jobId);
+  ap = (await call(base, `/api/projects/${project.id}`)).data;
+  assert.equal(ap.adPlan.ads[0].scenes[2].headline, 'Revised by the AI', 'one scene regenerated by the AI');
+  assert.equal(ap.adPlan.ads[0].scenes[0].headline, adPrior.adPlan.ads[0].scenes[0].headline, 'other scenes kept');
+
+  // Studio save: hand edits + timing, then restore the first version.
+  const edBoard = { ...ap.adPlan.ads[0], scenes: ap.adPlan.ads[0].scenes.map((x, i) => ({ ...x, headline: i ? x.headline : 'Hand edited', duration: 2 })), music: 'none', direction: 'editorial', keepDurations: true };
+  job = (await call(base, `/api/projects/${project.id}/ads/0/render`, { method: 'POST', body: { board: edBoard } })).data;
   await waitJob(base, job.jobId);
   ap = (await call(base, `/api/projects/${project.id}`)).data;
   assert.equal(ap.adPlan.ads[0].scenes[0].headline, 'Hand edited');
-  assert.equal(ap.adPlan.ads[0].scenes[0].photo, 0, 'photo kept on hand edit');
-  assert.equal(ap.adPlan.ads[0].scenes.length, 3, 'kept scenes + call to action');
+  assert.equal(ap.adPlan.ads[0].direction, 'editorial');
   assert.equal(ap.adPlan.ads[0].music, null);
-  log('ad hand edit + re-render ok');
+  assert.ok(Math.abs(ap.adRenders[0].duration - 2 * ap.adPlan.ads[0].scenes.length) < 0.6, `hand timing kept (${ap.adRenders[0].duration}s)`);
+  const first = ap.adVersions[0].at(-1);
+  const restored = (await call(base, `/api/projects/${project.id}/ads/0/restore`, { method: 'POST', body: { file: first.file } })).data;
+  assert.equal(restored.adPlan.ads[0].scenes[0].headline, adPrior.adPlan.ads[0].scenes[0].headline, 'version restored');
+  assert.equal(restored.adRenders[0].file, first.file);
+  log('studio: scene regenerate, hand edit + render, versions and restore');
 
   // Project list + delete video marks plan stale
   const list = (await call(base, '/api/projects')).data;
@@ -382,27 +415,64 @@ async function main() {
   await checkClips(srv2.base, path.join(TMP, 'data-3556'), r);
   log('ask for changes without a key: length, song, hook, no music, and an honest "not understood"');
 
-  // Animated ads without a key: templates, square format, rule-based changes
+  // Ads without a key: free-mode concepts, square format, rule-based changes, scene new take
   const jEmpty = (await call(srv2.base, `/api/projects/${p3.id}/ads/generate`, { method: 'POST', body: { mode: 'auto', profile: {} } })).data;
   await assert.rejects(waitJob(srv2.base, jEmpty.jobId), /business name/, 'ads need business details');
+  const retried = await call(srv2.base, `/api/jobs/${jEmpty.jobId}/retry`, { method: 'POST' });
+  assert.equal(retried.status, 200, 'failed job can be retried');
+  await assert.rejects(waitJob(srv2.base, retried.data.jobId), /business name/);
   const stills = (await call(srv2.base, `/api/projects/${p3.id}/ad-assets/stills`, { method: 'POST', body: { count: 3 } })).data;
   assert.ok(stills.adAssets.length >= 3, 'stills taken from footage');
-  const ja = (await call(srv2.base, `/api/projects/${p3.id}/ads/generate`, { method: 'POST', body: { mode: 'auto', business: 'detailing', profile: { name: 'Gloss Boss', services: 'ceramic coating', location: 'Parramatta' }, count: 3, seconds: 15, format: '1:1', theme: 'auto', music: 'none' } })).data;
+  const ja = (await call(srv2.base, `/api/projects/${p3.id}/ads/generate`, { method: 'POST', body: { mode: 'auto', business: 'cafe', profile: { name: 'Bean There', services: 'espresso, pastries, oat lattes', location: 'Newtown' }, count: 3, seconds: 15, format: '1:1', direction: 'auto', music: 'none' } })).data;
   await waitJob(srv2.base, ja.jobId);
   let fp = (await call(srv2.base, `/api/projects/${p3.id}`)).data;
   assert.equal(fp.adPlan.source, 'auto');
-  assert.equal(new Set(fp.adPlan.ads.map((a) => a.theme)).size, 3, 'each template ad has its own look');
-  assert.ok(fp.adPlan.ads.every((a) => a.scenes.at(-1).type === 'cta' && /Gloss Boss/.test(a.scenes.at(-1).headline)), 'ends with a named call to action');
-  assert.ok(!JSON.stringify(fp.adPlan).match(/% off|review/i), 'no invented offers or reviews');
+  assert.equal(new Set(fp.adPlan.ads.map((a) => a.direction)).size, 3, 'each concept has its own look');
+  assert.equal(new Set(fp.adPlan.ads.map((a) => a.scenes.map((x) => x.recipe).join())).size, 3, 'each concept has its own structure');
+  assert.ok(fp.adPlan.ads.every((a) => a.scenes.at(-1).recipe === 'cta' && /Bean There/.test(a.scenes.at(-1).headline)), 'ends with a named call to action');
+  assert.ok(!JSON.stringify(fp.adPlan).match(/% off|review|licensed|guarantee/i), 'no invented offers, reviews or claims');
   const sq = probe(path.join(TMP, 'data-3556', 'projects', p3.id, 'ad-output', fp.adRenders[0].file));
   assert.equal(`${sq.streams[0].width}x${sq.streams[0].height}`, '1080x1080');
-  const jr = (await call(srv2.base, `/api/projects/${p3.id}/ads/revise`, { method: 'POST', body: { request: 'make ad 1 neon and 10 seconds' } })).data;
+  const jr = (await call(srv2.base, `/api/projects/${p3.id}/ads/revise`, { method: 'POST', body: { request: 'make ad 1 luxury and 10 seconds' } })).data;
   await waitJob(srv2.base, jr.jobId);
   fp = (await call(srv2.base, `/api/projects/${p3.id}`)).data;
-  assert.equal(fp.adPlan.ads[0].theme, 'neon');
-  assert.ok(Math.abs(fp.adRenders[0].duration - 10) <= 0.5, `revised ad is ${fp.adRenders[0].duration}s`);
-  assert.match(fp.adChat.at(-1).text, /^Done: set the length to 10 seconds, switched to the Neon look/);
-  log('free-mode ads: stills from footage, 3 looks, 1:1 format, rule-based changes');
+  assert.equal(fp.adPlan.ads[0].direction, 'luxury');
+  assert.ok(Math.abs(fp.adRenders[0].duration - 10) <= 1, `revised ad is ${fp.adRenders[0].duration}s`);
+  assert.match(fp.adChat.at(-1).text, /^Done: set the length to 10 seconds, switched to the Luxury direction/);
+  const before2 = fp.adPlan.ads[1].scenes[0];
+  const jt = (await call(srv2.base, `/api/projects/${p3.id}/ads/1/scenes/0/regenerate`, { method: 'POST', body: { mode: 'auto' } })).data;
+  await waitJob(srv2.base, jt.jobId);
+  fp = (await call(srv2.base, `/api/projects/${p3.id}`)).data;
+  assert.notEqual(JSON.stringify(fp.adPlan.ads[1].scenes[0]), JSON.stringify(before2), 'free-mode new take changed the scene');
+  log('free-mode ads: 3 distinct concepts, 1:1, rule-based changes, new take, job retry');
+
+  // Clients: brand kit carries into new projects and styles the ads.
+  const cl = (await call(srv2.base, '/api/clients', { method: 'POST', body: { name: 'Gloss Boss', business: 'detailing', profile: { name: 'Gloss Boss', services: 'ceramic coating, interiors', location: 'Parramatta' } } })).data;
+  const lf = new FormData();
+  lf.append('images', new Blob([await fs.readFile(path.join(imgDir, 'logo.png'))]), 'logo.png');
+  const lres = await (await fetch(`${srv2.base}/api/clients/${cl.id}/media?kind=logo`, { method: 'POST', body: lf })).json();
+  assert.ok(lres.client.logo && lres.client.brand.colors.length, 'logo colours become brand colours');
+  const mf = new FormData();
+  mf.append('images', new Blob([await fs.readFile(path.join(imgDir, 'product.jpg'))]), 'product.jpg');
+  await fetch(`${srv2.base}/api/clients/${cl.id}/media`, { method: 'POST', body: mf });
+  await call(srv2.base, `/api/clients/${cl.id}`, { method: 'PATCH', body: { brand: { colors: ['#0a84ff'], direction: 'futuristic' } } });
+  const cp = (await call(srv2.base, `/api/clients/${cl.id}/projects`, { method: 'POST', body: {} })).data;
+  assert.equal(cp.clientId, cl.id);
+  assert.deepEqual(cp.adAssets.map((x) => x.kind).sort(), ['logo', 'photo']);
+  const jc = (await call(srv2.base, `/api/projects/${cp.id}/ads/generate`, { method: 'POST', body: { mode: 'auto', business: 'detailing', profile: cp.profile, count: 1, seconds: 10, format: '9:16', direction: 'auto', music: 'none' } })).data;
+  await waitJob(srv2.base, jc.jobId);
+  const cpp = (await call(srv2.base, `/api/projects/${cp.id}`)).data;
+  assert.equal(cpp.adPlan.ads[0].direction, 'futuristic', "client's preferred look used");
+  const ck = (await call(srv2.base, `/api/projects/${cp.id}/ads/0/kit`)).data;
+  assert.deepEqual(ck.brandColors, ['#0a84ff'], 'brand kit colours drive the palette');
+  const dup = (await call(srv2.base, `/api/projects/${cp.id}/duplicate`, { method: 'POST' })).data;
+  assert.equal(dup.adPlan.ads.length, 1, 'duplicate keeps the ads');
+  log('clients: logo colours, saved look and media carry into projects; duplicate');
+
+  // Requests from other websites are refused.
+  const evil = await fetch(`${srv2.base}/api/projects`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://evil.example' }, body: '{}' });
+  assert.equal(evil.status, 403);
+  log('cross-site requests blocked');
 
   // Settings: save a key (to a temp .env), check it, remove it
   const envFile = path.join(TMP, 'env-3556');
