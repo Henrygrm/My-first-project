@@ -165,6 +165,8 @@ async function openProject(id) {
   saveSettings();
   route();
   if (p.activeJob) pollJob(p.activeJob);
+  else if (p.lastJob && ['error', 'interrupted'].includes(p.lastJob.status)) showJobError(p.lastJob.error, p.lastJob.id);
+  else setJobUi({ hidden: true });
 }
 
 async function newProject() {
@@ -414,11 +416,12 @@ async function renderOne(index) {
 }
 
 // The same progress shows on the Home and Ads pages.
-function setJobUi({ hidden, error, stage, pct }) {
+function setJobUi({ hidden, error, stage, pct, retry }) {
   for (const pre of ['', 'ad-']) {
     const box = $(`#${pre}job`);
     if (hidden !== undefined) box.hidden = hidden;
     if (error !== undefined) box.classList.toggle('error', error);
+    if (retry !== undefined) $('.job-retry', box).hidden = !retry;
     if (stage !== undefined) $(`#${pre}job-stage`).textContent = stage;
     if (pct !== undefined) {
       $(`#${pre}job-pct`).textContent = pct === null ? '' : `${Math.round(pct * 100)}%`;
@@ -427,8 +430,22 @@ function setJobUi({ hidden, error, stage, pct }) {
   }
 }
 
-function showJobError(message) {
-  setJobUi({ hidden: false, error: true, stage: message, pct: null });
+// A failed or interrupted job can be run again with the same settings.
+let retryJobId = null;
+function showJobError(message, jobId = null) {
+  retryJobId = jobId;
+  setJobUi({ hidden: false, error: true, stage: message, pct: null, retry: Boolean(jobId) });
+}
+
+async function retryJob() {
+  if (!retryJobId || state.job) return;
+  try {
+    const { jobId, kind } = await api(`/api/jobs/${retryJobId}/retry`, { method: 'POST' });
+    retryJobId = null;
+    pollJob(jobId, kind);
+  } catch (err) {
+    toast(err.message, { error: true });
+  }
 }
 
 function refreshViews() {
@@ -438,7 +455,8 @@ function refreshViews() {
 
 async function pollJob(jobId, kind = null) {
   state.job = { id: jobId, kind };
-  setJobUi({ hidden: false, error: false, stage: 'Starting…', pct: 0 });
+  retryJobId = null;
+  setJobUi({ hidden: false, error: false, stage: 'Starting…', pct: 0, retry: false });
   refreshViews();
   let misses = 0;
   let finished = null;
@@ -470,7 +488,7 @@ async function pollJob(jobId, kind = null) {
       state.job = null;
       finished = job;
       if (job.status === 'error') {
-        showJobError(job.error);
+        showJobError(job.error, job.id);
         if (job.kind === 'revise' || job.kind === 'ads-revise') toast(job.error, { error: true });
       } else {
         setTimeout(() => { if (!state.job) setJobUi({ hidden: true }); }, 2000);
@@ -1028,7 +1046,7 @@ function renderSettings() {
   $('#opt-speech').disabled = !speechOk;
   $('#opt-speech').checked = speechOk && s.speechSubtitles;
   $('#openai-status').textContent = srv?.openaiKey ? `Saved key: ${srv.openaiKey}` : 'No key saved.';
-  $('#about').textContent = `Cutline ${APP_VERSION}${state.status ? ` · server ${state.status.version || 'old'} · FFmpeg ${state.status.ffmpeg.version || 'missing'}` : ''}`;
+  $('#about').textContent = `Cutline ${APP_VERSION}${state.status ? ` · server ${state.status.version || 'old'} · FFmpeg ${state.status.ffmpeg.version || 'missing'}` : ''}${srv?.logFile ? ` · Log file: ${srv.logFile}` : ''}`;
 }
 
 async function saveKey(field, value, label) {
@@ -1109,6 +1127,7 @@ function wire() {
   window.addEventListener('drop', (e) => e.preventDefault());
   $('#music-input').addEventListener('change', (e) => handleMusicFiles(e.target.files));
 
+  $$('.job-retry').forEach((b) => b.addEventListener('click', retryJob));
   $('#btn-generate').addEventListener('click', generate);
   $('#ask-form').addEventListener('submit', ask);
 

@@ -404,7 +404,7 @@ app.post('/api/projects/:id/revise', wrap(async (req, res) => {
 
 const isLocal = (req) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
 
-app.get('/api/settings', (req, res) => res.json({ ...publicSettings(), editable: isLocal(req) }));
+app.get('/api/settings', (req, res) => res.json({ ...publicSettings(), editable: isLocal(req), logFile: LOG_PATH }));
 
 app.post('/api/settings', wrap(async (req, res) => {
   if (!isLocal(req)) throw Object.assign(new Error('Settings can only be changed on the computer running Cutline.'), { status: 403 });

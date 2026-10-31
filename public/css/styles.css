@@ -145,7 +145,8 @@ select { appearance: none; padding-right: 28px !important; background-image: lin
 .bar { height: 5px; border-radius: 5px; background: var(--panel-3); overflow: hidden; }
 .bar i { display: block; height: 100%; width: 0; background: var(--grad); border-radius: 5px; transition: width .4s ease; }
 .job.error { border-color: rgba(255, 107, 107, .45); }
-.job.error #job-stage { color: var(--err); }
+.job.error #job-stage, .job.error #ad-job-stage { color: var(--err); }
+.job-retry { margin-top: 8px; }
 
 /* results */
 .results { display: grid; gap: 12px; min-width: 0; }
