@@ -12,8 +12,11 @@ import { publicSettings, saveSettings } from './lib/settings.js';
 import { createRequire } from 'node:module';
 import { addTrack, deleteTrack, listTracks, MOODS, MUSIC_DIR, updateTrack } from './lib/music.js';
 import { publicStyleList } from './lib/styles.js';
-import { AD_THEMES, FORMATS } from './lib/adRender.js';
-import { AD_LENGTHS, addAsset, deleteAsset, generateAds, rerenderAd, reviseAdsJob, rotateAsset, stillsFromFootage } from './lib/ads.js';
+import { FORMATS } from '../public/engine/compose.js';
+import { DIRECTIONS } from '../public/engine/styles.js';
+import { AD_LENGTHS, addAsset, deleteAsset, generateAds, previewKit, regenerateScene, restoreVersion, reviseAdsJob, rotateAsset, saveBoard, stillsFromFootage } from './lib/ads.js';
+import { OBJECTIVES } from './lib/director.js';
+import { providerStatus } from './providers/index.js';
 import {
   activeJobFor, createProject, DATA_DIR, deleteProject, enqueueJob, getJob, jobView, lastJobFor, listProjects,
   loadProject, newId, projectDir, PROJECTS_DIR, updateProject,
@@ -60,6 +63,8 @@ app.use(express.static(path.join(ROOT, 'public')));
 // Uploaded footage and rendered clips (supports range requests for scrubbing).
 app.use('/media', express.static(PROJECTS_DIR, { dotfiles: 'deny', index: false, fallthrough: false }));
 app.use('/music-files', express.static(MUSIC_DIR, { dotfiles: 'deny', index: false, fallthrough: false }));
+// Typefaces for the live ad preview (same files the renderer uses).
+app.use('/fonts', express.static(path.join(ROOT, 'assets', 'fonts'), { index: false, fallthrough: false, maxAge: '7d' }));
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -71,7 +76,8 @@ const RUNNERS = {
   revise: (pid, a, ctx) => revise(pid, a, ctx),
   ads: (pid, a, ctx) => generateAds(pid, a, ctx),
   'ads-revise': (pid, a, ctx) => reviseAdsJob(pid, a, ctx),
-  'ad-render': (pid, a, ctx) => rerenderAd(pid, a.index, a.ad || {}, ctx),
+  'ad-render': (pid, a, ctx) => saveBoard(pid, a.index, a.board || {}, ctx),
+  'ad-scene': (pid, a, ctx) => regenerateScene(pid, a, ctx),
 };
 
 function startJob(projectId, kind, args) {
@@ -100,10 +106,12 @@ app.get('/api/status', wrap(async (req, res) => {
     styles: publicStyleList(),
     moods: MOODS,
     ads: {
-      themes: Object.entries(AD_THEMES).map(([id, t]) => ({ id, label: t.label, brief: t.brief, accent: t.accent, bg: t.bg })),
+      directions: Object.entries(DIRECTIONS).map(([id, d]) => ({ id, label: d.label, brief: d.brief, font: d.fonts.display.family })),
       formats: Object.entries(FORMATS).map(([id, f]) => ({ id, label: f.label })),
       lengths: AD_LENGTHS,
+      objectives: Object.entries(OBJECTIVES).map(([id, label]) => ({ id, label })),
     },
+    providers: providerStatus(),
   });
 }));
 
@@ -373,8 +381,9 @@ app.post('/api/projects/:id/ads/revise', wrap(async (req, res) => {
   const request = String(req.body?.request || '').trim();
   if (!request) throw Object.assign(new Error('Type what you want changed.'), { status: 400 });
   const adIndex = Number.isInteger(req.body?.adIndex) ? req.body.adIndex : null;
+  const sceneIndex = Number.isInteger(req.body?.sceneIndex) ? req.body.sceneIndex : null;
   const mode = req.body?.mode === 'auto' ? 'auto' : 'ai';
-  const job = startJob(project.id, 'ads-revise', { request, adIndex, mode });
+  const job = startJob(project.id, 'ads-revise', { request, adIndex, sceneIndex, mode });
   res.json({ jobId: job.id });
 }));
 
@@ -382,8 +391,28 @@ app.post('/api/projects/:id/ads/:index/render', wrap(async (req, res) => {
   const project = await requireProject(req);
   noJob(project);
   if (!project.adPlan?.ads?.[Number(req.params.index)]) throw Object.assign(new Error('Ad not found'), { status: 404 });
-  const job = startJob(project.id, 'ad-render', { index: Number(req.params.index), ad: req.body?.ad || {} });
+  const job = startJob(project.id, 'ad-render', { index: Number(req.params.index), board: req.body?.board || {} });
   res.json({ jobId: job.id });
+}));
+
+app.post('/api/projects/:id/ads/:index/scenes/:scene/regenerate', wrap(async (req, res) => {
+  const project = await requireProject(req);
+  noJob(project);
+  const adIndex = Number(req.params.index), sceneIndex = Number(req.params.scene);
+  if (!project.adPlan?.ads?.[adIndex]?.scenes?.[sceneIndex]) throw Object.assign(new Error('Scene not found'), { status: 404 });
+  const job = startJob(project.id, 'ad-scene', { adIndex, sceneIndex, request: String(req.body?.request || '').slice(0, 500), mode: req.body?.mode === 'auto' ? 'auto' : 'ai' });
+  res.json({ jobId: job.id });
+}));
+
+app.post('/api/projects/:id/ads/:index/restore', wrap(async (req, res) => {
+  const project = await requireProject(req);
+  noJob(project);
+  res.json(await restoreVersion(project.id, Number(req.params.index), String(req.body?.file || '')));
+}));
+
+app.get('/api/projects/:id/ads/:index/kit', wrap(async (req, res) => {
+  await requireProject(req);
+  res.json(await previewKit(req.params.id, Number(req.params.index)));
 }));
 
 // --- ask for changes --------------------------------------------------------

@@ -5,7 +5,7 @@
 export const BUSINESSES = {
   restaurant: {
     id: 'restaurant',
-    label: 'Restaurant & café',
+    label: 'Restaurant',
     short: 'Food',
     tagline: 'Sizzle, plating, the money shot.',
     priorities: [
@@ -27,6 +27,31 @@ export const BUSINESSES = {
     reasons: ['Made fresh every day', 'Local produce', 'Cooked to order', 'Portions that fill you up'],
     promo: ['Fresh daily', 'Dine in or takeaway', 'Book online', 'Walk-ins welcome'],
     hashtagSeeds: ['foodie', 'foodtok', 'restaurant', 'cafe', 'eatlocal'],
+  },
+  cafe: {
+    id: 'cafe',
+    label: 'Café & coffee',
+    short: 'Café',
+    tagline: 'Espresso pours, latte art, the cosy table.',
+    priorities: [
+      'espresso extraction and milk being steamed or poured',
+      'latte art forming in the cup, close up',
+      'the finished coffee and food on the counter or table, in good light',
+      'baking and food prep: pastries, toasties, cabinet food',
+      'warm atmosphere: regulars, the barista at work, morning light',
+    ],
+    avoid: ['empty seating', 'dark interiors', 'people waiting in line', 'long shots of the menu board'],
+    pacing: 'Medium. 1.5–3 second cuts that follow the pour; linger on the latte art.',
+    structure: 'Hook with the latte art or the hero drink → making-of sequence → food and atmosphere → the finished order → CTA.',
+    segment: { min: 1.4, max: 3.0 },
+    hookFirstFrom: 'end',
+    hooks: ['Your morning, sorted', 'Watch this pour', 'The flat white locals swear by', 'Coffee worth getting up for', 'POV: your new favourite café', 'Made by a barista who cares', 'Your daily ritual, upgraded', 'Fresh from the oven this morning'],
+    captions: ['Fresh grind', 'The pour', 'Made to order', 'Your coffee'],
+    cta: 'Visit us today',
+    story: ['6am, the grinder starts', 'Dialling in the espresso', 'Steaming the milk', 'Latte art, every cup', 'Fresh from the oven', 'See you tomorrow'],
+    reasons: ['Freshly roasted beans', 'Baked every morning', 'Made by real baristas', 'A seat in the sun'],
+    promo: ['Order ahead', 'Dine in or takeaway', 'Fresh pastries daily', 'Open early'],
+    hashtagSeeds: ['coffee', 'cafe', 'latteart', 'flatwhite', 'coffeetime'],
   },
   detailing: {
     id: 'detailing',

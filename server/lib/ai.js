@@ -2,7 +2,9 @@ import fs from 'node:fs/promises';
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
-import { AD_THEMES, ANIMATIONS, SCENE_TYPES } from './adRender.js';
+import { RECIPE_IDS, RECIPES } from '../../public/engine/recipes.js';
+import { DIRECTION_IDS, DIRECTIONS } from '../../public/engine/styles.js';
+import { OBJECTIVES } from './director.js';
 import { STYLES } from './styles.js';
 
 export const MODELS = {
@@ -367,128 +369,192 @@ The footage follows so you can choose different moments if asked.`,
 }
 
 // ---------------------------------------------------------------------------
-// Animated ads
+// Ads (motion engine v3): creative director, revisions, frame review
 // ---------------------------------------------------------------------------
 
-const AdSceneSchema = z.object({
-  type: z.string().describe(`One of: ${SCENE_TYPES.join(', ')}`),
-  headline: z.string().describe('Main on-screen text, max 7 words, no emoji. For "stat" include the number; for "review" the exact quote'),
-  subline: z.string().describe('Smaller supporting line, max 8 words, or empty'),
-  items: z.array(z.string()).describe('"features": 2–4 short bullet points (max 5 words each). "cta": one button label like "Book now". Otherwise empty'),
-  photo: z.number().describe('1-based photo number shown behind this scene, or 0 for the animated background'),
-  animation: z.string().describe(`How the headline enters. One of: ${ANIMATIONS.join(', ')}`),
-  duration: z.number().describe('Seconds on screen, 1.5–5'),
+const SceneSchema = z.object({
+  recipe: z.string().describe(`Composition recipe. One of: ${RECIPE_IDS.join(', ')}`),
+  purpose: z.string().describe('Why this scene exists and what it does for the ad (one sentence)'),
+  duration: z.number().describe('Seconds, 1.5–5'),
+  headline: z.string().describe('Main on-screen text, max 7 words, no emoji. Wrap the one word to emphasise in *asterisks*. For "review" the exact real quote; for "offer" the real offer; for "stat" a real number'),
+  subline: z.string().describe('Small supporting line, max 9 words, or empty'),
+  items: z.array(z.string()).describe('"features": 2–4 benefits (max 5 words each). "process": step labels. "compare": ["Before label", "After label"]. "cta": [button label]. Otherwise empty'),
+  main_asset: z.string().describe('Asset id of the main photo for this scene, or empty'),
+  other_assets: z.array(z.string()).describe('Extra photo asset ids (gallery, process, compare); else empty'),
+  video: z.string().describe('Footage id for a "footage" scene, else empty'),
+  video_from: z.number().describe('Start time in the footage (seconds), else 0'),
+  camera: z.string().describe(`Camera move: one of ${['push', 'pull', 'pan', 'rise', 'orbit', 'punch', 'still'].join(', ')}, or empty for the default`),
+  entrance: z.string().describe('How the subject enters: one of rise, drop, pop, zoom, scaleDown, blur, tilt, spin, slideL, slideR, whip, fade, or empty for the default'),
+  text_animation: z.string().describe('How the headline animates: one of words, pop, blurWords, slideWords, lines, chars, or empty for the default'),
+  transition: z.string().describe(`Transition INTO this scene: one of ${['push', 'whip', 'zoom', 'blur', 'fade', 'wipe', 'iris', 'brand', 'flash', 'split', 'cut'].join(', ')}, or empty for the default`),
 });
 
-const AdSchema = z.object({
-  title: z.string().describe('Short name for this ad'),
-  angle: z.string().describe('The persuasion angle, e.g. "Offer", "Trust", "Problem → solution", "Showcase", "Social proof"'),
-  why_it_works: z.string().describe('One or two sentences: why this ad should get attention and customers for THIS business'),
-  theme: z.string().describe(`Visual look. One of: ${Object.keys(AD_THEMES).join(', ')}`),
-  accent_color: z.string().describe('Brand accent colour as #rrggbb if known from the logo or photos, else empty string'),
-  music_track: z.string().describe('Exact name of a song from the MUSIC LIBRARY, or "auto" if none is given'),
+const BoardSchema = z.object({
+  title: z.string(),
+  angle: z.string().describe('The persuasion angle, e.g. "Product showcase", "Offer", "Trust", "Problem → solution", "Local favourite"'),
+  objective: z.string().describe(`One of: ${Object.keys(OBJECTIVES).filter((k) => k !== 'auto').join(', ')}`),
+  why_it_works: z.string().describe('One or two sentences: why this ad will get attention and customers for THIS business'),
+  direction: z.string().describe(`Creative direction. One of: ${DIRECTION_IDS.join(', ')}`),
+  brand_colors: z.array(z.string()).describe('1–3 brand colours as #rrggbb taken from the logo or the business photos (most important first); empty if unclear'),
+  music_track: z.string().describe('Exact name of a song from the MUSIC LIBRARY, or "auto"'),
   music_mood: z.string().describe('One of: energetic, chill, build'),
-  scenes: z.array(AdSceneSchema).describe('Scenes in order. Start with a scroll-stopping hook, end with a "cta" scene'),
-  post_caption: z.string().describe('Ready-to-post caption for this ad, may include emoji'),
+  voiceover_script: z.string().describe('A natural spoken script for this ad (about 2.3 words per second of ad), or empty if a voice would not help'),
+  scenes: z.array(SceneSchema).describe('Scenes in order. Open with the strongest visual hook; end with a "cta" scene'),
+  post_caption: z.string().describe('Ready-to-post caption, may include emoji'),
   hashtags: z.array(z.string()),
 });
 
-const AdPlanSchema = z.object({
-  strategy: z.string().describe('2–3 sentences: what will make this business stand out in an ad, and how the ads differ'),
-  ads: z.array(AdSchema),
+const BoardsSchema = z.object({
+  strategy: z.string().describe('2–3 sentences: what will make this business stand out, and how the ads differ'),
+  photo_notes: z.array(z.object({
+    asset: z.string(),
+    description: z.string().describe('What the photo shows, in a few words'),
+    best_use: z.string().describe('hero product, supporting, background, before, after, or avoid'),
+  })).describe('One entry per photo'),
+  ads: z.array(BoardSchema),
 });
 
-const themeBriefs = () => Object.entries(AD_THEMES).map(([id, t]) => `- "${id}": ${t.brief}`).join('\n');
+const recipeBriefs = () => RECIPE_IDS.map((id) => `- "${id}" (${RECIPES[id].label}; needs ${RECIPES[id].needs}): ${RECIPES[id].brief}`).join('\n');
+const directionBriefs = () => DIRECTION_IDS.map((id) => `- "${id}" (${DIRECTIONS[id].label}): ${DIRECTIONS[id].brief}`).join('\n');
 
-function adSystem() {
-  return `You are a performance-marketing creative director who makes short animated (motion-graphics) video ads for local businesses. Your storyboards are rendered exactly as written by an animation engine, so be precise.
+function directorSystem() {
+  return `You are the creative director of a small studio that makes premium short video ads (motion graphics with real photos and footage) for local businesses. Clients pay for ads that look designed by a professional team and bring in customers. An animation engine renders your storyboard exactly.
 
 ${PLAYBOOK}
 
-How these ads work:
-- Each scene is one screen: big animated headline, optional small subline, optional photo behind it.
-- Scene types: "hook" (big text, opener), "photo" (a photo with a caption box; needs a photo), "features" (headline plus 2–4 ticked bullet points), "offer" (big pulsing badge with the deal), "stat" (a big number that counts up), "review" (5 stars and a customer quote), "cta" (call to action with a button; always the last scene).
-- Text must be short and readable in under a second: headlines max 7 words, no emoji, no hashtags.
-- Be specific to this business: use its name, suburb, services and offer. Never write vague filler like "Quality service".
-- NEVER invent facts: no made-up reviews, prices, discounts, statistics, years in business or guarantees. Only use an "offer" scene if an offer is given, a "review" scene if a real review is given, and a "stat" scene if a real number is given.
-- Use photos where they help (the money shot, the result); a photo can appear more than once.
-- Pick the theme that suits the business and the angle; make each ad clearly different (angle, structure, theme).
+How to direct:
+- The client's PRODUCT is the hero, not the words: use their photos and footage in most scenes. Recipes like product_hero, photo_full, gallery and process put real things on screen; kinetic (text only) is for one punchy beat at most.
+- "Cut-out available" photos can float as studio product shots (product_hero); others work full screen or as cards.
+- The first 1.5 seconds must stop the scroll: a striking visual plus a short hook. Never open on the logo.
+- Every scene needs a purpose (hook, desire, proof, value, offer, action) and the sequence must build to the call to action.
+- Vary composition and rhythm: no two neighbouring scenes with the same recipe; mix close product shots with full-frame photos.
+- Pick the creative direction that suits THIS brand (and its logo colours), not just the industry. In a batch, make each ad clearly different: different angle, structure, direction.
+- Text is minimal: headlines max 7 words, sublines max 9, no emoji, no hashtags on screen.
+- NEVER invent facts: no made-up prices, discounts, reviews, star ratings, statistics, awards, years in business, guarantees or claims like "licensed" unless given. Only use offer/review/stat scenes with real information supplied below.
+- Never describe a photo as something it is not. If a photo is weak (blurry, dark, unrelated), avoid it.
 
-Visual themes:
-${themeBriefs()}`;
+Composition recipes:
+${recipeBriefs()}
+
+Creative directions:
+${directionBriefs()}`;
 }
 
-async function imageContent(photos, logo) {
+async function mediaContent(photos, logo, footage) {
   const content = [];
-  for (const [i, p] of photos.entries()) {
-    content.push({ type: 'text', text: `Photo ${i + 1}:` });
-    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: (await fs.readFile(p)).toString('base64') } });
+  for (const p of photos) {
+    content.push({ type: 'text', text: `Photo "${p.id}"${p.cut ? ' (cut-out available)' : ''}${p.note ? `: ${p.note}` : ''}` });
+    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: (await fs.readFile(p.thumb)).toString('base64') } });
   }
   if (logo) {
-    content.push({ type: 'text', text: 'The business logo (shown automatically in every ad):' });
-    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: (await fs.readFile(logo)).toString('base64') } });
+    content.push({ type: 'text', text: 'The business logo (shown automatically in the corner and on the ending):' });
+    content.push({ type: 'image', source: { type: 'base64', media_type: logo.thumb.endsWith('.png') ? 'image/png' : 'image/jpeg', data: (await fs.readFile(logo.thumb)).toString('base64') } });
+  }
+  for (const v of footage || []) {
+    content.push({ type: 'text', text: `Footage "${v.id}" (${v.duration.toFixed(1)}s). Best moment around ${v.bestFrom.toFixed(1)}s:` });
+    if (v.thumb) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: (await fs.readFile(v.thumb)).toString('base64') } });
   }
   return content;
 }
 
-export async function planAds(p) {
-  const { business, profile, count, seconds, format, theme, accent, instructions, photos, logo, tracks } = p;
+/**
+ * Plan ad storyboards.
+ * p: { business, profile, count, seconds, format, direction ('auto'|id), objective, instructions,
+ *      photos: [{ id, thumb, cut, note }], logo: { thumb } | null, footage: [{ id, duration, bestFrom, thumb }], tracks, voiceover }
+ */
+export async function planAdBoards(p) {
+  const { business, profile, count, seconds, format, direction, objective, instructions, photos, logo, footage, tracks, voiceover } = p;
   const content = [{
     type: 'text',
     text: `${businessBlock(business, profile)}
 
-DELIVERABLE: ${count} animated ad${count > 1 ? 's' : ''}, each about ${seconds} seconds (scene durations should add up to that), format ${format}.
-${theme !== 'auto' ? `Use the "${theme}" theme for every ad.` : 'Choose the best theme for each ad.'}${accent ? ` The brand colour is ${accent}; use it as accent_color.` : ''}
-PHOTOS: ${photos.length ? `${photos.length} (shown below, numbered from 1)` : 'none, so use the animated background (photo = 0) in every scene'}.
-${tracks.length ? `\nMUSIC LIBRARY (pick one song per ad by its exact name; the mood label was set by the creator. Use a different song per ad when there are enough):\n${libraryList(tracks)}\n` : ''}${instructions ? `\nINSTRUCTIONS FROM THE CREATOR (follow these closely):\n${instructions}\n` : ''}
-First decide what will make people stop and act for THIS business, then write ${count > 1 ? `${count} ads with different angles` : 'the ad'}.`,
+DELIVERABLE: ${count} ad${count > 1 ? 's' : ''}, each ${seconds} seconds (scene durations add up to that), format ${format}.
+OBJECTIVE: ${objective === 'auto' ? 'choose the best objective for each ad' : OBJECTIVES[objective]}.
+${direction !== 'auto' ? `Use the "${direction}" creative direction for every ad.` : 'Choose the creative direction per ad.'}
+MEDIA: ${photos.length} photo(s)${footage.length ? `, ${footage.length} video clip(s)` : ''}${logo ? ', a logo' : ', no logo'}. Asset ids are in quotes below; use them exactly.
+${tracks.length ? `\nMUSIC LIBRARY (pick one song per ad by exact name; use different songs across ads when possible):\n${libraryList(tracks)}\n` : ''}${voiceover ? '\nThe creator wants a VOICEOVER: write voiceover_script for each ad.\n' : '\nNo voiceover: leave voiceover_script empty.\n'}${instructions ? `\nINSTRUCTIONS FROM THE CREATOR (follow these closely):\n${instructions}\n` : ''}
+First look at every photo and note what it shows. Then decide what will make people stop scrolling and act for THIS business, and direct ${count > 1 ? `${count} clearly different ads` : 'the ad'}.`,
   }];
-  content.push(...(await imageContent(photos, logo)));
-  return structuredCall({ system: adSystem(), content, schema: AdPlanSchema, effort: 'high' });
+  content.push(...(await mediaContent(photos, logo, footage)));
+  return structuredCall({ system: directorSystem(), content, schema: BoardsSchema, effort: 'high' });
 }
 
-const AdRevisionSchema = z.object({
+const BoardRevisionSchema = z.object({
   reply: z.string().describe('One or two sentences to the creator saying exactly what you changed (or why something is not possible)'),
-  ads: z.array(AdSchema.extend({
-    ad_number: z.number().describe('1-based number of the existing ad'),
+  ads: z.array(BoardSchema.extend({
+    ad_number: z.number(),
     changed: z.boolean().describe('true if anything about this ad changed'),
-    target_seconds: z.number().describe('Length of this ad in seconds'),
-  })).describe('Every existing ad, in order, revised or unchanged'),
+  })).describe('Every existing ad, in order'),
 });
 
-export async function reviseAds(p) {
-  const { business, profile, plan, request, adNumber, tracks, format, photos, logo } = p;
-  const current = plan.ads.map((a, i) => ({
-    ad_number: i + 1,
-    title: a.title,
-    angle: a.angle,
-    theme: a.theme,
-    accent_color: a.accent || '',
-    music: a.music ? a.music.name : 'none',
-    length_seconds: a.targetSeconds,
-    scenes: a.scenes.map((s) => ({ type: s.type, headline: s.headline, subline: s.subline, items: s.items, photo: s.photo + 1, animation: s.animation, duration: s.duration })),
-  }));
+/** Revise existing storyboards from a plain-English request (optionally one ad / one scene). */
+export async function reviseAdBoards(p) {
+  const { business, profile, boards, request, adNumber, sceneNumber, photos, logo, footage, tracks, format } = p;
+  const current = boards.map((b, i) => ({ ad_number: i + 1, ...boardForAi(b) }));
   const content = [{
     type: 'text',
     text: `${businessBlock(business, profile)}
 
-FORMAT: ${format}. PHOTOS: ${photos.length ? `${photos.length} (shown below, numbered from 1)` : 'none'}.
-MUSIC LIBRARY:
+FORMAT: ${format}. MUSIC LIBRARY:
 ${tracks.length ? libraryList(tracks) : 'empty'}
-For music_track use "keep" to keep the current song, "none" for no music, or a song's exact name.
+(music_track: "keep" keeps the current song.)
 
 THE CURRENT ADS:
 ${JSON.stringify(current, null, 1)}
 
-THE CREATOR'S REQUEST${adNumber ? ` (about ad ${adNumber})` : ''}:
+THE CREATOR'S REQUEST${adNumber ? ` (about ad ${adNumber}${sceneNumber ? `, scene ${sceneNumber}` : ''})` : ''}:
 "${request}"
 
 Apply the request:
-- ${adNumber ? `Change only ad ${adNumber}.` : 'If the request names ads, change those; otherwise apply it to every ad.'}
-- Make the change clearly visible. Set changed=true on every ad you modify; ads you leave alone come back exactly as given with changed=false.
-- Keep everything the creator did not ask to change, including the length (target_seconds = length_seconds unless asked).
-- The reply says exactly what you changed, in plain words.`,
+- ${adNumber ? `Change only ad ${adNumber}${sceneNumber ? `, and within it only scene ${sceneNumber} unless the request clearly needs more` : ''}.` : 'If the request names ads, change those; otherwise apply it to every ad.'}
+- Make the change clearly visible. Keep everything the creator did not ask to change, including scene order, timing and assets.
+- Set changed=true on every ad you modify; return the others exactly as given with changed=false.
+- The reply says exactly what you changed.`,
   }];
-  content.push(...(await imageContent(photos, logo)));
-  return structuredCall({ system: adSystem(), content, schema: AdRevisionSchema, effort: 'medium' });
+  content.push(...(await mediaContent(photos, logo, footage)));
+  return structuredCall({ system: directorSystem(), content, schema: BoardRevisionSchema, effort: 'medium' });
+}
+
+export function boardForAi(b) {
+  return {
+    title: b.title, angle: b.angle, objective: b.objective, why_it_works: b.why, direction: b.direction, brand_colors: b.brandColors,
+    music_track: b.music?.name || 'auto', music_mood: b.musicMood, voiceover_script: b.voiceover || '',
+    scenes: b.scenes.map((s) => ({
+      recipe: s.recipe, purpose: s.purpose || '', duration: s.duration, headline: s.headline, subline: s.subline, items: s.items,
+      main_asset: s.main || '', other_assets: s.alt || [], video: s.video || '', video_from: s.from || 0,
+      camera: s.camera || '', entrance: s.entrance || '', text_animation: s.textAnim || '', transition: s.transition || '',
+    })),
+    post_caption: b.postCaption, hashtags: b.hashtags,
+  };
+}
+
+const ReviewSchema = z.object({
+  verdict: z.string().describe('"ready" if a client would be happy, otherwise "fix"'),
+  summary: z.string().describe('One sentence on overall quality'),
+  scenes: z.array(z.object({
+    scene: z.number().describe('1-based scene number'),
+    ok: z.boolean(),
+    problem: z.string().describe('What looks wrong (layout, readability, weak or wrong photo, repetitive, off-brand, text too long), or empty'),
+    fix_headline: z.string().describe('Better headline if the text is the problem, else empty'),
+    fix_recipe: z.string().describe(`A better recipe if the composition is the problem (${RECIPE_IDS.join(', ')}), else empty`),
+    fix_asset: z.string().describe('A better photo asset id if the photo is the problem, else empty'),
+  })),
+});
+
+/** Claude looks at one still per scene (a contact sheet) and flags weak scenes with concrete fixes. */
+export async function reviewAdFrames({ business, profile, board, frames, photos }) {
+  const content = [{
+    type: 'text',
+    text: `${businessBlock(business, profile)}
+
+You are reviewing a draft ad before it goes to a paying client. Below is one still frame per scene (taken late in each scene, after animations settle), plus the storyboard. Judge it like a senior designer: hierarchy, readability, composition, whether the product is the hero, colour, variety, and whether each scene earns its place. Be strict but practical: only flag real problems, and give concrete fixes using the available photo ids: ${photos.map((p) => `"${p.id}"`).join(', ') || 'none'}.
+
+STORYBOARD:
+${JSON.stringify(boardForAi(board).scenes.map((s, i) => ({ scene: i + 1, recipe: s.recipe, headline: s.headline, main_asset: s.main_asset })), null, 1)}`,
+  }];
+  for (const f of frames) {
+    content.push({ type: 'text', text: `Scene ${f.scene}:` });
+    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: (await fs.readFile(f.path)).toString('base64') } });
+  }
+  return structuredCall({ system: directorSystem(), content, schema: ReviewSchema, effort: 'medium', maxTokens: 8000 });
 }

@@ -166,7 +166,7 @@ function product_hero(spec, kit, r) {
   layers.push(...particlesFor(kit, r, { x: 0.15, y: prodY - prodH * 0.6, w: 0.7, h: prodH * 0.9 }));
   const ty = layout === 0 ? S.top + 0.02 : layout === 1 ? prodY + prodH / 2 + 0.04 : S.top + 0.04;
   layers.push(...headline(kit, r, spec, { y: Math.min(ty, 1 - S.bottom - 0.12), size: layout === 2 ? 0.13 : 0.1, at: 0.45 }));
-  return { layers, camera: camera(kit, r, dur, cut ? pick(['push', 'orbit', 'rise'], r) : 'push'), sfx: [{ t: 0.1, kind: entrance === 'drop' ? 'impact' : 'whoosh' }, { t: 1.0, kind: 'shimmer' }] };
+  return { layers, camera: camera(kit, r, dur, spec.camera || cut ? pick(['push', 'orbit', 'rise'], r) : 'push'), sfx: [{ t: 0.1, kind: entrance === 'drop' ? 'impact' : 'whoosh' }, { t: 1.0, kind: 'shimmer' }] };
 }
 
 function photo_full(spec, kit, r) {
@@ -200,7 +200,7 @@ function photo_full(spec, kit, r) {
       y: 1 - S.bottom - 0.17, size: 0.07, align: 'left', x: 0.5, w: 0.8, color: 'onAccent', at: 0.35, box: { color: 'accent', perLine: true, reveal: true, pad: 0.022 },
     }).map((l) => (l.id === 'subline' ? { ...l, color: '#ffffff', onPhoto: true, y: l.y + 0.02 } : l)));
   }
-  return { layers, camera: camera(kit, r, dur, cut ? 'push' : pick(['still', 'push', 'pan'], r)), sfx: [{ t: 0.35, kind: 'swoosh' }] };
+  return { layers, camera: camera(kit, r, dur, spec.camera || cut ? 'push' : pick(['still', 'push', 'pan'], r)), sfx: [{ t: 0.35, kind: 'swoosh' }] };
 }
 
 function gallery(spec, kit, r) {
@@ -223,7 +223,7 @@ function gallery(spec, kit, r) {
     });
   });
   layers.push(...headline(kit, r, spec, { y: S.top + 0.01, size: 0.09, at: 0.1 }));
-  return { layers, camera: camera(kit, r, dur, 'pan'), sfx: photos.map((_, i) => ({ t: 0.15 + i * 0.35, kind: 'swoosh' })) };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'pan'), sfx: photos.map((_, i) => ({ t: 0.15 + i * 0.35, kind: 'swoosh' })) };
 }
 
 function compare(spec, kit, r) {
@@ -237,7 +237,7 @@ function compare(spec, kit, r) {
     split: [[0, 1], [0.5, 1], [Math.min(dur - 0.6, 2.2), 0.5, 'inOutCubic'], [dur, 0.45]], in: { type: 'rise', at: 0, dur: 0.6 }, z: -0.05,
   });
   layers.push(...headline(kit, r, spec, { y: S.top, size: 0.09, at: 0.15 }));
-  return { layers, camera: camera(kit, r, dur, 'push'), sfx: [{ t: 0.5, kind: 'swoosh' }, { t: Math.min(dur - 0.6, 2.2), kind: 'shimmer' }] };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'push'), sfx: [{ t: 0.5, kind: 'swoosh' }, { t: Math.min(dur - 0.6, 2.2), kind: 'shimmer' }] };
 }
 
 function kinetic(spec, kit, r) {
@@ -255,7 +255,7 @@ function kinetic(spec, kit, r) {
   });
   if (spec.subline) layers.push({ type: 'text', text: spec.subline, role: 'body', size: 0.04, x: 0.5, y: 0.74, w: 0.84, maxW: 0.84, align: layout === 1 ? 'left' : 'center', anchor: 'top', color: 'textMuted', textAnim: 'none', in: { type: 'rise', at: 0.8, dur: 0.5 } });
   layers.push(...particlesFor(kit, r, { x: 0, y: 0, w: 1, h: 1 }, { density: 0.5, z: 0.4 }));
-  return { layers, camera: camera(kit, r, dur, kit.direction.motion.camera === 'dynamic' ? 'punch' : 'push'), sfx: [{ t: 0.15, kind: kit.direction.sound === 'punchy' ? 'impact' : 'whoosh' }] };
+  return { layers, camera: camera(kit, r, dur, spec.camera || kit.direction.motion.camera === 'dynamic' ? 'punch' : 'push'), sfx: [{ t: 0.15, kind: kit.direction.sound === 'punchy' ? 'impact' : 'whoosh' }] };
 }
 
 function features(spec, kit, r) {
@@ -285,7 +285,7 @@ function features(spec, kit, r) {
     layers.push({ type: 'icon', icon: icons[i % icons.length], x: 0.13, y, size: 0.04, lineWidth: 2.8, color: 'onAccent', disc: 'accent', in: { type: 'pop', at, dur: 0.4 }, z: -0.1 });
     layers.push({ type: 'text', text: it, role: 'body', size: 0.05, x: 0.56, y, w: 0.66, maxW: 0.66, align: 'left', anchor: 'middle', lines: 2, color: layout === 1 ? 'onSurface' : 'text', textAnim: 'none', in: { type: 'slideR', at: at + 0.05, dur: 0.5 }, z: -0.1 });
   });
-  return { layers, camera: camera(kit, r, dur, 'still'), sfx: items.map((_, i) => ({ t: 0.55 + i * 0.32, kind: 'pop' })) };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'still'), sfx: items.map((_, i) => ({ t: 0.55 + i * 0.32, kind: 'pop' })) };
 }
 
 function offer(spec, kit, r) {
@@ -308,7 +308,7 @@ function offer(spec, kit, r) {
   if (spec.subline) layers.push({ type: 'text', text: spec.subline, role: 'body', size: 0.042, x: 0.5, y: 1 - S.bottom - 0.06, w: 0.84, maxW: 0.84, anchor: 'bottom', color: 'text', textAnim: 'none', in: { type: 'rise', at: 0.9, dur: 0.5 } });
   if (['playful', 'energetic'].includes(kit.direction.id)) layers.push(...particlesFor(kit, r, { x: 0, y: -0.1, w: 1, h: 0.9 }, { kind: 'confetti', density: 0.8 }));
   else layers.push(...particlesFor(kit, r, { x: 0.15, y: by - 0.2, w: 0.7, h: 0.4 }, { kind: 'sparkle', density: 0.8 }));
-  return { layers, camera: camera(kit, r, dur, 'punch'), sfx: [{ t: 0.1, kind: 'impact' }, { t: 0.35, kind: 'pop' }] };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'punch'), sfx: [{ t: 0.1, kind: 'impact' }, { t: 0.35, kind: 'pop' }] };
 }
 
 function review(spec, kit, r) {
@@ -319,7 +319,7 @@ function review(spec, kit, r) {
   layers.push({ type: 'stars', x: 0.5, y: kit.square ? 0.27 : 0.355, size: 0.035, color: 'accent', in: { type: 'none', at: 0.35 }, z: 0 });
   layers.push({ type: 'text', text: `“${quote}”`, role: kit.fonts?.accent ? 'accent' : 'display', size: 0.06, x: 0.5, y: 0.5, w: 0.76, maxW: 0.76, anchor: 'middle', lines: 5, color: 'onSurface', textAnim: 'lines', textAt: 0.6, z: 0 });
   layers.push({ type: 'text', text: spec.subline || 'Customer review', role: 'body', size: 0.034, x: 0.5, y: kit.square ? 0.74 : 0.65, w: 0.76, maxW: 0.76, anchor: 'top', color: 'onSurface', opacity: 0.7, textAnim: 'none', in: { type: 'fade', at: 1.1, dur: 0.5 }, z: 0 });
-  return { layers, camera: camera(kit, r, dur, 'push'), sfx: [{ t: 0.35, kind: 'shimmer' }] };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'push'), sfx: [{ t: 0.35, kind: 'shimmer' }] };
 }
 
 function stat(spec, kit, r) {
@@ -329,7 +329,7 @@ function stat(spec, kit, r) {
   layers.push({ type: 'light', kind: 'glow', x: 0.5, y: 0.45, r: 0.6, color: 'accent', strength: 0.25, z: 0.5 });
   layers.push({ type: 'text', id: 'stat', text: num ? spec.headline.replace(num[0], `*${num[0]}*`) : spec.headline, role: 'display', size: kit.square ? 0.16 : 0.2, x: 0.5, y: 0.44, w: 0.9, maxW: 0.9, anchor: 'middle', lines: 2, color: 'text', textAnim: 'blurWords', textAt: 0.2, countUp: true, idle: { type: 'breathe', amt: 0.4 }, glow: kit.direction.glow ? true : undefined });
   if (spec.subline) layers.push({ type: 'text', text: spec.subline, role: 'body', size: 0.045, x: 0.5, y: 0.6, w: 0.84, maxW: 0.84, anchor: 'top', color: 'textMuted', textAnim: 'none', in: { type: 'rise', at: 0.7, dur: 0.5 } });
-  return { layers, camera: camera(kit, r, dur, 'push'), sfx: [{ t: 0.2, kind: 'riser' }] };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'push'), sfx: [{ t: 0.2, kind: 'riser' }] };
 }
 
 function process(spec, kit, r) {
@@ -351,7 +351,7 @@ function process(spec, kit, r) {
     const label = spec.items?.[i] || `Step ${i + 1}`;
     layers.push({ type: 'text', text: label, role: 'body', size: 0.04, x: 0.81, y, w: 0.3, maxW: 0.3, align: 'left', anchor: 'middle', lines: 3, color: 'text', textAnim: 'none', in: { type: 'fade', at: at + 0.25, dur: 0.4 }, z: 0 });
   });
-  return { layers, camera: camera(kit, r, dur, 'still'), sfx: photos.map((_, i) => ({ t: 0.3 + i * step, kind: 'click' })) };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'still'), sfx: photos.map((_, i) => ({ t: 0.3 + i * step, kind: 'click' })) };
 }
 
 function footage(spec, kit, r) {
@@ -362,7 +362,7 @@ function footage(spec, kit, r) {
   const layout = spec.layout ?? Math.floor(r() * 2);
   if (layout === 0) layers.push(...headline(kit, r, spec, { y: 1 - S.bottom - 0.19, size: 0.085, align: 'left', x: 0.5, w: 0.84, onPhoto: true, color: '#ffffff', at: 0.3 }));
   else layers.push(...headline(kit, r, spec, { y: 1 - S.bottom - 0.14, size: 0.06, align: 'center', x: 0.5, w: 0.84, color: 'onAccent', at: 0.3, box: { color: 'accent', perLine: true, reveal: true } }).map((l) => (l.id === 'subline' ? { ...l, color: '#ffffff', onPhoto: true } : l)));
-  return { layers, camera: camera(kit, r, dur, 'still'), sfx: [] };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'still'), sfx: [] };
 }
 
 function location(spec, kit, r) {
@@ -375,7 +375,7 @@ function location(spec, kit, r) {
   layers.push({ type: 'icon', icon: 'pin', x: 0.5, y: 0.4, size: 0.2, color: 'accent', lineWidth: 2.4, in: { type: 'drop', at: 0.15 }, z: 0 });
   layers.push({ type: 'text', id: 'headline', text: spec.headline, role: 'display', size: 0.11, x: 0.5, y: 0.56, w: 0.86, maxW: 0.86, anchor: 'top', lines: 2, color: 'text', textAnim: 'words', textAt: 0.6 });
   if (spec.subline) layers.push({ type: 'text', text: spec.subline, role: 'body', size: 0.04, x: 0.5, y: 0.7, w: 0.84, maxW: 0.84, anchor: 'top', color: 'textMuted', textAnim: 'none', in: { type: 'rise', at: 1.0, dur: 0.5 } });
-  return { layers, camera: camera(kit, r, dur, 'push'), sfx: [{ t: 0.35, kind: 'impact' }] };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'push'), sfx: [{ t: 0.35, kind: 'impact' }] };
 }
 
 function cta(spec, kit, r) {
@@ -398,7 +398,7 @@ function cta(spec, kit, r) {
     layers.push({ type: 'text', text: spec.subline, role: 'body', size: 0.036, x: 0.5, y: btnY + 0.08, w: 0.84, maxW: 0.84, anchor: 'top', lines: 2, color: 'textMuted', textAnim: 'none', in: { type: 'rise', at: 1.05, dur: 0.5 }, z: 0 });
   }
   layers.push(...particlesFor(kit, r, { x: 0, y: 0, w: 1, h: 1 }, { density: 0.4, z: 0.5 }));
-  return { layers, camera: camera(kit, r, dur, 'push'), sfx: [{ t: 0.05, kind: 'whoosh' }, { t: 0.75, kind: 'pop' }, { t: 0.8, kind: 'shimmer' }] };
+  return { layers, camera: camera(kit, r, dur, spec.camera || 'push'), sfx: [{ t: 0.05, kind: 'whoosh' }, { t: 0.75, kind: 'pop' }, { t: 0.8, kind: 'shimmer' }] };
 }
 
 const BUILDERS = { product_hero, photo_full, gallery, compare, kinetic, features, offer, review, stat, process, footage, location, cta };

@@ -1,37 +1,40 @@
-// Animated ads: photo/logo assets, storyboard planning (Claude or templates),
-// rendering and change requests. Ads live in the same project as the clips.
+// Ads: media (photos, logo, cut-outs, footage), creative direction (Claude or
+// free mode), the motion engine, rendering, versions and change requests.
+// Ads live in the same project as the clips.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { AD_THEMES, ANIMATIONS, FORMATS, SCENE_TYPES, renderAd } from './adRender.js';
-import { aiConfigured, planAds, reviseAds, SetupError } from './ai.js';
+import { createCanvas } from '@napi-rs/canvas';
+import { buildPalette, isChromatic } from '../../public/engine/brand.js';
+import { compose, FORMATS } from '../../public/engine/compose.js';
+import { renderFrame } from '../../public/engine/compositor.js';
+import { RECIPES } from '../../public/engine/recipes.js';
+import { DIRECTIONS, getDirection } from '../../public/engine/styles.js';
+import { aiConfigured, planAdBoards, reviewAdFrames, reviseAdBoards, SetupError } from './ai.js';
+import { analyzeImage, logoNeedsPlate } from './analyze.js';
 import { getBusiness } from './businesses.js';
+import { cutout, cutoutsAvailable } from './cutout.js';
+import { adDefaults, mediaSummary, normalizeBoard, OBJECTIVES, planFree } from './director.js';
+import { loadAssets, makeEnv, registerFonts } from './engine/node.js';
+import { renderComposition } from './engine/render.js';
 import { FFMPEG, frameAt, run } from './ffmpeg.js';
+import { log } from './log.js';
 import { findTrack, getTrack, listTracks, MUSIC_DIR, pickTrack } from './music.js';
 import { cleanProfile } from './pipeline.js';
-import { makeRng } from './planner.js';
-import { cleanOnScreenText } from './subtitles.js';
+import { checkRender } from './qa.js';
 import { loadProject, newId, projectDir, updateProject } from './store.js';
+import { speak, voiceConfigured } from '../providers/tts.js';
 
 export const AD_LENGTHS = [10, 15, 20, 30];
+const MAX_VERSIONS = 6;
 const assetDir = (projectId) => path.join(projectDir(projectId), 'ad-assets');
 const outDir = (projectId) => path.join(projectDir(projectId), 'ad-output');
-
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const oneOf = (v, list, fallback) => {
-  const s = String(v || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
-  return list.includes(s) ? s : fallback;
-};
-const short = (text, n) => {
-  const t = cleanOnScreenText(text);
-  return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t;
-};
-const pick = (list, rng) => list[Math.floor(rng() * list.length)];
 
 // ---------------------------------------------------------------------------
-// Assets: photos and logo
+// Media: photos and logo
 // ---------------------------------------------------------------------------
 
-/** Convert an uploaded image (JPG, PNG, WebP, HEIC…) to a web-friendly file plus a small thumbnail. */
+/** Convert an uploaded image (JPG, PNG, WebP, HEIC…) to a web-friendly file plus a thumbnail, and analyse it. */
 export async function addAsset(projectId, tmpPath, originalName, kind) {
   const dir = assetDir(projectId);
   await fs.mkdir(dir, { recursive: true });
@@ -48,10 +51,16 @@ export async function addAsset(projectId, tmpPath, originalName, kind) {
     await fs.rm(path.join(dir, file), { force: true });
     throw new Error("Couldn't read this image. Save it as a JPG or PNG and try again.");
   }
-  return { id, file, thumb, name: String(originalName || 'image').slice(0, 120), kind: isLogo ? 'logo' : 'photo', addedAt: new Date().toISOString() };
+  let analysis = null;
+  try {
+    analysis = await analyzeImage(path.join(dir, file), { kind: isLogo ? 'logo' : 'photo' });
+  } catch (err) {
+    log('warn', `analysis failed for ${file}:`, err.message);
+  }
+  return { id, file, thumb, name: String(originalName || 'image').slice(0, 120), kind: isLogo ? 'logo' : 'photo', analysis, addedAt: new Date().toISOString() };
 }
 
-/** Rotate a photo 90° clockwise (for phone photos that come in sideways). */
+/** Rotate a photo 90° clockwise (phone photos that come in sideways). Its cut-out is redone. */
 export async function rotateAsset(projectId, assetId) {
   const project = await loadProject(projectId);
   const a = project?.adAssets?.find((x) => x.id === assetId);
@@ -62,9 +71,11 @@ export async function rotateAsset(projectId, assetId) {
     await run(FFMPEG, ['-y', '-v', 'error', '-i', path.join(dir, f), '-frames:v', '1', '-vf', 'transpose=1', ...(f.endsWith('.jpg') ? ['-q:v', '3'] : []), tmp]);
     await fs.rename(tmp, path.join(dir, f));
   }
+  if (a.cut?.file) await fs.rm(path.join(dir, a.cut.file), { force: true });
+  const analysis = await analyzeImage(path.join(dir, a.file), { kind: a.kind }).catch(() => a.analysis);
   return updateProject(projectId, (p) => {
     const x = p.adAssets.find((y) => y.id === assetId);
-    if (x) x.rev = (x.rev || 0) + 1;
+    if (x) Object.assign(x, { rev: (x.rev || 0) + 1, cut: null, analysis });
   });
 }
 
@@ -75,7 +86,7 @@ export async function deleteAsset(projectId, assetId) {
     if (i < 0) throw Object.assign(new Error('Image not found'), { status: 404 });
     [removed] = p.adAssets.splice(i, 1);
   });
-  for (const f of [removed.file, removed.thumb]) await fs.rm(path.join(assetDir(projectId), f), { force: true });
+  for (const f of [removed.file, removed.thumb, removed.cut?.file].filter(Boolean)) await fs.rm(path.join(assetDir(projectId), f), { force: true });
   return project;
 }
 
@@ -89,13 +100,9 @@ export async function stillsFromFootage(projectId, want = 6) {
   const picks = [];
   for (const v of project.videos) {
     const n = Math.max(1, Math.round((want * v.meta.duration) / total));
-    let signals = null;
-    try {
-      signals = JSON.parse(await fs.readFile(path.join(projectDir(projectId), 'work', v.id, 'signals.json'), 'utf8'));
-    } catch {}
+    const signals = await readSignals(projectId, v);
     for (let k = 0; k < n; k++) {
       const d = v.meta.duration;
-      // Evenly spread across the middle of the video, nudged to a bright, steady second when measured.
       let t = d * (0.1 + (0.8 * (k + 0.5)) / n);
       if (signals) {
         const lo = Math.floor(d * (0.1 + (0.8 * k) / n));
@@ -128,131 +135,155 @@ export async function stillsFromFootage(projectId, want = 6) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Storyboards
-// ---------------------------------------------------------------------------
-
-/** Validate an ad storyboard (from Claude or the editor) so it always renders. */
-export function sanitizeAd(raw, { photos, target, defaults = {} }) {
-  const accent = String(raw.accent_color ?? raw.accent ?? '').trim();
-  const ad = {
-    title: short(raw.title || 'Ad', 60) || 'Ad',
-    angle: String(raw.angle || '').slice(0, 120),
-    why_it_works: String(raw.why_it_works || '').slice(0, 400),
-    theme: AD_THEMES[raw.theme] ? raw.theme : oneOf(raw.theme, Object.keys(AD_THEMES), defaults.theme || 'bold'),
-    accent: /^#?[0-9a-f]{6}$/i.test(accent) ? `#${accent.replace('#', '').toLowerCase()}` : defaults.accent || '',
-    music_mood: oneOf(raw.music_mood, ['energetic', 'chill', 'build'], ''),
-    post_caption: String(raw.post_caption || '').slice(0, 2200),
-    hashtags: (raw.hashtags || []).map((h) => `#${String(h).replace(/^#+/, '').replace(/\s+/g, '')}`).filter((h) => h.length > 1).slice(0, 12),
-  };
-  let scenes = (raw.scenes || []).slice(0, 10).map((s) => {
-    // Claude numbers photos from 1; the editor sends 0-based `photo` with `photoIndex: true`.
-    const n = Math.round(Number(s.photo));
-    const photo = s.zeroBased ? (n >= 0 && n < photos ? n : -1) : n >= 1 && n <= photos ? n - 1 : -1;
-    const scene = {
-      type: oneOf(s.type, SCENE_TYPES, 'hook'),
-      headline: short(s.headline, 90),
-      subline: short(s.subline, 90),
-      items: (s.items || []).map((x) => short(x, 42)).filter(Boolean).slice(0, 4),
-      photo,
-      animation: oneOf(s.animation, ANIMATIONS, 'slide'),
-      duration: clamp(Number(s.duration) || 2.5, 1.2, 6),
-    };
-    if (scene.type === 'photo' && scene.photo < 0) scene.type = 'hook';
-    if (scene.type === 'features' && !scene.items.length) scene.type = 'hook';
-    return scene;
-  }).filter((s) => s.headline || s.items.length || s.photo >= 0);
-  if (!scenes.length) scenes = [{ type: 'hook', headline: defaults.hook || 'Book today', subline: '', items: [], photo: -1, animation: 'pop', duration: 3 }];
-  if (scenes.at(-1).type !== 'cta') {
-    scenes.push({ type: 'cta', headline: defaults.cta || 'Book today', subline: defaults.ctaSub || '', items: [defaults.button || 'Link in bio'], photo: -1, animation: 'pop', duration: 3 });
+async function readSignals(projectId, v) {
+  try {
+    return JSON.parse(await fs.readFile(path.join(projectDir(projectId), 'work', v.id, 'signals.json'), 'utf8'));
+  } catch {
+    return null;
   }
-  ad.scenes = fitDurations(scenes, target);
-  ad.targetSeconds = target;
-  return ad;
 }
 
-/** Scale scene lengths so the ad lands on the target length. */
-function fitDurations(scenes, target) {
-  // The closing call to action always gets time to be read; the rest share what's left.
-  const last = scenes.length > 1 ? Math.max(2.2, Math.min(4, scenes.at(-1).duration)) : target;
-  let out = scenes.slice(0, -1).map((s) => ({ ...s }));
-  const room = Math.max(1.2 * out.length, target - last);
-  for (let pass = 0; pass < 4 && out.length; pass++) {
-    const sum = out.reduce((a, s) => a + s.duration, 0);
-    const k = room / sum;
-    if (Math.abs(k - 1) < 0.01) break;
-    out = out.map((s) => ({ ...s, duration: clamp(Math.round(s.duration * k * 100) / 100, 1.2, 6) }));
+/** Cut out every photo that hasn't been cut yet (cached per photo). */
+async function prepareMedia(projectId, ctx) {
+  const project = await loadProject(projectId);
+  const photos = (project.adAssets || []).filter((a) => a.kind === 'photo');
+  const todo = photos.filter((a) => !a.cut || a.cut.rev !== (a.rev || 0));
+  if (todo.length && cutoutsAvailable()) {
+    for (const [i, a] of todo.entries()) {
+      ctx.stage(`Cutting out photo ${i + 1} of ${todo.length}`, 0.02 + (0.12 * i) / todo.length);
+      try {
+        const res = await cutout(path.join(assetDir(projectId), a.file), path.join(assetDir(projectId), `${a.id}-cut.png`), { onStage: (m) => ctx.stage(m, 0.02) });
+        await updateProject(projectId, (p) => {
+          const x = p.adAssets.find((y) => y.id === a.id);
+          if (x) x.cut = res ? { ...res, rev: a.rev || 0 } : null;
+        });
+      } catch (err) {
+        ctx.log?.(`Cut-out skipped for ${a.name}: ${err.message}`);
+        log('warn', `cutout failed for ${a.file}:`, err.message);
+      }
+    }
   }
-  return [...out, { ...scenes.at(-1), duration: clamp(last, 1.2, 6) }];
+  // Footage: a frame + best moment per video for the director.
+  const footage = [];
+  for (const v of project.videos || []) {
+    const signals = await readSignals(projectId, v);
+    let bestFrom = Math.min(1, v.meta.duration / 4);
+    if (signals?.motion?.length) {
+      let best = -1;
+      for (let s = 0; s < signals.motion.length - 3; s++) {
+        const score = signals.motion.slice(s, s + 3).reduce((x, y) => x + y, 0) + ((signals.brightness[s] ?? 100) > 50 ? 5 : -20);
+        if (score > best) {
+          best = score;
+          bestFrom = s;
+        }
+      }
+    }
+    footage.push({ id: v.id, duration: v.meta.duration, bestFrom, thumbFile: path.join(projectDir(projectId), 'videos', v.thumb), meta: v.meta, file: path.join(projectDir(projectId), 'videos', v.file) });
+  }
+  return { project: await loadProject(projectId), footage };
 }
 
-function adDefaults(business, profile) {
-  const name = profile.name;
-  const sub = [profile.location, profile.contact].filter(Boolean).join('  ·  ');
-  return {
-    hook: business.hooks[0],
-    cta: name && name.length <= 22 ? `${business.cta.split(' ')[0]} ${name} today` : business.cta,
-    ctaSub: sub,
-    button: profile.contact && profile.contact.length <= 24 ? 'Message us' : 'Link in bio',
-  };
+// ---------------------------------------------------------------------------
+// Board → composition
+// ---------------------------------------------------------------------------
+
+const industryOf = (business) => (business.id === 'cafe' || /caf|coffee/i.test(business.label) ? 'cafe' : business.id);
+
+/** Brand colours, best first: brand kit → AI-read logo colours → logo pixels → photo colours. */
+function brandColors(project, board) {
+  const kit = (project.brand?.colors || []).filter(Boolean);
+  if (kit.length) return kit;
+  if (board.brandColors?.length) return board.brandColors;
+  const logo = (project.adAssets || []).find((a) => a.kind === 'logo');
+  const fromLogo = (logo?.analysis?.colors || []).filter(isChromatic);
+  if (fromLogo.length) return fromLogo;
+  const fromPhotos = (project.adAssets || []).filter((a) => a.kind === 'photo').flatMap((a) => (a.analysis?.colors || []).slice(0, 2)).filter(isChromatic);
+  return fromPhotos.slice(0, 3);
 }
 
-/** Template ads for free mode: three different concepts built from the business details. */
-export function templateAds({ business, profile, photos, count, target, theme, accent, rng }) {
-  const services = (profile.services || '').split(/[,;\n]|\band\b/).map((x) => x.trim().replace(/^./, (c) => c.toUpperCase())).filter((x) => x.length > 2 && x.length <= 40);
-  const d = adDefaults(business, profile);
-  const ph = (i) => (photos ? (i % photos) + 1 : 0);
-  const photoScenes = (from, n, captions) => Array.from({ length: Math.min(n, photos) }, (_, i) => ({
-    type: 'photo', headline: captions[i % captions.length], subline: '', items: [], photo: ph(from + i), animation: pick(['slide', 'typewriter'], rng), duration: 2.2,
-  }));
-  const cta = { type: 'cta', headline: d.cta, subline: d.ctaSub, items: [d.button], photo: 0, animation: 'pop', duration: 3 };
-  const reasons = services.length >= 3 ? services.slice(0, 3) : business.reasons.slice(0, 3);
-  const review = profile.review ? [{ type: 'review', headline: profile.review, subline: 'Customer review', items: [], photo: 0, animation: 'slide', duration: 3.2 }] : [];
+/** Everything the engine needs for a board: palette, asset info, render specs. */
+export function kitFor(project, board, business) {
+  const dir = assetDir(project.id);
+  const photos = (project.adAssets || []).filter((a) => a.kind === 'photo');
+  const logo = (project.adAssets || []).find((a) => a.kind === 'logo');
+  const direction = getDirection(board.direction);
+  const palette = buildPalette({ brandColors: brandColors(project, board), industry: industryOf(business), tone: board.tone || direction.tone, seed: board.seed || 1, direction: board.direction });
+  if (board.accent && /^#[0-9a-f]{6}$/i.test(board.accent)) Object.assign(palette, { accent: board.accent });
+  const info = {};
+  const assetSpec = {};
+  const urls = {};
+  for (const a of photos) {
+    const usable = a.cut?.usable && a.cut.file;
+    const an = a.analysis || {};
+    const focus = a.cut?.box && an.w ? { x: clamp((a.cut.box.x + a.cut.box.w / 2) / an.w, 0, 1), y: clamp((a.cut.box.y + a.cut.box.h * 0.45) / an.h, 0, 1) } : { x: 0.5, y: 0.5 };
+    info[a.id] = { cut: Boolean(usable), w: an.w, h: an.h };
+    assetSpec[a.id] = { path: path.join(dir, a.file), cutPath: usable ? path.join(dir, a.cut.file) : null, focus };
+    urls[a.id] = { src: `/media/${project.id}/ad-assets/${a.file}?v=${a.rev || 0}`, cut: usable ? `/media/${project.id}/ad-assets/${a.cut.file}?v=${a.rev || 0}` : null, focus };
+  }
+  if (logo) {
+    info.logo = { cut: false, w: logo.analysis?.w, h: logo.analysis?.h };
+    assetSpec.logo = { path: path.join(dir, logo.file) };
+    urls.logo = { src: `/media/${project.id}/ad-assets/${logo.file}?v=${logo.rev || 0}` };
+  }
+  const videoSpec = {};
+  for (const v of project.videos || []) videoSpec[v.id] = { path: path.join(projectDir(project.id), 'videos', v.file), w: v.meta.width, h: v.meta.height, hdr: v.meta.hdr, rotation: 0 };
+  return { palette, info, assetSpec, urls, videoSpec, logo: logo ? 'logo' : null, logoNeedsPlate: logo ? logoNeedsPlate(logo.analysis, palette.bg) : false, industry: industryOf(business) };
+}
 
-  const concepts = [
-    {
-      title: profile.offer ? 'Offer ad' : 'Showcase ad',
-      angle: profile.offer ? 'Offer' : 'Showcase',
-      scenes: [
-        { type: photos ? 'photo' : 'hook', headline: pick(business.hooks, rng), subline: profile.location || '', items: [], photo: ph(0), animation: 'words', duration: 2.4 },
-        ...photoScenes(1, 2, services.length ? services : business.captions),
-        profile.offer
-          ? { type: 'offer', headline: profile.offer, subline: profile.name || '', items: [], photo: 0, animation: 'pop', duration: 2.6 }
-          : { type: 'features', headline: 'What you get', subline: '', items: reasons, photo: 0, animation: 'slide', duration: 3.4 },
-        cta,
-      ],
-    },
-    {
-      title: 'Why choose us',
-      angle: 'Trust',
-      scenes: [
-        { type: 'hook', headline: profile.location ? `${profile.location}, this one's for you` : pick(business.hooks, rng), subline: profile.name || '', items: [], photo: 0, animation: 'words', duration: 2.4 },
-        { type: 'features', headline: `Why locals choose ${profile.name || 'us'}`, subline: '', items: reasons, photo: 0, animation: 'pop', duration: 3.6 },
-        ...photoScenes(2, 1, business.captions.slice(-1)),
-        ...review,
-        cta,
-      ],
-    },
-    {
-      title: 'Quick promo',
-      angle: 'Promo',
-      scenes: [
-        { type: 'hook', headline: pick(business.hooks, rng), subline: profile.name || '', items: [], photo: 0, animation: 'zoom', duration: 1.8 },
-        ...photoScenes(0, 3, services.length ? [...services].reverse() : business.captions),
-        ...(profile.offer ? [{ type: 'offer', headline: profile.offer, subline: '', items: [], photo: 0, animation: 'pop', duration: 2.4 }] : []),
-        cta,
-      ],
-    },
-  ];
-  const themes = Object.keys(AD_THEMES).sort(() => rng() - 0.5);
-  return concepts.slice(0, count).map((c, i) => sanitizeAd({
-    ...c,
-    theme: theme !== 'auto' ? theme : themes[i],
-    accent_color: accent,
-    why_it_works: 'Template ad built from your business details. Add a Claude key for an ad planned around this business.',
-    post_caption: `${c.scenes[0].headline} 👀\n\n${d.cta}.${profile.location ? ` 📍 ${profile.location}` : ''}`,
-    hashtags: business.hashtagSeeds,
-  }, { photos, target, defaults: { ...d, theme: themes[i], accent } }));
+export function compFor(project, board, business, format) {
+  const kit = kitFor(project, board, business);
+  const comp = compose({
+    direction: board.direction, format, palette: kit.palette, seed: board.seed || 1, logo: kit.logo, logoNeedsPlate: kit.logoNeedsPlate,
+    music: board.music?.bpm ? { bpm: board.music.bpm } : null, scenes: board.scenes,
+  }, kit.info, kit.industry);
+  return { comp, kit };
+}
+
+// ---------------------------------------------------------------------------
+// Pre-flight review: Claude looks at a still per scene and fixes weak ones
+// ---------------------------------------------------------------------------
+
+async function previewFrames(comp, kit, dir) {
+  registerFonts();
+  const assets = await loadAssets(kit.assetSpec);
+  const env = makeEnv(assets, () => null, { externalGrade: false });
+  const W = Math.round(comp.width / 2), H = Math.round(comp.height / 2);
+  const big = createCanvas(comp.width, comp.height);
+  const small = createCanvas(W, H);
+  await fs.mkdir(dir, { recursive: true });
+  const out = [];
+  for (const [i, s] of comp.scenes.entries()) {
+    renderFrame(big.getContext('2d'), comp, s.start + s.duration * 0.8, env);
+    small.getContext('2d').drawImage(big, 0, 0, W, H);
+    const file = path.join(dir, `scene-${i + 1}.jpg`);
+    await fs.writeFile(file, await small.encode('jpeg', 82));
+    out.push({ scene: i + 1, path: file });
+  }
+  return out;
+}
+
+async function aiReview({ project, board, business, profile, format, photos }) {
+  const { comp, kit } = compFor(project, board, business, format);
+  const dir = path.join(outDir(project.id), `.review-${newId()}`);
+  try {
+    const frames = await previewFrames(comp, kit, dir);
+    const res = await reviewAdFrames({ business, profile, board, frames, photos });
+    const known = new Set(photos.map((p) => p.id));
+    const fixes = [];
+    const scenes = board.scenes.map((s, i) => {
+      const r = res.data.scenes.find((x) => Math.round(x.scene) === i + 1);
+      if (!r || r.ok) return s;
+      const next = { ...s };
+      if (r.fix_headline) next.headline = r.fix_headline.slice(0, 90);
+      if (r.fix_recipe && RECIPES[r.fix_recipe] && r.fix_recipe !== 'cta' && i < board.scenes.length - 1) next.recipe = r.fix_recipe;
+      if (r.fix_asset && known.has(r.fix_asset)) next.main = r.fix_asset;
+      if (JSON.stringify(next) !== JSON.stringify(s)) fixes.push(`Scene ${i + 1}: ${r.problem}`);
+      return next;
+    });
+    return { board: { ...board, scenes }, review: { verdict: res.data.verdict, summary: res.data.summary, fixes } };
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -263,154 +294,241 @@ function addAdChat(p, who, text, error = false) {
   p.adChat = [...(p.adChat || []), { who, text, at: new Date().toISOString(), ...(error ? { error: true } : {}) }].slice(-60);
 }
 
-const photosOf = (project) => (project.adAssets || []).filter((a) => a.kind === 'photo');
-const logoOf = (project) => (project.adAssets || []).find((a) => a.kind === 'logo') || null;
+function chooseTrack(board, musicChoice, tracks, used, seedFn) {
+  if (musicChoice === 'none') return Promise.resolve(null);
+  if (musicChoice && musicChoice !== 'auto') return getTrack(musicChoice);
+  const named = board.musicTrack && board.musicTrack !== 'auto' ? findTrack(tracks, board.musicTrack) : null;
+  return named ? Promise.resolve(named) : pickTrack(board.musicMood || 'energetic', used, seedFn);
+}
 
-async function chooseTrack(ad, musicChoice, tracks, used, rng) {
-  if (musicChoice === 'none') return null;
-  if (musicChoice !== 'auto') return getTrack(musicChoice);
-  let track = ad.music_track && ad.music_track !== 'auto' ? findTrack(tracks, ad.music_track) : null;
-  return track || pickTrack(ad.music_mood || AD_THEMES[ad.theme]?.mood || 'energetic', used, rng);
+/** Render one board (with voiceover and QA) and record it as a new version. */
+async function renderBoard(projectId, idx, ctx, base, span) {
+  const project = await loadProject(projectId);
+  const plan = project.adPlan;
+  const board = plan.ads[idx];
+  const business = getBusiness(plan.business, project.businessCustom);
+  const { comp, kit } = compFor(project, board, business, plan.format);
+  const settings = project.adSettings || {};
+  const track = board.music?.id ? await getTrack(board.music.id) : null;
+  const baseName = `ad-${idx + 1}-${Date.now().toString(36)}`;
+  let voice = null;
+  const notes = [];
+  if (settings.voiceover && board.voiceover) {
+    if (!voiceConfigured()) notes.push('Voiceover skipped: add an OpenAI key in Settings.');
+    else {
+      ctx.stage(`Recording the voiceover for ad ${idx + 1}`, base);
+      const vpath = path.join(outDir(projectId), `${baseName}-voice.mp3`);
+      await fs.mkdir(outDir(projectId), { recursive: true });
+      await speak(board.voiceover, vpath, { voice: settings.voice || 'coral', style: getDirection(board.direction).voiceStyle });
+      voice = { path: vpath, start: 0.35 };
+    }
+  }
+  ctx.stage(`Animating ad ${idx + 1}: "${board.title}"`, base);
+  const result = await renderComposition({
+    comp, assetSpec: kit.assetSpec, videoSpec: kit.videoSpec, outDir: outDir(projectId), baseName,
+    music: track ? { path: path.join(MUSIC_DIR, track.file), startAt: track.startAt, loudness: track.loudness, bpm: track.bpm } : null,
+    musicLevel: settings.musicLevel, family: getDirection(board.direction).sound, voice,
+    onProgress: (p) => ctx.progress(base + span * 0.9 * p),
+  });
+  ctx.stage(`Checking ad ${idx + 1}`, base + span * 0.92);
+  const qa = await checkRender({ file: path.join(outDir(projectId), result.file), comp, voice, kit, project, board }).catch((err) => ({ passed: false, score: 0, checks: [{ id: 'qa', level: 'warn', text: `Quality check could not run: ${err.message}` }] }));
+  if (notes.length) qa.checks.push(...notes.map((text) => ({ id: 'voice', level: 'warn', text })));
+  const version = { ...result, qa, board: JSON.parse(JSON.stringify(board)), createdAt: new Date().toISOString(), voice: voice ? path.basename(voice.path) : null };
+  let drop = [];
+  await updateProject(projectId, (p) => {
+    p.adRenders = p.adRenders || [];
+    p.adVersions = p.adVersions || [];
+    const list = [version, ...(p.adVersions[idx] || [])];
+    drop = list.slice(MAX_VERSIONS);
+    p.adVersions[idx] = list.slice(0, MAX_VERSIONS);
+    p.adRenders[idx] = version;
+  });
+  for (const v of drop) for (const f of [v.file, v.thumb, v.voice].filter(Boolean)) await fs.rm(path.join(outDir(projectId), f), { force: true });
+  return version;
 }
 
 async function renderAll(projectId, indexes, ctx, base = 0.4) {
-  const project = await loadProject(projectId);
-  const photos = photosOf(project);
-  const logo = logoOf(project);
-  const dir = assetDir(projectId);
-  const settings = project.adSettings || {};
-  const span = 1 - base;
-  for (const [n, idx] of indexes.entries()) {
-    const ad = project.adPlan.ads[idx];
-    ctx.stage(`Animating ad ${n + 1} of ${indexes.length}: "${ad.title}"`, base + (span * n) / indexes.length);
-    const track = ad.music?.id ? await getTrack(ad.music.id) : null;
-    const result = await renderAd(ad, {
-      outDir: outDir(projectId),
-      baseName: `ad-${idx + 1}-${Date.now().toString(36)}`,
-      format: project.adPlan.format,
-      images: photos.map((a) => path.join(dir, a.file)),
-      logo: logo ? path.join(dir, logo.file) : null,
-      music: track ? { path: path.join(MUSIC_DIR, track.file), startAt: track.startAt, loudness: track.loudness, bpm: track.bpm } : null,
-      musicLevel: settings.musicLevel,
-      onProgress: (p) => ctx.progress(base + (span * (n + p)) / indexes.length),
-    });
-    await updateProject(projectId, (p) => {
-      p.adRenders = p.adRenders || [];
-      p.adRenders[idx] = { ...result, renderedAt: new Date().toISOString() };
-    });
-    const keep = path.parse(result.file).name;
-    for (const f of await fs.readdir(outDir(projectId))) {
-      if (f.startsWith(`ad-${idx + 1}-`) && path.parse(f).name !== keep) await fs.rm(path.join(outDir(projectId), f), { force: true });
-    }
-  }
+  const span = (1 - base) / indexes.length;
+  for (const [n, idx] of indexes.entries()) await renderBoard(projectId, idx, ctx, base + span * n, span);
 }
 
-/** Plan and render a set of ads. */
+/** Plan and render a batch of ads. */
 export async function generateAds(projectId, opts, ctx) {
-  const project = await loadProject(projectId);
+  let project = await loadProject(projectId);
   if (!project) throw new Error('Project not found');
   const business = getBusiness(opts.business, opts.businessCustom);
   const profile = cleanProfile(opts.profile);
   const count = clamp(Math.round(Number(opts.count) || 2), 1, 3);
   const seconds = AD_LENGTHS.includes(Number(opts.seconds)) ? Number(opts.seconds) : 15;
   const format = FORMATS[opts.format] ? opts.format : '9:16';
-  const theme = AD_THEMES[opts.theme] ? opts.theme : 'auto';
-  const accent = /^#[0-9a-f]{6}$/i.test(opts.accent || '') ? opts.accent.toLowerCase() : '';
+  const direction = DIRECTIONS[opts.direction] ? opts.direction : 'auto';
+  const objective = OBJECTIVES[opts.objective] ? opts.objective : 'auto';
   const musicChoice = opts.music || 'auto';
   const mode = opts.mode === 'auto' ? 'auto' : 'ai';
   const tracks = await listTracks();
-  const photos = photosOf(project);
-  const logo = logoOf(project);
-  const rng = makeRng();
   if (!profile.name && !profile.services) throw new Error('Fill in the business name and what they sell first (Business details).');
   if (mode === 'ai' && !aiConfigured()) throw new SetupError('The AI needs a Claude API key. Add it on the Settings page, or switch the engine to Free auto-edit there.');
 
+  const prepared = await prepareMedia(projectId, ctx);
+  project = prepared.project;
+  const photos = (project.adAssets || []).filter((a) => a.kind === 'photo');
+  const logo = (project.adAssets || []).find((a) => a.kind === 'logo');
+  const media = mediaSummary(photos);
+  const d = adDefaults(business, profile);
+  const seed = Math.floor(Math.random() * 1e6);
+
   let plan;
   if (mode === 'ai') {
-    ctx.stage(`The AI is writing ${count} ad${count > 1 ? 's' : ''} for ${profile.name || business.label}…`, 0.05);
-    let p = 0.05;
-    const ticker = setInterval(() => ctx.progress((p = Math.min(0.35, p + 0.005))), 1000);
+    ctx.stage(`The AI is directing ${count} ad${count > 1 ? 's' : ''} for ${profile.name || business.label}…`, 0.16);
+    let p = 0.16;
+    const ticker = setInterval(() => ctx.progress((p = Math.min(0.3, p + 0.004))), 1000);
     let res;
     try {
-      res = await planAds({
-        business, profile, count, seconds, format: FORMATS[format].label,
-        theme, accent, instructions: String(opts.instructions || '').slice(0, 2000),
-        photos: photos.map((a) => path.join(assetDir(projectId), a.thumb)),
-        logo: logo ? path.join(assetDir(projectId), logo.thumb) : null,
-        tracks: musicChoice === 'auto' ? tracks : [],
+      res = await planAdBoards({
+        business, profile, count, seconds, format: FORMATS[format].label, direction, objective,
+        instructions: String(opts.instructions || '').slice(0, 2000),
+        photos: media.map((m) => ({ id: m.id, cut: m.cut, thumb: path.join(assetDir(projectId), photos.find((x) => x.id === m.id).thumb), note: '' })),
+        logo: logo ? { thumb: path.join(assetDir(projectId), logo.thumb) } : null,
+        footage: prepared.footage.map((f) => ({ id: f.id, duration: f.duration, bestFrom: f.bestFrom, thumb: f.thumbFile })),
+        tracks: musicChoice === 'auto' ? tracks : [], voiceover: Boolean(opts.voiceover),
       });
     } finally {
       clearInterval(ticker);
     }
-    const d = adDefaults(business, profile);
-    plan = {
-      source: 'ai',
-      model: res.model,
-      strategy: res.data.strategy || '',
-      ads: (res.data.ads || []).slice(0, count).map((a) => ({
-        ...sanitizeAd(a, { photos: photos.length, target: seconds, defaults: { ...d, theme: theme === 'auto' ? 'bold' : theme, accent } }),
-        music_track: a.music_track,
-        ...(theme !== 'auto' ? { theme } : {}),
-        ...(accent ? { accent } : {}),
-      })),
-    };
-    if (!plan.ads.length) throw new Error('The AI did not return any ads. Try again.');
+    const ads = (res.data.ads || []).slice(0, count).map((raw, i) => ({
+      ...normalizeBoard(raw, { assetIds: photos.map((a) => a.id), videoIds: prepared.footage.map((f) => f.id), seconds, defaults: { direction: direction === 'auto' ? 'commercial' : direction, ...d } }),
+      ...(direction !== 'auto' ? { direction } : {}),
+      seed: seed + i * 7919,
+    }));
+    if (!ads.length) throw new Error('The AI did not return any ads. Try again.');
+    // Remember what each photo shows (used later by change requests).
+    const notes = Object.fromEntries((res.data.photo_notes || []).map((n) => [n.asset, `${n.description} (${n.best_use})`]));
+    await updateProject(projectId, (q) => {
+      for (const a of q.adAssets || []) if (notes[a.id]) a.notes = notes[a.id].slice(0, 200);
+    });
+    plan = { source: 'ai', model: res.model, strategy: res.data.strategy || '', ads };
   } else {
-    ctx.stage('Building ads from your business details', 0.1);
-    plan = { source: 'auto', strategy: '', ads: templateAds({ business, profile, photos: photos.length, count, target: seconds, theme, accent, rng }) };
+    ctx.stage('Planning ads from your business details and photos', 0.2);
+    plan = {
+      source: 'auto', strategy: '',
+      ads: planFree({ business, profile, media, videos: prepared.footage, count, seconds, direction, objective, seed }),
+    };
   }
 
+  // Music per ad (different songs when possible), beat grid for the engine.
   const used = [];
-  for (const ad of plan.ads) {
-    const track = await chooseTrack(ad, musicChoice, tracks, used, rng);
+  for (const b of plan.ads) {
+    const track = await chooseTrack(b, musicChoice, tracks, used);
     if (track) used.push(track.id);
-    ad.music = track ? { id: track.id, name: track.name, bpm: track.bpm } : null;
-    delete ad.music_track;
+    b.music = track ? { id: track.id, name: track.name, bpm: track.bpm } : null;
+  }
+
+  // Optional pre-flight review (approved: Claude looks at a still per scene).
+  if (mode === 'ai' && opts.review !== false) {
+    for (const [i, b] of plan.ads.entries()) {
+      ctx.stage(`The AI is reviewing ad ${i + 1} before rendering`, 0.32 + (0.06 * i) / plan.ads.length);
+      try {
+        const out = await aiReview({ project, board: b, business, profile, format, photos: media });
+        plan.ads[i] = { ...out.board, review: out.review };
+      } catch (err) {
+        ctx.log?.(`Review skipped: ${err.message}`);
+      }
+    }
   }
   if (musicChoice !== 'none' && !tracks.length) plan.musicNote = 'No music: your music library is empty. Add songs on the Music page, then make the ads again.';
   Object.assign(plan, { format, seconds, business: business.id, createdAt: new Date().toISOString() });
 
-  await fs.rm(outDir(projectId), { recursive: true, force: true });
-  await updateProject(projectId, (p) => {
-    p.adPlan = plan;
-    p.adRenders = [];
-    p.profile = profile;
-    p.adSettings = { count, seconds, format, theme, accent, music: musicChoice, musicLevel: opts.musicLevel || 'normal', mode };
-    addAdChat(p, 'cutline', plan.source === 'ai'
+  await updateProject(projectId, (q) => {
+    // Keep old renders as files of earlier versions; start a fresh set.
+    q.adPlan = plan;
+    q.adRenders = [];
+    q.adVersions = [];
+    q.profile = profile;
+    q.adSettings = { count, seconds, format, direction, objective, music: musicChoice, musicLevel: opts.musicLevel || 'normal', mode, voiceover: Boolean(opts.voiceover), voice: opts.voice || 'coral', review: opts.review !== false };
+    addAdChat(q, 'cutline', plan.source === 'ai'
       ? `Made ${plan.ads.length} ad${plan.ads.length > 1 ? 's' : ''}. ${plan.strategy}`.trim()
-      : `Made ${plan.ads.length} template ad${plan.ads.length > 1 ? 's' : ''} (no AI).`);
+      : `Made ${plan.ads.length} ad${plan.ads.length > 1 ? 's' : ''} in free mode (no AI).`);
   });
-  await renderAll(projectId, plan.ads.map((_, i) => i), ctx);
+  await fs.rm(outDir(projectId), { recursive: true, force: true });
+  await renderAll(projectId, plan.ads.map((_, i) => i), ctx, 0.4);
   return { projectId };
 }
 
-/** Save hand edits to one ad and re-render it. */
-export async function rerenderAd(projectId, index, edited, ctx) {
+/** Save an edited board from the studio and re-render that ad. */
+export async function saveBoard(projectId, index, edited, ctx) {
   const project = await loadProject(projectId);
   const idx = Number(index);
   const old = project?.adPlan?.ads?.[idx];
   if (!old) throw new Error('Ad not found');
-  const photos = photosOf(project).length;
+  const business = getBusiness(project.adPlan.business, project.businessCustom);
+  const profile = cleanProfile(project.profile);
+  const photos = (project.adAssets || []).filter((a) => a.kind === 'photo').map((a) => a.id);
+  const seconds = clamp(Math.round(Number(edited.seconds) || old.seconds || project.adPlan.seconds), 6, 60);
+  const board = normalizeBoard({
+    ...boardToRaw(old), ...boardToRaw(edited),
+  }, { assetIds: photos, videoIds: (project.videos || []).map((v) => v.id), seconds, defaults: { direction: old.direction, ...adDefaults(business, profile) } });
+  // The studio sets scene lengths by hand: keep them rather than re-fitting.
+  if (edited.scenes && edited.keepDurations !== false) board.scenes = board.scenes.map((s, i) => ({ ...s, duration: clamp(Number(edited.scenes[i]?.duration) || s.duration, 1.2, 8) }));
   const tracks = await listTracks();
-  const ad = sanitizeAd({
-    ...old,
-    ...edited,
-    accent_color: edited.accent ?? old.accent,
-    scenes: (edited.scenes || old.scenes).map((s) => ({ ...s, zeroBased: true })),
-  }, { photos, target: Number(edited.targetSeconds) || old.targetSeconds || 15, defaults: { theme: old.theme } });
-  // Keep hand-set scene lengths: the editor already decides them.
-  if (edited.scenes) ad.scenes = ad.scenes.map((s, i) => ({ ...s, duration: clamp(Number(edited.scenes[i]?.duration) || s.duration, 1.2, 6) }));
   let music = old.music;
   if (edited.music === 'none') music = null;
   else if (edited.music && edited.music !== old.music?.id) {
     const t = tracks.find((x) => x.id === edited.music);
     if (t) music = { id: t.id, name: t.name, bpm: t.bpm };
   }
-  ad.music = music;
+  const next = { ...board, seed: Number.isInteger(edited.seed) ? edited.seed : old.seed, music, accent: edited.accent ?? old.accent, tone: edited.tone ?? old.tone, review: old.review };
   await updateProject(projectId, (p) => {
-    p.adPlan.ads[idx] = ad;
+    p.adPlan.ads[idx] = next;
   });
   await renderAll(projectId, [idx], ctx, 0.05);
+  return { projectId };
+}
+
+/** Board fields in the director's raw shape (for re-normalising). */
+function boardToRaw(b) {
+  if (!b) return {};
+  const out = {};
+  for (const k of ['title', 'angle', 'objective', 'direction', 'voiceover', 'hashtags']) if (b[k] !== undefined) out[k] = b[k];
+  if (b.why !== undefined) out.why_it_works = b.why;
+  if (b.brandColors) out.brand_colors = b.brandColors;
+  if (b.musicMood) out.music_mood = b.musicMood;
+  if (b.postCaption !== undefined) out.post_caption = b.postCaption;
+  if (b.voiceover !== undefined) out.voiceover_script = b.voiceover;
+  if (b.scenes) out.scenes = b.scenes.map((s) => ({ ...s, main_asset: s.main, other_assets: s.alt, video_from: s.from, text_animation: s.textAnim }));
+  return out;
+}
+
+/** Restore an earlier version of an ad. */
+export async function restoreVersion(projectId, index, versionFile) {
+  return updateProject(projectId, (p) => {
+    const list = p.adVersions?.[index] || [];
+    const v = list.find((x) => x.file === versionFile);
+    if (!v) throw Object.assign(new Error('Version not found'), { status: 404 });
+    p.adPlan.ads[index] = JSON.parse(JSON.stringify(v.board));
+    p.adRenders[index] = v;
+  });
+}
+
+/** Regenerate one scene: a fresh take with the AI, or a new layout/recipe in free mode. */
+export async function regenerateScene(projectId, { adIndex, sceneIndex, request, mode }, ctx) {
+  const project = await loadProject(projectId);
+  const board = project?.adPlan?.ads?.[adIndex];
+  if (!board?.scenes?.[sceneIndex]) throw new Error('Scene not found');
+  if (aiConfigured() && mode !== 'auto') {
+    return reviseAdsJob(projectId, { request: request || 'Make a stronger, more eye-catching version of this scene. Keep its purpose; try a different composition or photo.', adIndex, sceneIndex, mode }, ctx);
+  }
+  const s = board.scenes[sceneIndex];
+  const photos = (project.adAssets || []).filter((a) => a.kind === 'photo').map((a) => a.id);
+  const alternatives = { product_hero: ['photo_full', 'product_hero'], photo_full: ['product_hero', 'gallery'], gallery: ['photo_full', 'process'], kinetic: ['photo_full', 'kinetic'], features: ['features'], process: ['gallery'], offer: ['offer'], review: ['review'], cta: ['cta'] };
+  const options = alternatives[s.recipe] || [s.recipe];
+  const recipe = options[Math.floor(Math.random() * options.length)];
+  const main = photos.length > 1 && recipe !== 'cta' ? photos[(photos.indexOf(s.main) + 1) % photos.length] : s.main;
+  const scene = { ...s, recipe, main, seed: Math.floor(Math.random() * 1e6), layout: undefined, entrance: undefined, textAnim: undefined, camera: undefined };
+  await updateProject(projectId, (p) => {
+    p.adPlan.ads[adIndex].scenes[sceneIndex] = scene;
+    addAdChat(p, 'cutline', `Made a new take of scene ${sceneIndex + 1} in ad ${adIndex + 1}.`);
+  });
+  await renderAll(projectId, [adIndex], ctx, 0.05);
   return { projectId };
 }
 
@@ -422,19 +540,27 @@ function parseAdRequest(text, plan, tracks) {
   let idx = [...t.matchAll(/\bads?\s*(?:#|number\s*)?(\d)\b/g)].map((m) => Number(m[1]) - 1).filter((i) => plan.ads[i]);
   const secs = t.match(/\b(10|15|20|30)\s*(?:s|sec|secs|seconds?)\b/);
   if (secs) {
-    patch.targetSeconds = Number(secs[1]);
+    patch.seconds = Number(secs[1]);
     did.push(`set the length to ${secs[1]} seconds`);
   }
-  for (const id of Object.keys(AD_THEMES)) {
-    if (new RegExp(`\\b${id}\\b`).test(t)) {
-      patch.theme = id;
-      did.push(`switched to the ${AD_THEMES[id].label} look`);
+  for (const id of Object.keys(DIRECTIONS)) {
+    const label = DIRECTIONS[id].label.toLowerCase();
+    if (new RegExp(`\\b(${id}|${label})\\b`).test(t)) {
+      patch.direction = id;
+      did.push(`switched to the ${DIRECTIONS[id].label} direction`);
     }
+  }
+  if (/\b(light|bright|white) (background|look|version)\b/.test(t)) {
+    patch.tone = 'light';
+    did.push('switched to a light background');
+  } else if (/\b(dark|black|moody) (background|look|version)\b/.test(t)) {
+    patch.tone = 'dark';
+    did.push('switched to a dark background');
   }
   const col = text.match(/#([0-9a-f]{6})\b/i);
   if (col) {
     patch.accent = `#${col[1].toLowerCase()}`;
-    did.push(`set the brand colour to ${patch.accent}`);
+    did.push(`set the accent colour to ${patch.accent}`);
   }
   const q = (k) => text.match(new RegExp(`${k}\\s*(?:to|:|=)\\s*["“']?(.+?)["”']?\\s*$`, 'i'))?.[1];
   const hook = q('(?:hook|headline|opening)');
@@ -460,39 +586,37 @@ function parseAdRequest(text, plan, tracks) {
       did.push('changed the song');
     }
   }
-  if (/\b(redo|regenerate|new version|try again|start over)\b/.test(t)) {
-    patch.redo = true;
-    did.push('made a fresh version');
+  if (/\b(redo|regenerate|new version|try again|start over|shuffle)\b/.test(t)) {
+    patch.reseed = true;
+    did.push('made a fresh take');
   }
   if (!idx.length) idx = plan.ads.map((_, i) => i);
   return {
-    understood: did.length > 0,
-    idx,
-    patch,
+    understood: did.length > 0, idx, patch,
     reply: did.length
       ? `Done: ${did.join(', ')}.`
-      : `I couldn't work out that change without the AI. Without a Claude key I understand: "make it 20 seconds", "make it luxury" (or ${Object.keys(AD_THEMES).join(', ')}), "colour #ff3366", "hook: Your text", "cta: Your text", "no music", "different song", "redo ad 2". Add a Claude key in Settings to ask for anything.`,
+      : `I couldn't work out that change without the AI. Without a Claude key I understand: "make it 20 seconds", "make it luxury" (or ${Object.keys(DIRECTIONS).join(', ')}), "light background", "colour #ff3366", "hook: Your text", "cta: Your text", "no music", "different song", "redo ad 2". You can also edit any scene by hand. Add a Claude key in Settings to ask for anything.`,
   };
 }
 
-/** "Ask for changes" on the Ads page. */
-export async function reviseAdsJob(projectId, { request, adIndex, mode }, ctx) {
+/** "Ask for changes" on the Ads page (optionally about one ad or one scene). */
+export async function reviseAdsJob(projectId, { request, adIndex, sceneIndex, mode }, ctx) {
   const project = await loadProject(projectId);
   if (!project?.adPlan) throw new Error('Make ads first, then ask for changes.');
   const text = String(request || '').trim().slice(0, 1000);
   const focus = Number.isInteger(adIndex) && project.adPlan.ads[adIndex] ? adIndex : null;
-  await updateProject(projectId, (p) => addAdChat(p, 'you', focus !== null ? `Ad ${focus + 1}: ${text}` : text));
+  const sceneFocus = focus !== null && Number.isInteger(sceneIndex) && project.adPlan.ads[focus].scenes[sceneIndex] ? sceneIndex : null;
+  await updateProject(projectId, (p) => addAdChat(p, 'you', `${focus !== null ? `Ad ${focus + 1}${sceneFocus !== null ? `, scene ${sceneFocus + 1}` : ''}: ` : ''}${text}`));
 
-  const business = getBusiness(project.adPlan.business, project.businessCustom);
+  const plan = project.adPlan;
+  const business = getBusiness(plan.business, project.businessCustom);
   const profile = cleanProfile(project.profile);
   const tracks = await listTracks();
-  const photos = photosOf(project);
-  const logo = logoOf(project);
-  const plan = project.adPlan;
+  const photos = (project.adAssets || []).filter((a) => a.kind === 'photo');
+  const logo = (project.adAssets || []).find((a) => a.kind === 'logo');
   const newAds = plan.ads.map((a) => ({ ...a }));
   const changed = [];
   let reply;
-  const rng = makeRng();
 
   if (aiConfigured() && mode !== 'auto') {
     ctx.stage('The AI is working on your changes…', 0.05);
@@ -500,11 +624,12 @@ export async function reviseAdsJob(projectId, { request, adIndex, mode }, ctx) {
     const ticker = setInterval(() => ctx.progress((p = Math.min(0.35, p + 0.005))), 1000);
     let res;
     try {
-      res = await reviseAds({
-        business, profile, plan, request: text, adNumber: focus !== null ? focus + 1 : null, tracks,
-        format: FORMATS[plan.format]?.label || plan.format,
-        photos: photos.map((a) => path.join(assetDir(projectId), a.thumb)),
-        logo: logo ? path.join(assetDir(projectId), logo.thumb) : null,
+      res = await reviseAdBoards({
+        business, profile, boards: plan.ads, request: text, adNumber: focus !== null ? focus + 1 : null, sceneNumber: sceneFocus !== null ? sceneFocus + 1 : null,
+        format: FORMATS[plan.format]?.label || plan.format, tracks,
+        photos: mediaSummary(photos).map((m) => ({ id: m.id, cut: m.cut, thumb: path.join(assetDir(projectId), photos.find((x) => x.id === m.id).thumb), note: photos.find((x) => x.id === m.id).notes || '' })),
+        logo: logo ? { thumb: path.join(assetDir(projectId), logo.thumb) } : null,
+        footage: (project.videos || []).map((v) => ({ id: v.id, duration: v.meta.duration, bestFrom: 0, thumb: path.join(projectDir(projectId), 'videos', v.thumb) })),
       });
     } catch (err) {
       await updateProject(projectId, (q) => addAdChat(q, 'cutline', `That didn't work: ${err.message}`, true));
@@ -513,45 +638,45 @@ export async function reviseAdsJob(projectId, { request, adIndex, mode }, ctx) {
       clearInterval(ticker);
     }
     reply = res.data.reply;
+    const d = adDefaults(business, profile);
     for (const item of res.data.ads || []) {
       const i = Math.round(Number(item.ad_number)) - 1;
       if (!newAds[i] || (focus !== null && i !== focus)) continue;
-      const before = JSON.stringify(newAds[i].scenes.map((s) => [s.type, s.headline, s.subline, s.items, s.photo + 1]));
-      const after = JSON.stringify((item.scenes || []).map((s) => [s.type, s.headline, s.subline, s.items, s.photo]));
-      const differs = before !== after || item.theme !== newAds[i].theme || (item.music_track && item.music_track !== 'keep');
+      const old = newAds[i];
+      const next = normalizeBoard(item, { assetIds: photos.map((a) => a.id), videoIds: (project.videos || []).map((v) => v.id), seconds: old.seconds || plan.seconds, defaults: { direction: old.direction, ...d } });
+      const differs = JSON.stringify(next.scenes.map((s) => [s.recipe, s.headline, s.subline, s.items, s.main])) !== JSON.stringify(old.scenes.map((s) => [s.recipe, s.headline, s.subline, s.items, s.main])) || next.direction !== old.direction || (item.music_track && item.music_track !== 'keep' && item.music_track !== old.music?.name);
       if (!item.changed && !differs) continue;
-      const target = AD_LENGTHS.includes(Math.round(item.target_seconds)) ? Math.round(item.target_seconds) : clamp(Math.round(Number(item.target_seconds) || newAds[i].targetSeconds), 6, 60);
-      const ad = sanitizeAd(item, { photos: photos.length, target, defaults: { theme: newAds[i].theme, accent: newAds[i].accent } });
-      let music = newAds[i].music;
+      let music = old.music;
       if (item.music_track === 'none') music = null;
-      else if (item.music_track && item.music_track !== 'keep') {
+      else if (item.music_track && !['keep', 'auto'].includes(item.music_track)) {
         const tr = findTrack(tracks, item.music_track);
         if (tr) music = { id: tr.id, name: tr.name, bpm: tr.bpm };
       }
-      newAds[i] = { ...ad, music };
+      newAds[i] = { ...next, seed: old.seed, music, accent: old.accent, tone: old.tone };
       changed.push(i);
     }
-    console.log(`[ads revise] "${text}" → changed ads: ${changed.map((i) => i + 1).join(', ') || 'none'}`);
-    if (!changed.length) reply += ' (No ad was actually changed. Try saying exactly what to change, e.g. "ad 1: open with the offer and use the neon look".)';
+    log('info', `[ads revise] "${text}" → changed ads: ${changed.map((i) => i + 1).join(', ') || 'none'}`);
+    if (!changed.length) reply += ' (No ad was actually changed. Try saying exactly what to change, e.g. "ad 1: open on the coffee photo and use the luxury direction".)';
   } else {
     const cmd = parseAdRequest(text, plan, tracks);
     reply = cmd.reply;
     if (cmd.understood) {
-      const indexes = focus !== null ? [focus] : cmd.idx;
       const p = cmd.patch;
-      for (const i of indexes) {
-        let ad = { ...newAds[i], scenes: newAds[i].scenes.map((s) => ({ ...s })) };
-        if (p.redo) {
-          const fresh = templateAds({ business, profile, photos: photos.length, count: 3, target: ad.targetSeconds, theme: ad.theme, accent: ad.accent, rng });
-          ad = { ...fresh[Math.floor(rng() * fresh.length)], music: ad.music };
-        }
-        if (p.theme) ad.theme = p.theme;
+      for (const i of focus !== null ? [focus] : cmd.idx) {
+        const ad = { ...newAds[i], scenes: newAds[i].scenes.map((s) => ({ ...s })) };
+        if (p.direction) ad.direction = p.direction;
+        if (p.tone) ad.tone = p.tone;
         if (p.accent) ad.accent = p.accent;
-        if (p.hook) ad.scenes[0].headline = short(p.hook, 90);
-        if (p.cta) ad.scenes.at(-1).headline = short(p.cta, 90);
-        if (p.targetSeconds) {
-          ad.scenes = fitDurations(ad.scenes, p.targetSeconds);
-          ad.targetSeconds = p.targetSeconds;
+        if (p.hook) ad.scenes[0].headline = p.hook.slice(0, 90);
+        if (p.cta) ad.scenes[ad.scenes.length - 1].headline = p.cta.slice(0, 90);
+        if (p.reseed) {
+          ad.seed = Math.floor(Math.random() * 1e6);
+          ad.scenes = ad.scenes.map((s) => ({ ...s, seed: undefined, layout: undefined }));
+        }
+        if (p.seconds) {
+          const { fitDurations } = await import('./director.js');
+          ad.scenes = fitDurations(ad.scenes, p.seconds);
+          ad.seconds = p.seconds;
         }
         if (p.music === 'none') ad.music = null;
         else if (p.music === 'next') {
@@ -574,4 +699,15 @@ export async function reviseAdsJob(projectId, { request, adIndex, mode }, ctx) {
   });
   if (changed.length) await renderAll(projectId, changed, ctx, 0.4);
   return { projectId, changed, reply };
+}
+
+/** What the browser needs to compose and preview an ad live. */
+export async function previewKit(projectId, index) {
+  const project = await loadProject(projectId);
+  const board = project?.adPlan?.ads?.[index];
+  if (!board) throw Object.assign(new Error('Ad not found'), { status: 404 });
+  const business = getBusiness(project.adPlan.business, project.businessCustom);
+  const kit = kitFor(project, board, business);
+  const videos = Object.fromEntries((project.videos || []).map((v) => [v.id, { src: `/media/${projectId}/videos/${v.file}`, w: v.meta.width, h: v.meta.height }]));
+  return { board, format: project.adPlan.format, palette: kit.palette, info: kit.info, urls: kit.urls, videos, logo: kit.logo, logoNeedsPlate: kit.logoNeedsPlate, industry: kit.industry, music: board.music };
 }
