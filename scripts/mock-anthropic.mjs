@@ -125,6 +125,15 @@ function sse(res, event, data) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+// Client reply classification: a keyword stand-in for Claude's judgement.
+function replyFor(text) {
+  const t = (text.split('"""')[1] || text).toLowerCase();
+  if (/don.t want|not interested|won.t be going ahead|no thanks/.test(t)) return { intent: 'declined', confidence: 0.95, summary: 'The client does not want to go ahead.', requested_changes: [], decline_reason: 'Changed their mind' };
+  if (/change|swap|more|instead|could you|can you/.test(t)) return { intent: 'revision', confidence: 0.92, summary: 'The client wants changes.', requested_changes: ['As described in their email'], decline_reason: '' };
+  if (/love it|perfect|looks great/.test(t)) return { intent: 'accepted', confidence: 0.9, summary: 'The client is happy.', requested_changes: [], decline_reason: '' };
+  return { intent: 'unclear', confidence: 0.4, summary: 'Hard to tell.', requested_changes: [], decline_reason: '' };
+}
+
 export function startMock(port = 4555, { rejectFallbacks = false } = {}) {
   const server = http.createServer((req, res) => {
     let raw = '';
@@ -154,7 +163,8 @@ export function startMock(port = 4555, { rejectFallbacks = false } = {}) {
 
       const props = Object.keys(body.output_config?.format?.schema?.properties || {});
       const text = body.messages[0].content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-      const out = props.includes('verdict') ? reviewFor(text)
+      const out = props.includes('intent') ? replyFor(text)
+        : props.includes('verdict') ? reviewFor(text)
         : props.includes('photo_notes') ? boardsFor(text)
         : props.includes('reply') ? (props.includes('ads') ? boardRevisionFor(text) : revisionFor(text))
         : planFor(text);

@@ -42,30 +42,85 @@
       <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
       <symbol id="i-dup" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
       <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13h5l1.5 3h5L16 13h5M5.5 5h13L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></symbol>
+      <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></symbol>
+      <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9.5"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+      <symbol id="i-briefcase" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 12h18"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
       <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
     </defs>
   </svg>
 
-  <header class="topbar">
-    <a class="brand" href="#/">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="8" fill="url(#bm)"/><path d="M12 10.5v11l9-5.5z" fill="#14100a"/><path d="M9 23.5 23 8.5" stroke="#14100a" stroke-width="2.2" stroke-linecap="round"/><defs><linearGradient id="bm" x1="3" y1="3" x2="29" y2="29"><stop stop-color="#ffc35c"/><stop offset="1" stop-color="#ff6a3d"/></linearGradient></defs></svg>
+  <div class="app">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="#/dashboard">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="#2563eb"/><path d="M13 10.5v11l8.5-5.5z" fill="#fff"/></svg>
       <span>Cutline</span>
     </a>
     <nav class="nav" aria-label="Pages">
-      <a href="#/" data-page="home"><svg class="ic"><use href="#i-home"/></svg><span>Home</span></a>
-      <a href="#/ads" data-page="ads"><svg class="ic"><use href="#i-ad"/></svg><span>Ads</span></a>
-      <a href="#/requests" data-page="requests"><svg class="ic"><use href="#i-inbox"/></svg><span>Requests</span><em class="count" id="nav-req-count"></em></a>
-      <a href="#/clients" data-page="clients"><svg class="ic"><use href="#i-users"/></svg><span>Clients</span></a>
-      <a href="#/music" data-page="music"><svg class="ic"><use href="#i-music"/></svg><span>Music</span><em class="count" id="nav-music-count"></em></a>
+      <a href="#/dashboard" data-page="dashboard"><svg class="ic"><use href="#i-grid"/></svg><span>Dashboard</span></a>
+      <a href="#/onboarding" data-page="onboarding"><svg class="ic"><use href="#i-inbox"/></svg><span>Client Onboarding</span><em class="count" id="nav-onboarding"></em></a>
+      <a href="#/projects" data-page="projects"><svg class="ic"><use href="#i-briefcase"/></svg><span>Client Projects</span></a>
+      <a href="#/production" data-page="production"><svg class="ic"><use href="#i-film"/></svg><span>AI Video Production</span></a>
+      <a href="#/approval" data-page="approval"><svg class="ic"><use href="#i-check-circle"/></svg><span>Video Approval Centre</span><em class="count" id="nav-approval"></em></a>
+      <a href="#/emails" data-page="emails"><svg class="ic"><use href="#i-mail"/></svg><span>Email Management</span></a>
+      <a href="#/pending" data-page="pending"><svg class="ic"><use href="#i-clock"/></svg><span>Pending Emails</span><em class="count" id="nav-pending"></em></a>
+      <a href="#/revisions" data-page="revisions"><svg class="ic"><use href="#i-refresh"/></svg><span>Client Revisions</span><em class="count" id="nav-revisions"></em></a>
+      <a href="#/invoices" data-page="invoices"><svg class="ic"><use href="#i-receipt"/></svg><span>Invoice Management</span></a>
       <a href="#/settings" data-page="settings"><svg class="ic"><use href="#i-gear"/></svg><span>Settings</span></a>
     </nav>
-    <a class="ai-pill" id="ai-pill" href="#/settings" title="AI status"><span class="dot"></span><span class="label">…</span></a>
-  </header>
+    <div class="sidebar-foot">
+      <a class="ai-pill" id="ai-pill" href="#/settings" title="AI status"><span class="dot"></span><span class="label">…</span></a>
+      <a class="ai-pill" id="google-pill" href="#/onboarding" title="Google connection"><span class="dot"></span><span class="label">Google: …</span></a>
+    </div>
+  </aside>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
 
-  <div class="wrap" id="alerts"></div>
+  <div class="main-col">
+    <header class="appbar">
+      <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="Menu"><svg class="ic"><use href="#i-menu"/></svg></button>
+      <div class="appbar-title"><span id="appbar-section">Dashboard</span></div>
+      <div class="appbar-actions">
+        <button class="btn btn-sm" id="appbar-check" type="button" title="Check the Google Form and Gmail now"><svg class="ic"><use href="#i-refresh"/></svg><span>Check for new activity</span></button>
+      </div>
+    </header>
+    <div class="wrap" id="alerts"></div>
 
   <main class="wrap">
-    <!-- HOME -------------------------------------------------------------->
+    <!-- Shared heads for pages with tabs -->
+    <div class="page-head tabbed" id="production-head" hidden>
+      <div><h1>AI Video Production</h1><p class="muted">Animated ads, footage edits and your music library. Client projects use the same tools.</p></div>
+      <nav class="tabs" aria-label="Production tools">
+        <a href="#/production" data-tab="ads">Animated ads</a>
+        <a href="#/production/clips" data-tab="home">Footage clip editor</a>
+        <a href="#/production/music" data-tab="music">Music library</a>
+      </nav>
+    </div>
+    <div class="page-head tabbed" id="projects-head" hidden>
+      <div><h1>Client Projects</h1><p class="muted">Every client job in one place: answers, resources, videos, emails, invoices and history.</p></div>
+      <nav class="tabs" aria-label="Client views">
+        <a href="#/projects" data-tab="projects">Projects</a>
+        <a href="#/projects/clients" data-tab="clients">Clients &amp; brand kits</a>
+      </nav>
+    </div>
+
+    <!-- NEW WORKFLOW PAGES (rendered by js/ops.js) ---------------------------->
+    <section class="page" id="page-dashboard" hidden><div id="dashboard-root"></div></section>
+    <section class="page" id="page-onboarding" hidden><div id="onboarding-root"></div></section>
+    <section class="page" id="page-projects" hidden><div id="projects-root"></div></section>
+    <section class="page" id="page-approval" hidden><div id="approval-root"></div></section>
+    <section class="page" id="page-emails" hidden><div id="emails-root"></div></section>
+    <section class="page" id="page-pending" hidden><div id="pending-root"></div></section>
+    <section class="page" id="page-revisions" hidden><div id="revisions-root"></div></section>
+    <section class="page" id="page-invoices" hidden><div id="invoices-root"></div></section>
+
+    <!-- HOME (footage clip editor) ------------------------------------------>
     <section class="page" id="page-home">
       <div class="home-grid">
         <aside class="panel side">
@@ -222,8 +277,8 @@
 
     <!-- CLIENTS --------------------------------------------------------------->
     <section class="page" id="page-clients" hidden>
-      <div class="page-head">
-        <h1>Clients <small class="muted" id="clients-count"></small></h1>
+      <div class="page-head sub">
+        <h2>Clients &amp; brand kits <small class="muted" id="clients-count"></small></h2>
         <button class="btn btn-primary" id="client-new" type="button"><svg class="ic"><use href="#i-plus"/></svg> New client</button>
       </div>
       <div class="clients-layout">
@@ -232,79 +287,10 @@
       </div>
     </section>
 
-    <section class="page" id="page-requests" hidden>
-      <div class="page-head">
-        <h1>Requests <small class="muted" id="req-count"></small></h1>
-        <button class="btn" id="req-check" type="button"><svg class="ic"><use href="#i-refresh"/></svg> Check now</button>
-      </div>
-      <div class="req-layout">
-        <div class="req-list" id="req-list"></div>
-        <div class="panel settings req-setup">
-          <h2>Google Form <span class="tag" id="req-tag"></span></h2>
-          <p class="muted small" id="req-status"></p>
-          <div class="set-row">
-            <label class="label" for="req-url">Web app URL</label>
-            <input id="req-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false" />
-          </div>
-          <div class="set-row">
-            <label class="label" for="req-key">Connection code</label>
-            <input id="req-key" type="password" placeholder="The long code from the Apps Script log" autocomplete="off" spellcheck="false" />
-          </div>
-          <div class="key-row">
-            <button class="btn btn-primary" id="req-save" type="button">Save</button>
-            <button class="btn btn-ghost" id="req-disconnect" type="button">Disconnect</button>
-          </div>
-          <hr class="sep" />
-          <label class="toggle"><input type="checkbox" id="req-auto" /><span></span> Make videos automatically when a form comes in</label>
-          <div class="set-row"><span class="label">Engine for form requests</span><div class="seg" id="req-mode-seg"></div></div>
-          <label class="toggle"><input type="checkbox" id="req-voice" /><span></span> Add a voiceover when the client asks for one <small class="muted">(OpenAI, about 1–2c)</small></label>
-          <div class="set-row">
-            <label class="label" for="req-limit">Most automatic requests per day</label>
-            <input id="req-limit" type="number" min="0" max="100" step="1" class="narrow" />
-            <p class="muted small">Protects your AI credit if the form link gets shared or spammed. Extra requests wait for you to press Make videos.</p>
-          </div>
-          <div class="req-update" id="req-update" hidden>
-            <b>Update your Google script</b> so Cutline can email clients:
-            <ol>
-              <li><button class="btn btn-sm req-copy-script" type="button"><svg class="ic"><use href="#i-copy"/></svg> Copy the new script</button></li>
-              <li>Open your Cutline project at <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a>. Select all the text, paste over it, and click save.</li>
-              <li>Choose <b>setupCutline</b> → <b>Run</b>, and allow the new permission (sending email as you).</li>
-              <li><b>Deploy</b> → <b>Manage deployments</b> → pencil icon → Version: <b>New version</b> → <b>Deploy</b>. The URL stays the same.</li>
-              <li>Click <b>Check now</b> here.</li>
-            </ol>
-          </div>
-          <hr class="sep" />
-          <div id="req-email-box">
-            <h3 class="req-h3">Emails to clients</h3>
-            <p class="muted small">After you approve a request's videos, Cutline emails the client links to watch and download them. Nothing is sent without your click.</p>
-            <div class="set-row"><label class="label" for="req-sender">Your name or business (shown as the sender)</label><input id="req-sender" type="text" maxlength="60" placeholder="e.g. Henry from Cutline Media" /></div>
-            <div class="set-row"><label class="label" for="req-subject">Subject</label><input id="req-subject" type="text" maxlength="150" /></div>
-            <div class="set-row"><label class="label" for="req-message">Message</label><textarea id="req-message" rows="8" maxlength="5000"></textarea>
-              <p class="muted small">{name} = the client's business, {sender} = your name, {links} = the video buttons. You can still edit each email before sending.</p></div>
-            <div class="key-row"><button class="btn" id="req-email-save" type="button">Save email settings</button><button class="btn btn-ghost" id="req-email-reset" type="button">Reset message</button></div>
-          </div>
-          <details class="req-guide" id="req-guide">
-            <summary>How to connect your form (5 minutes)</summary>
-            <ol>
-              <li><button class="btn btn-sm" id="req-copy" type="button"><svg class="ic"><use href="#i-copy"/></svg> Copy the Google script</button></li>
-              <li>Go to <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com</a> (a new project opens). Delete the text there and paste.</li>
-              <li>Click the save icon. At the top, choose <b>setupCutline</b> and click <b>Run</b>. Allow access. (If Google says "app isn't verified", click <i>Advanced</i> → <i>Go to … (unsafe)</i>: it's your own script.)</li>
-              <li>The <b>Execution log</b> at the bottom shows your new form's link and your <b>connection code</b>.</li>
-              <li>Open the form and add 3 <b>File upload</b> questions in the "Your photos and logo" section: logo, photos and video clips (Google can't add those automatically).</li>
-              <li>Back in Apps Script: <b>Deploy</b> → <b>New deployment</b> → gear icon → <b>Web app</b>. Execute as <b>Me</b>, Who has access <b>Anyone</b>. Click <b>Deploy</b> and copy the <b>Web app URL</b>.</li>
-              <li>Paste the URL and code here, click <b>Save</b>, then <b>Check now</b>.</li>
-            </ol>
-            <p class="muted small">Already made your own form? Paste its edit link into the top line of the script (EXISTING_FORM_URL) before step 3. Keep the question wording close to Cutline's so the answers are understood.</p>
-            <p class="muted small">Cutline checks every few minutes while it is running on this Mac. Requests sent while it is closed are picked up the next time you open it.</p>
-          </details>
-        </div>
-      </div>
-    </section>
-
     <!-- MUSIC ------------------------------------------------------------->
     <section class="page" id="page-music" hidden>
-      <div class="page-head">
-        <h1>Music <small class="muted" id="music-count"></small></h1>
+      <div class="page-head sub">
+        <h2>Music library <small class="muted" id="music-count"></small></h2>
         <label class="btn btn-primary music-add">
           <input type="file" id="music-input" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" multiple hidden />
           <svg class="ic"><use href="#i-plus"/></svg> <span id="music-add-label">Add music</span>
@@ -327,7 +313,8 @@
 
     <!-- SETTINGS ---------------------------------------------------------->
     <section class="page" id="page-settings" hidden>
-      <div class="page-head"><h1>Settings</h1></div>
+      <div class="page-head"><div><h1>Settings</h1><p class="muted">Your business details, pricing, email templates, AI and video options.</p></div></div>
+      <div id="biz-settings"></div>
 
       <div class="panel settings">
         <h2>AI <span class="tag" id="ai-tag"></span></h2>
@@ -381,6 +368,8 @@
       </div>
     </section>
   </main>
+  </div>
+  </div>
 
   <dialog class="dialog" id="projects-dialog">
     <div class="dialog-head"><h3>Projects</h3><button class="icon-btn" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div>

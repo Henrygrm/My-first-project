@@ -2,66 +2,64 @@
  * Cutline ← Google Form connector.
  *
  * What it does:
- *  - setupCutline() makes the "Video request" form with every question Cutline
- *    understands (or uses your own form), and creates a secret connection code.
+ *  - setupCutline() connects your existing Google Form and creates a secret
+ *    connection code. It never changes your form or its questions.
  *  - Once deployed as a web app, Cutline (on your Mac) asks this script for new
  *    form answers every couple of minutes, using that code. Nobody without the
  *    code can read anything.
  *  - When you approve a client's videos in Cutline, it sends them here: they are
  *    saved in your Google Drive ("Cutline videos" folder) and emailed to the
- *    client from your Gmail with watch/download links.
+ *    client from your Gmail with watch/download links and the invoice.
+ *    Nothing is emailed unless you click Approve & Send in Cutline.
+ *  - Cutline also asks it for client replies to those emails (feedback,
+ *    change requests), only within those conversations / from those clients.
  *
- * Setup (Cutline's Requests page walks you through it):
- *  1. script.google.com → New project → delete what's there → paste this file.
+ * Setup (Cutline's Client Onboarding page walks you through it):
+ *  1. Open your form → ⋮ menu → Apps Script → delete what's there → paste this file.
  *  2. Pick "setupCutline" in the bar at the top → Run → allow access.
  *  3. Follow the steps printed in the Execution log.
  */
 
-// Already made your own form? Paste its edit link between the quotes before
-// running setupCutline. Leave it empty and a new form is made for you.
+// Easiest: open this script from inside your form (form ⋮ menu → Apps Script)
+// and leave this empty. Or paste your form's edit link between the quotes.
 const EXISTING_FORM_URL = '';
 
 const CHUNK = 5 * 1024 * 1024; // bytes per download piece
 const MAX_FILE = 50 * 1024 * 1024; // bigger uploads stay in Google Drive
 const MAX_RESPONSES = 20; // per check; Cutline asks again for the rest
-const SCRIPT_VERSION = 2; // 2: can save videos to Drive and email clients
+const SCRIPT_VERSION = 3; // 2: Drive + email; 3: Gmail conversations, invoices, replies
 
 function setupCutline() {
   const props = PropertiesService.getScriptProperties();
-  let form;
-  let made = false;
+  let form = null;
   if (EXISTING_FORM_URL) form = FormApp.openByUrl(EXISTING_FORM_URL);
-  else if (props.getProperty('FORM_ID')) form = FormApp.openById(props.getProperty('FORM_ID'));
-  else {
-    form = buildForm_();
-    made = true;
+  if (!form) {
+    try { form = FormApp.getActiveForm(); } catch (err) {}
   }
+  if (!form && props.getProperty('FORM_ID')) form = FormApp.openById(props.getProperty('FORM_ID'));
+  if (!form) throw new Error('No form found. Open this script from your form (in the form: ⋮ menu → Apps Script), or paste your form\'s edit link into EXISTING_FORM_URL at the top, then run setupCutline again.');
   props.setProperty('FORM_ID', form.getId());
   let key = props.getProperty('CUTLINE_KEY');
   if (!key) {
     key = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
     props.setProperty('CUTLINE_KEY', key);
   }
-  const lines = [
+  Logger.log([
     '',
     '===== CUTLINE SETUP =====',
-    made ? 'Your new form is ready. Edit it here: ' + form.getEditUrl() : 'Using your form: ' + form.getEditUrl(),
-    'Link to send to clients: ' + form.getPublishedUrl(),
+    'Connected to your form: ' + form.getTitle(),
+    'Link you send to clients: ' + form.getPublishedUrl(),
+    'Gmail account used for client emails: ' + myEmail_(),
     '',
     'YOUR CONNECTION CODE (paste into Cutline): ' + key,
     '',
     'Next:',
-    made ? '1. Open the form link above. In the section "Your photos and logo", click + and add 3 "File upload" questions:\n' +
-      '     "Upload your logo" (1 file, images)\n' +
-      '     "Upload photos of your products, food, work or shop" (up to 10 files, images)\n' +
-      '     "Got any video clips you\'d like included?" (videos)\n' +
-      '   (Google can\'t add upload questions automatically.)' : '1. Make sure your form has its questions (see the list in Cutline).',
-    '2. Here in Apps Script: Deploy → New deployment → gear icon → Web app.',
+    '1. Deploy → New deployment → gear icon → Web app.',
     '   Execute as: Me.   Who has access: Anyone.   Click Deploy and copy the Web app URL.',
-    '3. In Cutline → Requests: paste the Web app URL and the connection code, then click Save and Check now.',
+    '   (Updating later? Deploy → Manage deployments → pencil → Version: New version → Deploy. The URL stays the same.)',
+    '2. In Cutline → Client Onboarding: paste the Web app URL and the connection code, click Save, then Check now.',
     '=========================',
-  ];
-  Logger.log(lines.join('\n'));
+  ].join('\n'));
 }
 
 /** Called by Cutline. Every request must carry the connection code. */
@@ -78,7 +76,8 @@ function doGet(e) {
     return out_({
       ok: true,
       version: SCRIPT_VERSION,
-      form: { title: form.getTitle(), url: form.getPublishedUrl() },
+      form: { title: form.getTitle(), url: form.getPublishedUrl(), editUrl: form.getEditUrl() },
+      account: myEmail_(),
       responses: all.slice(0, MAX_RESPONSES).map(response_),
       more: all.length > MAX_RESPONSES,
     });
@@ -95,6 +94,8 @@ function doPost(e) {
     if (!key || b.key !== key) return out_({ error: 'The connection code is wrong. Copy it again from the Apps Script log (run setupCutline).' });
     if (b.action === 'upload') return out_(upload_(b));
     if (b.action === 'email') return out_(email_(b));
+    if (b.action === 'send') return out_(send_(b));
+    if (b.action === 'inbox') return out_(inbox_(b));
     return out_({ error: 'Unknown action' });
   } catch (err) {
     return out_({ error: String((err && err.message) || err) });
@@ -142,6 +143,95 @@ function email_(b) {
   if (b.senderName) opts.name = String(b.senderName).slice(0, 60);
   MailApp.sendEmail(opts);
   return { ok: true, remaining: MailApp.getRemainingDailyQuota() };
+}
+
+function myEmail_() {
+  try { return String(Session.getEffectiveUser().getEmail() || '').toLowerCase(); } catch (err) { return ''; }
+}
+
+/** Plain text + HTML versions of a message; {video_link} becomes the video buttons. */
+function compose_(body, links) {
+  let b = String(body || '').replace(/\{links\}/g, '{video_link}');
+  if (b.indexOf('{video_link}') < 0) b += '\n\n{video_link}';
+  const parts = b.split('{video_link}');
+  const text = parts.join(links.map(function (l) { return l.name + ': ' + l.url; }).join('\n'));
+  const buttons = links.map(function (l) {
+    return '<p style="margin:12px 0"><a href="' + esc_(l.url) + '" style="display:inline-block;padding:11px 20px;border-radius:8px;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:600">&#9654;&nbsp; ' + esc_(l.name) + '</a></p>';
+  }).join('');
+  const html = '<div style="font:15px/1.6 Arial,Helvetica,sans-serif;color:#1f2937;max-width:600px">' +
+    parts.map(function (p) { return esc_(p).replace(/\n/g, '<br>'); }).join(buttons) + '</div>';
+  return { text: text, html: html };
+}
+
+/**
+ * Send an approved email from your Gmail. With threadId it replies in that
+ * conversation. Each email has a ref, so a retry never sends it twice.
+ */
+function send_(b) {
+  const props = PropertiesService.getScriptProperties();
+  const ref = String(b.ref || '');
+  if (ref) {
+    const prev = props.getProperty('sent_' + ref);
+    if (prev) { const r = JSON.parse(prev); r.duplicate = true; return r; }
+  }
+  const to = String(b.to || '').trim();
+  if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(to)) return { error: 'That email address does not look right.' };
+  const links = (b.links || []).map(function (l) { return { name: String(l.name || 'Video'), url: String(l.url || '') }; })
+    .filter(function (l) { return /^https:\/\//.test(l.url); });
+  const msg = compose_(b.body, links);
+  const opts = { htmlBody: msg.html, attachments: (b.attachments || []).map(function (a) {
+    return Utilities.newBlob(Utilities.base64Decode(String(a.data || '')), String(a.type || 'application/pdf'), String(a.name || 'file').slice(0, 120));
+  }) };
+  if (b.senderName) opts.name = String(b.senderName).slice(0, 60);
+  const subject = String(b.subject || 'Your video is ready').slice(0, 150);
+  let sent = null;
+  if (b.threadId) {
+    let thread = null;
+    try { thread = GmailApp.getThreadById(String(b.threadId)); } catch (err) {}
+    if (thread) {
+      const me = myEmail_();
+      const msgs = thread.getMessages();
+      for (let i = msgs.length - 1; i >= 0 && !sent; i--) {
+        if (!me || msgs[i].getFrom().toLowerCase().indexOf(me) < 0) {
+          opts.subject = subject;
+          sent = msgs[i].createDraftReply(msg.text, opts).send();
+        }
+      }
+    }
+  }
+  if (!sent) sent = GmailApp.createDraft(to, subject, msg.text, opts).send();
+  const result = { ok: true, threadId: sent.getThread().getId(), messageId: sent.getId(), from: myEmail_() };
+  if (ref) props.setProperty('sent_' + ref, JSON.stringify(result));
+  return result;
+}
+
+/** New messages from clients in their conversations (or from their address). */
+function inbox_(b) {
+  const me = myEmail_();
+  const out = [];
+  (b.items || []).slice(0, 60).forEach(function (it) {
+    const after = Number(it.after) || 0;
+    const seen = {};
+    const msgs = [];
+    if (it.threadId) {
+      try { const t = GmailApp.getThreadById(String(it.threadId)); if (t) t.getMessages().forEach(function (m) { msgs.push(m); }); } catch (err) {}
+    }
+    if (it.from && /^[^\s@"]+@[^\s@"]+$/.test(String(it.from))) {
+      const q = 'from:' + it.from + ' after:' + Utilities.formatDate(new Date(after - 86400000), 'UTC', 'yyyy/MM/dd');
+      GmailApp.search(q, 0, 10).forEach(function (t) { t.getMessages().forEach(function (m) { msgs.push(m); }); });
+    }
+    msgs.forEach(function (m) {
+      const id = m.getId();
+      if (seen[id]) return;
+      seen[id] = true;
+      const from = String(m.getFrom() || '');
+      if (me && from.toLowerCase().indexOf(me) >= 0) return;
+      const t = m.getDate().getTime();
+      if (t <= after) return;
+      out.push({ ref: it.ref, id: id, threadId: m.getThread().getId(), from: from, date: t, subject: m.getSubject(), text: String(m.getPlainBody() || '').slice(0, 8000) });
+    });
+  });
+  return { ok: true, messages: out, account: me };
 }
 
 function form_() {
@@ -200,61 +290,4 @@ function filePiece_(form, responseId, fileId, offset) {
 
 function out_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
-}
-
-/** The "Video request" form. Cutline matches answers by these question titles. */
-function buildForm_() {
-  const form = FormApp.create('Video request');
-  form.setDescription('Thanks for choosing us! Please fill this in for each video you\'d like. It takes about 5 minutes. The more detail and photos you give, the better your video will be.');
-  try { form.setCollectEmail(true); } catch (err) {}
-  const notSure = 'Not sure, you decide';
-
-  form.addSectionHeaderItem().setTitle('About your business');
-  form.addTextItem().setTitle('Business name').setRequired(true);
-  form.addMultipleChoiceItem().setTitle('What type of business are you?').setRequired(true)
-    .setChoiceValues(['Restaurant', 'Café & coffee', 'Car detailing', 'Trades (plumber, electrician, builder)', 'Barber & hair salon', 'Gym & personal training'])
-    .showOtherOption(true);
-  form.addParagraphTextItem().setTitle('What do you sell or offer?').setHelpText('List your main products or services, e.g. "Flat whites, smashed avo, house-made banana bread"').setRequired(true);
-  form.addTextItem().setTitle('Suburb / city').setRequired(true);
-  form.addTextItem().setTitle('What should customers use to contact you?').setHelpText('Phone, website or social handle');
-
-  form.addPageBreakItem().setTitle('This video');
-  form.addMultipleChoiceItem().setTitle('What\'s the main goal of this video?').setRequired(true)
-    .setChoiceValues(['Get more bookings / orders', 'Promote a special offer', 'Show off our work / products', 'Build trust (quality, reviews)', 'Bring in local customers', notSure]);
-  form.addTextItem().setTitle('Do you have an offer or deal to promote?').setHelpText('e.g. "20% off this week", "Free coffee with any breakfast"');
-  form.addTextItem().setTitle('Which product or service should this video focus on?');
-  form.addMultipleChoiceItem().setTitle('What should viewers do at the end?')
-    .setChoiceValues(['Call us', 'Book online', 'Visit us', 'Order now', 'Follow us']).showOtherOption(true);
-
-  form.addPageBreakItem().setTitle('Where it will be posted');
-  form.addCheckboxItem().setTitle('Where will you post this video?').setRequired(true)
-    .setChoiceValues(['TikTok', 'Instagram Reels / Stories', 'Instagram / Facebook feed', 'YouTube Shorts', 'YouTube / website', 'Not sure']);
-  form.addMultipleChoiceItem().setTitle('How long should the video be?').setRequired(true)
-    .setChoiceValues(['10 seconds', '15 seconds (most popular)', '20 seconds', '30 seconds', notSure]);
-
-  form.addPageBreakItem().setTitle('Look and feel');
-  form.addMultipleChoiceItem().setTitle('What style suits your brand best?')
-    .setChoiceValues(['Cinematic: dramatic, movie-like', 'Luxury: elegant, high-end', 'Minimalist: clean and simple', 'Modern: bold and futuristic', 'Energetic: fast and exciting', 'Editorial: magazine style', 'Commercial: polished and professional', 'Playful: fun and colourful', 'Premium: sleek and classy', 'Industrial: tough and rugged', notSure]);
-  form.addTextItem().setTitle('What are your brand colours?').setHelpText('Names or colour codes are fine, e.g. "Navy and gold" or "#1A2B3C"');
-  form.addParagraphTextItem().setTitle('Any videos or brands whose style you love?').setHelpText('Paste links');
-
-  form.addPageBreakItem().setTitle('Sound');
-  form.addMultipleChoiceItem().setTitle('What kind of music do you want?')
-    .setChoiceValues(['Upbeat / energetic', 'Chill / relaxed', 'Cinematic / dramatic', 'Elegant / classy', 'You decide']);
-  form.addMultipleChoiceItem().setTitle('Would you like a voiceover?').setHelpText('A voice reading out the key message')
-    .setChoiceValues(['Yes, a deep voice', 'Yes, a warm, friendly voice', 'Yes, an energetic voice', 'No, music only']);
-
-  form.addPageBreakItem().setTitle('Your photos and logo')
-    .setHelpText('Clear, well-lit, high-quality photos work best. Please avoid screenshots or blurry pictures.');
-
-  form.addPageBreakItem().setTitle('Words and trust');
-  form.addParagraphTextItem().setTitle('Paste a real customer review we can feature').setHelpText('Include the customer\'s first name if you can');
-  form.addParagraphTextItem().setTitle('Any must-say details?').setHelpText('e.g. "Open 7 days", "Family owned since 1998", "Mobile service"');
-  form.addParagraphTextItem().setTitle('Is there anything we must NOT show or say?');
-
-  form.addPageBreakItem().setTitle('Final details');
-  form.addDateItem().setTitle('When do you need the video by?');
-  form.addMultipleChoiceItem().setTitle('How many versions would you like to choose from?').setChoiceValues(['1', '2', '3']);
-  form.addParagraphTextItem().setTitle('Anything else we should know?');
-  return form;
 }

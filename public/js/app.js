@@ -1,12 +1,13 @@
 import { $, $$, api, copyText, fmtDuration, fmtSec, h, icon, slug, store, timeAgo, toast, upload } from './ui.js';
 import { loadAssets as loadPreviewAssets, loadFonts, Player } from './preview.js';
 import { RECIPES } from '/engine/recipes.js';
+import * as ops from './ops.js';
 
 // Must match package.json. If the server reports a different version, an
 // old copy of Cutline is still running and new features won't work.
-const APP_VERSION = '3.2.0';
+const APP_VERSION = '4.0.0';
 
-const ROLE_COLORS = { hook: '#ffb03d', setup: '#6aa8ff', process: '#6aa8ff', reveal: '#3ddc97', payoff: '#3ddc97', cta: '#c79bff' };
+const ROLE_COLORS = { hook: '#2563eb', setup: '#60a5fa', process: '#60a5fa', reveal: '#14b8a6', payoff: '#14b8a6', cta: '#7c3aed' };
 const DEFAULTS = {
   business: 'restaurant', businessCustom: '', platform: 'tiktok', clipCount: 2, targetSeconds: 30,
   style: 'mix', music: 'auto', musicLevel: 'normal', mode: 'ai', reframe: 'auto', audio: 'original',
@@ -77,7 +78,6 @@ function renderTopbar() {
   else if (aiKey()) [label] = ['AI off (free mode)', pill.classList.add('off')];
   else [label] = ['AI off: add key', pill.classList.add('off')];
   $('.label', pill).textContent = label;
-  $('#nav-music-count').textContent = state.tracks.length ? String(state.tracks.length) : '';
 }
 
 function renderAlerts() {
@@ -101,17 +101,41 @@ function renderAlerts() {
 // Router
 // ---------------------------------------------------------------------------
 
+// Old links (#/ads, #/clients, …) still work.
+const ALIASES = { '': 'dashboard', home: 'production/clips', ads: 'production', clients: 'projects/clients', music: 'production/music', requests: 'onboarding' };
+const SECTION_NAMES = {
+  dashboard: 'Dashboard', onboarding: 'Client Onboarding', projects: 'Client Projects', production: 'AI Video Production', approval: 'Video Approval Centre',
+  emails: 'Email Management', pending: 'Pending Emails', revisions: 'Client Revisions', invoices: 'Invoice Management', settings: 'Settings',
+};
+
 function route() {
-  const name = location.hash.replace(/^#\/?/, '') || 'home';
-  const page = ['home', 'ads', 'requests', 'clients', 'music', 'settings'].includes(name) ? name : 'home';
+  let name = location.hash.replace(/^#\/?/, '');
+  if (name in ALIASES) name = ALIASES[name];
+  const [top, sub, extra] = name.split('/');
+  const nav = SECTION_NAMES[top] ? top : 'dashboard';
+  // Which <section> shows.
+  let page = nav;
+  if (nav === 'production') page = sub === 'clips' ? 'home' : sub === 'music' ? 'music' : 'ads';
+  if (nav === 'projects' && sub === 'clients') page = 'clients';
   $$('.page').forEach((p) => (p.hidden = p.id !== `page-${page}`));
-  $$('.nav a').forEach((a) => a.classList.toggle('active', a.dataset.page === page));
+  $$('.nav a').forEach((a) => a.classList.toggle('active', a.dataset.page === nav));
+  $('#appbar-section').textContent = SECTION_NAMES[nav];
+  document.title = `${SECTION_NAMES[nav]} · Cutline`;
+  $('#production-head').hidden = nav !== 'production';
+  $('#projects-head').hidden = !(nav === 'projects' && (!sub || sub === 'clients'));
+  $$('#production-head .tabs a').forEach((a) => a.classList.toggle('active', a.dataset.tab === page));
+  $$('#projects-head .tabs a').forEach((a) => a.classList.toggle('active', a.dataset.tab === (page === 'clients' ? 'clients' : 'projects')));
+  document.body.classList.remove('nav-open');
+  window.scrollTo(0, 0);
   if (page === 'music') renderMusicPage();
-  if (page === 'settings') renderSettings();
+  if (page === 'settings') {
+    renderSettings();
+    ops.renderBusinessSettings();
+  }
   if (page === 'home') renderHome();
   if (page === 'ads') renderAds();
   if (page === 'clients') renderClients();
-  if (page === 'requests') renderRequests();
+  ops.route(nav, sub, extra);
 }
 
 // ---------------------------------------------------------------------------
@@ -629,7 +653,7 @@ function clipEditor(clip, rendered, i, busy) {
 // ---------------------------------------------------------------------------
 
 const directionLabel = (id) => (id === 'auto' ? 'Auto' : state.status?.ads?.directions.find((d) => d.id === id)?.label || id);
-const RECIPE_COLORS = { product_hero: '#ffb03d', photo_full: '#6aa8ff', gallery: '#58c4dc', compare: '#9b8cff', kinetic: '#ff7a9a', features: '#3ddc97', offer: '#ff5f8f', review: '#ffd84d', stat: '#c79bff', process: '#4fd1a5', footage: '#7aa2ff', location: '#ff9f5a', cta: '#e6e6e6' };
+const RECIPE_COLORS = { product_hero: '#2563eb', photo_full: '#3b82f6', gallery: '#0ea5e9', compare: '#6366f1', kinetic: '#8b5cf6', features: '#14b8a6', offer: '#ec4899', review: '#f59e0b', stat: '#7c3aed', process: '#10b981', footage: '#60a5fa', location: '#f97316', cta: '#64748b' };
 
 function renderAds() {
   renderAdClient();
@@ -1440,199 +1464,6 @@ async function handleMusicFiles(files) {
 }
 
 // ---------------------------------------------------------------------------
-// Google Form requests
-// ---------------------------------------------------------------------------
-
-const REQ_STATUS = {
-  waiting: ['Waiting for you', 'warn'], queued: ['In the queue', 'info'], preparing: ['Getting files', 'info'], making: ['Making videos', 'info'],
-  review: ['Check and approve', 'warn'], done: ['Check and approve', 'warn'], sending: ['Sending…', 'info'], sent: ['Sent to client', 'good'],
-  error: ['Problem', 'bad'], dismissed: ['Dismissed', 'muted'],
-};
-const ASPECT_NAMES = { '9:16': 'Vertical', '4:5': 'Feed', '1:1': 'Square', '16:9': 'Landscape' };
-
-async function loadRequests() {
-  try {
-    state.intake = await api('/api/intake');
-  } catch {
-    state.intake = null;
-  }
-  const waiting = (state.intake?.requests || []).filter((r) => ['waiting', 'error', 'review', 'done'].includes(r.status)).length;
-  $('#nav-req-count').textContent = waiting ? String(waiting) : '';
-  return state.intake;
-}
-
-async function renderRequests() {
-  const it = await loadRequests();
-  if (!it) return;
-  const tag = $('#req-tag');
-  const okConn = it.configured && !it.lastError && it.lastCheck;
-  tag.className = `tag ${okConn ? 'on' : 'off'}`;
-  tag.textContent = !it.configured ? 'Not connected' : it.lastError ? 'Problem' : it.lastCheck ? 'Connected' : 'Not checked yet';
-  const st = $('#req-status');
-  st.className = `small ${it.lastError ? 'bad' : 'muted'}`;
-  st.textContent = !it.configured ? 'Connect your Google Form and new requests turn into videos automatically. Follow the steps below.'
-    : it.lastError ? it.lastError
-      : it.lastCheck ? `"${it.formTitle || 'Your form'}" · checked ${timeAgo(it.lastCheck)} · checks every ${it.checkEveryMinutes} min while Cutline is open.` : 'Saved. Click Check now.';
-  if (document.activeElement !== $('#req-url')) $('#req-url').value = it.url || '';
-  $('#req-key').placeholder = it.key ? `Saved: ${it.key}` : 'The long code from the Apps Script log';
-  $('#req-auto').checked = it.auto;
-  $('#req-voice').checked = it.voiceover;
-  if (document.activeElement !== $('#req-limit')) $('#req-limit').value = it.dailyLimit;
-  seg($('#req-mode-seg'), [['ai', `Claude AI${it.ai ? '' : ' (no key)'}`], ['auto', 'Free (no AI)']], it.mode, (v) => saveIntake({ mode: v }));
-  for (const id of ['req-url', 'req-key', 'req-save', 'req-disconnect', 'req-auto', 'req-voice', 'req-limit']) $(`#${id}`).disabled = !it.editable;
-  $('#req-disconnect').disabled = !it.editable || !it.configured;
-  $('#req-check').disabled = !it.configured;
-  $('#req-guide').open = !it.configured;
-  $('.req-setup').classList.toggle('first', !it.configured);
-  $('#req-update').hidden = !(it.configured && it.lastCheck && !it.canEmail);
-  if (!$('#req-email-box').contains(document.activeElement)) {
-    $('#req-sender').value = it.senderName || '';
-    $('#req-subject').value = it.emailSubject || '';
-    $('#req-message').value = it.emailMessage || '';
-  }
-  for (const id of ['req-sender', 'req-subject', 'req-message', 'req-email-save']) $(`#${id}`).disabled = !it.editable;
-
-  const list = it.requests.filter((r) => r.status !== 'dismissed' || state.showDismissed);
-  $('#req-count').textContent = it.requests.length ? String(it.requests.length) : '';
-  const box = $('#req-list');
-  // Rebuild only when something changed, and never while the owner is typing
-  // an email or watching a video (that would wipe the field or stop playback).
-  const sig = JSON.stringify([list, it.formUrl, it.canEmail]);
-  const typing = box.contains(document.activeElement) && /INPUT|TEXTAREA/.test(document.activeElement.tagName);
-  const playing = [...box.querySelectorAll('video')].some((v) => !v.paused);
-  if ((sig === state.reqSig || typing || playing) && box.childElementCount) {
-    // keep the current cards
-  } else if (!list.length) {
-    state.reqSig = sig;
-    box.replaceChildren(h('div', { class: 'panel req-empty' },
-      icon('inbox'),
-      h('p', {}, it.configured ? 'No requests yet. When a client fills in your form, it shows up here and Cutline starts making their videos.' : 'Form requests will show up here once your Google Form is connected.'),
-      it.formUrl ? h('button', { class: 'btn btn-sm', type: 'button', onclick: async () => { await copyText(it.formUrl); toast('Form link copied: send it to your clients'); } }, icon('copy'), 'Copy the form link for clients') : null));
-  } else {
-    state.reqSig = sig;
-    box.replaceChildren(...[
-      it.formUrl ? h('div', { class: 'req-formlink' }, h('span', { class: 'muted small' }, 'Link for clients:'), h('a', { href: it.formUrl, target: '_blank', rel: 'noopener', class: 'small' }, it.formUrl.replace(/^https:\/\//, '').slice(0, 48) + '…'), h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: async () => { await copyText(it.formUrl); toast('Form link copied'); } }, icon('copy'), 'Copy')) : null,
-      ...list.map(requestCard)].filter(Boolean));
-  }
-  clearTimeout(state.reqTimer);
-  if (location.hash.startsWith('#/requests')) state.reqTimer = setTimeout(() => location.hash.startsWith('#/requests') && renderRequests(), it.requests.some((r) => ['queued', 'preparing', 'making', 'sending'].includes(r.status)) ? 3000 : 20000);
-}
-
-function requestCard(r) {
-  const [statusLabel, tone] = REQ_STATUS[r.status] || [r.status, 'muted'];
-  const s = r.summary;
-  const label = (list, id) => (state.status?.ads?.[list] || []).find((x) => x.id === id)?.label || id;
-  const facts = [
-    s.objective !== 'auto' ? label('objectives', s.objective) : null,
-    `${s.seconds}s`,
-    s.formats.map((f) => ASPECT_NAMES[f] || f).join(' + '),
-    s.direction !== 'auto' ? label('directions', s.direction) : null,
-    `${s.count} version${s.count > 1 ? 's' : ''}`,
-    [s.photos ? `${s.photos} photo${s.photos === 1 ? '' : 's'}` : 'no photos sent', s.logo ? 'logo' : null, s.clips ? `${s.clips} clip${s.clips > 1 ? 's' : ''}` : null].filter(Boolean).join(' + '),
-    s.voiceover ? 'voiceover' : null,
-  ].filter(Boolean);
-  const busy = ['queued', 'preparing', 'making', 'sending'].includes(r.status);
-  const ready = ['review', 'done', 'sent'].includes(r.status);
-  const act = async (path, msg) => {
-    try {
-      await api(`/api/intake/requests/${r.id}/${path}`, { method: 'POST' });
-      if (msg) toast(msg);
-      renderRequests();
-    } catch (err) {
-      toast(err.message, { error: true });
-    }
-  };
-  return h('div', { class: `panel req-card req-${r.status}` },
-    h('div', { class: 'req-top' },
-      h('div', {}, h('b', {}, r.name), h('div', { class: 'muted small' }, [r.email, `sent ${timeAgo(r.submittedAt)}`, s.deadline ? `needed by ${new Date(s.deadline).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : null].filter(Boolean).join(' · '))),
-      h('span', { class: `badge qa ${tone}` }, statusLabel)),
-    h('div', { class: 'badges' }, facts.map((f) => h('span', { class: 'badge' }, f))),
-    busy && r.stage ? h('div', { class: 'job' }, h('div', { class: 'job-top' }, h('span', {}, r.stage), h('span', {}, r.progress != null ? `${Math.round(r.progress * 100)}%` : '')), h('div', { class: 'bar' }, h('i', { style: { width: `${Math.round((r.progress || 0) * 100)}%` } }))) : null,
-    r.error ? h('p', { class: 'small bad' }, r.error) : null,
-    r.sendError ? h('p', { class: 'small bad' }, r.sendError) : null,
-    r.notes.length ? h('ul', { class: 'req-notes small muted' }, r.notes.map((n) => h('li', {}, n))) : null,
-    r.status === 'sent' ? h('div', { class: 'req-sentline small' }, icon('check'), h('span', {}, `Emailed to ${r.sentTo} ${timeAgo(r.sentAt)}: `), r.links.map((l, i) => [i ? ', ' : '', h('a', { href: l.url, target: '_blank', rel: 'noopener' }, l.name)])) : null,
-    ready && r.status !== 'sent' ? approvePanel(r) : null,
-    r.status === 'sent' ? h('details', { class: 'req-again' }, h('summary', { class: 'small' }, 'Send again'), approvePanel(r)) : null,
-    h('details', { class: 'req-answers' }, h('summary', { class: 'small' }, 'Their answers'),
-      h('dl', {}, r.answers.map((a) => [h('dt', {}, a.title), h('dd', {}, a.answer)]))),
-    h('div', { class: 'req-actions' },
-      r.projectId ? h('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: async () => { await openProject(r.projectId); location.hash = '#/ads'; } }, icon('film'), ready ? `Open in Ads${r.sizes.length ? ` (${ASPECT_NAMES[s.format] || s.format})` : ''}` : 'Open project') : null,
-      ...r.sizes.map((z) => h('button', { class: 'btn btn-sm', type: 'button', onclick: async () => { await openProject(z.projectId); location.hash = '#/ads'; } }, icon('film'), `${ASPECT_NAMES[z.format] || z.format} size`)),
-      ['waiting', 'error', 'dismissed', 'review', 'done', 'sent'].includes(r.status) ? h('button', { class: `btn btn-sm${r.projectId ? '' : ' btn-primary'}`, type: 'button', onclick: () => {
-        if (ready && !confirm('Make this request\'s videos again from scratch? The current ones are kept as earlier versions.')) return;
-        act('make', 'Added to the queue');
-      } }, icon('sparkle'), r.status === 'error' ? 'Try again' : ready ? 'Make again' : 'Make videos') : null,
-      !busy && r.status !== 'dismissed' ? h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => act('dismiss') }, 'Dismiss') : null));
-}
-
-/** Watch the videos, pick which to send, edit the email, approve. */
-function approvePanel(r) {
-  state.reqDrafts = state.reqDrafts || {};
-  const d = (state.reqDrafts[r.id] = state.reqDrafts[r.id] || { ...r.draft, videos: r.videos.map((v) => v.key) });
-  d.videos = d.videos.filter((k) => r.videos.some((v) => v.key === k));
-  const canEmail = state.intake?.canEmail;
-  const field = (key, el) => {
-    el.value = d[key] || '';
-    el.addEventListener('input', () => (d[key] = el.value));
-    return el;
-  };
-  const send = async (e) => {
-    const btn = e.currentTarget;
-    if (!d.videos.length) return toast('Tick at least one video to send.', { error: true });
-    if (!confirm(`Email ${d.videos.length} video${d.videos.length > 1 ? 's' : ''} to ${d.to}?`)) return;
-    btn.disabled = true;
-    try {
-      await api(`/api/intake/requests/${r.id}/send`, { method: 'POST', body: d });
-      toast('Sending… the videos are going to your Google Drive, then the email goes out.');
-      state.reqSig = null;
-      renderRequests();
-    } catch (err) {
-      btn.disabled = false;
-      toast(err.message, { error: true });
-    }
-  };
-  if (!r.videos.length) return h('p', { class: 'small muted' }, 'No finished videos found for this request. Press Make again.');
-  return h('div', { class: 'req-review' },
-    h('div', { class: 'req-videos' }, r.videos.map((v) => h('div', { class: 'req-video' },
-      h('video', { src: `/media/${v.projectId}/ad-output/${v.file}`, poster: v.thumb ? `/media/${v.projectId}/ad-output/${v.thumb}` : null, controls: true, playsinline: true, preload: 'metadata', class: `fmt-${v.format.replace(':', 'x')}` }),
-      h('label', { class: 'req-pick small' },
-        h('input', { type: 'checkbox', checked: d.videos.includes(v.key), onchange: (e) => { d.videos = e.target.checked ? [...new Set([...d.videos, v.key])] : d.videos.filter((k) => k !== v.key); } }),
-        v.label)))),
-    h('div', { class: 'req-email' },
-      h('label', { class: 'label' }, 'To', field('to', h('input', { type: 'email', placeholder: 'client@example.com', autocomplete: 'off' }))),
-      h('label', { class: 'label' }, 'Subject', field('subject', h('input', { type: 'text', maxlength: 150 }))),
-      h('label', { class: 'label' }, 'Message', field('message', h('textarea', { rows: 7, maxlength: 5000 }))),
-      h('p', { class: 'muted small' }, '{links} is where the watch / download buttons go. The videos are saved in your Google Drive ("Cutline videos") and the email comes from your Gmail.'),
-      !canEmail ? h('p', { class: 'small bad' }, 'To email from Cutline, update your Google script first (see "Update your Google script" on the right).') : null,
-      h('div', { class: 'req-actions' },
-        h('button', { class: 'btn btn-primary', type: 'button', disabled: !canEmail, onclick: send }, icon('send'), r.status === 'sent' ? 'Send again' : 'Approve and send'),
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: async () => { await openProject(r.projectId); location.hash = '#/ads'; toast('Use "Tell the AI what to change" or the Studio, then come back here to send.'); } }, icon('edit'), 'Change something first'))));
-}
-
-async function saveIntake(body, okMsg) {
-  try {
-    await api('/api/intake/settings', { method: 'POST', body });
-    if (okMsg) toast(okMsg);
-  } catch (err) {
-    toast(err.message, { error: true });
-  }
-  await renderRequests();
-}
-
-async function checkRequests() {
-  const btn = $('#req-check');
-  btn.disabled = true;
-  try {
-    const r = await api('/api/intake/check', { method: 'POST' });
-    toast(r.message, { error: !r.ok });
-  } catch (err) {
-    toast(err.message, { error: true });
-  }
-  await renderRequests();
-}
-
-// ---------------------------------------------------------------------------
 // Settings page
 // ---------------------------------------------------------------------------
 
@@ -1852,49 +1683,14 @@ function wire() {
   $('#openai-remove').addEventListener('click', () => saveKey('openaiKey', '', 'OpenAI key'));
   $('#opt-text').addEventListener('change', (e) => setSetting('onScreenText')(e.target.checked));
 
-  // Google Form requests
-  $('#req-save').addEventListener('click', async () => {
-    const url = $('#req-url').value.trim();
-    const key = $('#req-key').value.trim();
-    if (!url) return toast('Paste the Web app URL first.', { error: true });
-    if (!key && !state.intake?.key) return toast('Paste the connection code too.', { error: true });
-    await saveIntake(key ? { url, key } : { url }, 'Saved. Checking your form…');
-    $('#req-key').value = '';
-    if (state.intake?.configured) checkRequests();
-  });
-  $('#req-disconnect').addEventListener('click', () => confirm('Disconnect the Google Form? Requests already here are kept.') && saveIntake({ url: '', key: '' }, 'Form disconnected'));
-  $('#req-check').addEventListener('click', checkRequests);
-  $('#req-auto').addEventListener('change', (e) => saveIntake({ auto: e.target.checked }));
-  $('#req-voice').addEventListener('change', (e) => saveIntake({ voiceover: e.target.checked }));
-  $('#req-limit').addEventListener('change', (e) => saveIntake({ dailyLimit: Number(e.target.value) }));
-  $('#req-email-save').addEventListener('click', () => saveIntake({ senderName: $('#req-sender').value, emailSubject: $('#req-subject').value, emailMessage: $('#req-message').value }, 'Email settings saved'));
-  $('#req-email-reset').addEventListener('click', () => {
-    $('#req-message').value = state.intake?.defaultMessage || '';
-  });
-  $$('.req-copy-script').forEach((b) => b.addEventListener('click', async () => {
-    try {
-      await copyText(await (await fetch('/api/intake/script')).text());
-      toast('Script copied. Now paste it into script.google.com');
-    } catch (err) {
-      toast(err.message, { error: true });
-    }
-  }));
-  $('#req-copy').addEventListener('click', async () => {
-    try {
-      const res = await fetch('/api/intake/script');
-      await copyText(await res.text());
-      toast('Script copied. Now paste it into script.google.com');
-    } catch (err) {
-      toast(err.message, { error: true });
-    }
-  });
   $('#opt-speech').addEventListener('change', (e) => setSetting('speechSubtitles')(e.target.checked));
 }
 
 async function init() {
   wire();
   await refreshStatus();
-  await Promise.all([loadTracks(), loadServerSettings(), loadClients(), loadRequests()]);
+  ops.init({ openProjectInEditor: async (id, where = 'production') => { await openProject(id); location.hash = `#/${where}`; }, refreshStatus });
+  await Promise.all([loadTracks(), loadServerSettings(), loadClients()]);
   const saved = store.get('project', null);
   if (saved && state.status) {
     try {
@@ -1909,7 +1705,7 @@ async function init() {
     const before = JSON.stringify([state.status?.version, state.status?.ai?.configured, Boolean(state.status)]);
     await refreshStatus();
     if (JSON.stringify([state.status?.version, state.status?.ai?.configured, Boolean(state.status)]) !== before) route();
-    if (!location.hash.startsWith('#/requests')) loadRequests();
+    ops.refreshCounts();
   }, 15000);
 }
 

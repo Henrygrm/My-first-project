@@ -558,3 +558,27 @@ ${JSON.stringify(boardForAi(board).scenes.map((s, i) => ({ scene: i + 1, recipe:
   }
   return structuredCall({ system: directorSystem(), content, schema: ReviewSchema, effort: 'medium', maxTokens: 8000 });
 }
+
+// ---------------------------------------------------------------------------
+// Client replies
+// ---------------------------------------------------------------------------
+
+const ReplySchema = z.object({
+  intent: z.enum(['revision', 'declined', 'accepted', 'question', 'unclear']).describe('revision = wants changes to the video; declined = clearly does not want to proceed with the video at all; accepted = happy with it / no changes; question = asks something without requesting changes; unclear = cannot tell'),
+  confidence: z.number().describe('0 to 1: how sure you are about the intent'),
+  summary: z.string().describe('One short sentence for the video creator describing what the client wants'),
+  requested_changes: z.array(z.string()).describe('Each specific change the client asked for, in plain words (empty unless revision)'),
+  decline_reason: z.string().describe('If declined: their reason in a few words, else empty'),
+});
+
+/** What does the client want? Used to route replies to delivery emails. */
+export async function classifyReply({ text, businessName }) {
+  const res = await structuredCall({
+    system: 'You read client replies to a video agency\'s delivery email and classify them for the agency owner. Be careful: asking for ANY change (even a big one, or with mild disappointment) is a revision, not a decline. Only choose "declined" when the client clearly says they do not want the video or will not proceed. If the message is ambiguous, mixed, or off-topic, choose "unclear". Never invent requests.',
+    content: [{ type: 'text', text: `CLIENT REPLY TO CLASSIFY (business: ${businessName || 'unknown'}):\n"""\n${String(text).slice(0, 4000)}\n"""` }],
+    schema: ReplySchema,
+    effort: 'low',
+    maxTokens: 2000,
+  });
+  return res.data;
+}

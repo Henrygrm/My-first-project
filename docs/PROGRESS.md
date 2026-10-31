@@ -2,7 +2,7 @@
 
 Read `docs/ROADMAP.md` first (audit, technology decisions, plan). This file records what is done and what is next, so a new session can continue.
 
-## Status: v3.2.0 (2026-10-31)
+## Status: v4.0.0 (2026-10-31)
 
 ### Done
 - **Foundations:** cross-site/Host request guard; persistent job records with logs, interrupted-job detection and retry (`RUNNERS` registry in `server/index.js`); `project.prev.json` backups; `data/logs/cutline.log`; "Try again" in the UI.
@@ -43,11 +43,30 @@ Read `docs/ROADMAP.md` first (audit, technology decisions, plan). This file reco
   - Nothing is ever sent automatically. A failed send returns to review with the reason.
   - Gmail limit: about 100 emails a day on a personal account.
 
+- **v4.0: client workflow platform + white/blue redesign.**
+  - *Data:* `server/lib/cprojects.js` holds client projects: one folder per project in `data/cprojects/<id>` with `project.json`, `resources/` (clips) and `versions/vN/` (snapshot MP4s). Numbered CP-0001…; every action goes into the project history and `activity.js` (`data/activity.jsonl`).
+  - *Settings:* `business.js` (`data/business.json`) holds business details, pricing, invoice settings and email templates.
+  - *Invoices:* `invoices.js` (`data/invoices.json`) with pdfkit PDFs. Statuses: draft → issued (when emailed) → paid (owner only), or void on decline.
+  - *Workflow:* submitted → collecting (downloads) → ready_for_review → [Approve production] → producing → video_review → [Approve video] → email_review (email + invoice prepared) → [Approve & Send] → sent → client reply → revision_requested / needs_attention / completed / declined.
+  - *Approval centre options:* Approve, Request internal changes (`ads-revise`), Regenerate (`ads`), Use my editor changes.
+  - *Extra sizes:* re-rendered with `ads-size {format, into}`.
+  - *Requests with no effect:* a revise that changes nothing creates no version and sets `lastNoChange`.
+  - *Gmail:* Apps Script v3 (`integrations/google-form/Code.gs`), chosen over the Gmail API because it needs no Cloud project and has no weekly token expiry in testing mode.
+    - `send` is idempotent per email ref and replies in-thread to the client's last message.
+    - `inbox` returns client messages by thread or from-address.
+    - setupCutline attaches to the owner's existing form and never creates one.
+  - *Replies:* classified by Claude (`classifyReply`) with rule checks. A "declined" that mentions changes, or low confidence, becomes `needs_attention`. Without AI, conservative rules are used.
+  - *UI:* the sidebar shell in `index.html` and the new pages in `public/js/ops.js`. `app.js` routes; old hashes (`#/ads`, `#/clients`, …) are aliased. The editor pages live under AI Video Production (tabs), and brand kits under Client Projects (tab).
+  - *Design:* `css/styles.css` was rewritten as a light design system with the same class names.
+  - *Tests:* `npm run test:workflow` runs the Google script against fake Google services, then the full 16-step workflow against a stand-in Apps Script and the mock Claude.
+  - Setup guide for the owner: `docs/SETUP-GOOGLE.md`.
+
 ### Owner decisions
 - Approved: Claude photo analysis and frame review; OpenAI voiceover.
 - Not approved: AI image and video generation. Provider slots exist in `server/providers/index.js`.
 
 ### Known limitations / next ideas (ranked)
+0. The real Google script has been tested only against faithful stand-ins. The first real form submission and email should be watched.
 1. Test the real Claude director with the owner's key, then tune prompts on real output.
 2. Hook variations: 3 alternative openings per ad, re-rendering only scene 1.
 3. Content packs: several objectives for one client in one run.

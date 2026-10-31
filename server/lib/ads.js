@@ -689,7 +689,7 @@ function parseAdRequest(text, plan, tracks) {
 export async function reviseAdsJob(projectId, { request, adIndex, sceneIndex, mode }, ctx) {
   const project = await loadProject(projectId);
   if (!project?.adPlan) throw new Error('Make ads first, then ask for changes.');
-  const text = String(request || '').trim().slice(0, 1000);
+  const text = String(request || '').trim().slice(0, 4000);
   const focus = Number.isInteger(adIndex) && project.adPlan.ads[adIndex] ? adIndex : null;
   const sceneFocus = focus !== null && Number.isInteger(sceneIndex) && project.adPlan.ads[focus].scenes[sceneIndex] ? sceneIndex : null;
   await updateProject(projectId, (p) => addAdChat(p, 'you', `${focus !== null ? `Ad ${focus + 1}${sceneFocus !== null ? `, scene ${sceneFocus + 1}` : ''}: ` : ''}${text}`));

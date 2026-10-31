@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { log } from './log.js';
 
@@ -126,6 +127,8 @@ export async function deleteProject(id) {
 
 const jobs = new Map();
 let queue = Promise.resolve();
+/** 'finished' fires with the job when one ends (done or error). */
+export const jobEvents = new EventEmitter();
 
 const PUBLIC_FIELDS = ['id', 'projectId', 'kind', 'status', 'stage', 'progress', 'error', 'code', 'createdAt', 'startedAt', 'finishedAt', 'log'];
 const jobFile = (id) => path.join(JOBS_DIR, `${id}.json`);
@@ -251,6 +254,11 @@ export function enqueueJob(projectId, kind, fn, args = {}) {
     job.finishedAt = Date.now();
     log('info', `[job ${job.id}] ${kind} ${job.status} in ${((job.finishedAt - job.startedAt) / 1000).toFixed(1)}s${job.error ? `: ${job.error}` : ''}`);
     persist(job, true);
+    try {
+      jobEvents.emit('finished', job);
+    } catch (err) {
+      log('error', 'job listener failed', err);
+    }
   });
 
   // Forget finished jobs from memory after a day (their records stay on disk for a week).
