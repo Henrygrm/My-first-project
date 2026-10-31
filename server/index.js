@@ -15,10 +15,11 @@ import { publicStyleList } from './lib/styles.js';
 import { AD_THEMES, FORMATS } from './lib/adRender.js';
 import { AD_LENGTHS, addAsset, deleteAsset, generateAds, rerenderAd, reviseAdsJob, rotateAsset, stillsFromFootage } from './lib/ads.js';
 import {
-  activeJobFor, createProject, DATA_DIR, deleteProject, enqueueJob, getJob, listProjects,
+  activeJobFor, createProject, DATA_DIR, deleteProject, enqueueJob, getJob, jobView, lastJobFor, listProjects,
   loadProject, newId, projectDir, PROJECTS_DIR, updateProject,
 } from './lib/store.js';
 import { transcriptionConfigured } from './lib/transcribe.js';
+import { log, LOG_PATH } from './lib/log.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const APP_VERSION = createRequire(import.meta.url)('../package.json').version;
@@ -27,6 +28,33 @@ const HOST = process.env.HOST || '127.0.0.1';
 const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB || 2048);
 
 const app = express();
+
+// Only this computer's browser tab may change things. Blocks other websites
+// from sending requests to Cutline (e.g. starting paid AI jobs) and DNS-rebinding
+// tricks that pretend to be localhost.
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
+app.use((req, res, next) => {
+  const host = req.get('host') || '';
+  if (!['0.0.0.0', '::'].includes(HOST) && !LOCAL_HOST.test(host)) {
+    return res.status(403).json({ error: 'Cutline only answers requests addressed to this computer.' });
+  }
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const origin = req.get('origin');
+  let sameOrigin = true;
+  if (origin) {
+    try {
+      sameOrigin = new URL(origin).host === host;
+    } catch {
+      sameOrigin = false;
+    }
+  }
+  if (!sameOrigin || req.get('sec-fetch-site') === 'cross-site') {
+    log('warn', `blocked ${req.method} ${req.path} from origin ${origin || '(none)'}`);
+    return res.status(403).json({ error: 'Blocked a request from another website.' });
+  }
+  next();
+});
+
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(ROOT, 'public')));
 // Uploaded footage and rendered clips (supports range requests for scrubbing).
@@ -34,6 +62,21 @@ app.use('/media', express.static(PROJECTS_DIR, { dotfiles: 'deny', index: false,
 app.use('/music-files', express.static(MUSIC_DIR, { dotfiles: 'deny', index: false, fallthrough: false }));
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+// Every kind of background job, by name, so a failed or interrupted job can be
+// run again with the same arguments.
+const RUNNERS = {
+  generate: (pid, a, ctx) => generate(pid, a, ctx),
+  render: (pid, a, ctx) => rerender(pid, a.index, a.clip || {}, a.options || {}, ctx),
+  revise: (pid, a, ctx) => revise(pid, a, ctx),
+  ads: (pid, a, ctx) => generateAds(pid, a, ctx),
+  'ads-revise': (pid, a, ctx) => reviseAdsJob(pid, a, ctx),
+  'ad-render': (pid, a, ctx) => rerenderAd(pid, a.index, a.ad || {}, ctx),
+};
+
+function startJob(projectId, kind, args) {
+  return enqueueJob(projectId, kind, (ctx) => RUNNERS[kind](projectId, args, ctx), args);
+}
 
 async function requireProject(req) {
   const project = await loadProject(req.params.id);
@@ -73,7 +116,8 @@ app.post('/api/projects', wrap(async (req, res) => res.json(await createProject(
 app.get('/api/projects/:id', wrap(async (req, res) => {
   const project = await requireProject(req);
   const job = activeJobFor(project.id);
-  res.json({ ...project, activeJob: job ? job.id : null });
+  const last = lastJobFor(project.id);
+  res.json({ ...project, activeJob: job ? job.id : null, lastJob: last && !job ? jobView(last) : null });
 }));
 
 app.patch('/api/projects/:id', wrap(async (req, res) => {
@@ -215,7 +259,7 @@ app.post('/api/projects/:id/generate', wrap(async (req, res) => {
   const project = await requireProject(req);
   if (activeJobFor(project.id)) throw Object.assign(new Error('A job is already running for this project.'), { status: 409 });
   const opts = req.body || {};
-  const job = enqueueJob(project.id, 'generate', (ctx) => generate(project.id, opts, ctx));
+  const job = startJob(project.id, 'generate', opts);
   res.json({ jobId: job.id });
 }));
 
@@ -223,16 +267,25 @@ app.post('/api/projects/:id/clips/:index/render', wrap(async (req, res) => {
   const project = await requireProject(req);
   if (activeJobFor(project.id)) throw Object.assign(new Error('A job is already running for this project.'), { status: 409 });
   const { clip, options } = req.body || {};
-  const job = enqueueJob(project.id, 'render', (ctx) => rerender(project.id, req.params.index, clip || {}, options || {}, ctx));
+  const job = startJob(project.id, 'render', { index: Number(req.params.index), clip: clip || {}, options: options || {} });
   res.json({ jobId: job.id });
 }));
 
 app.get('/api/jobs/:jobId', (req, res) => {
   const job = getJob(req.params.jobId);
   if (!job) return res.status(404).json({ error: 'Job not found (the server may have restarted).' });
-  const { id, projectId, kind, status, stage, progress, error, code } = job;
-  res.json({ id, projectId, kind, status, stage, progress, error, code });
+  res.json(jobView(job));
 });
+
+app.post('/api/jobs/:jobId/retry', wrap(async (req, res) => {
+  const old = getJob(req.params.jobId);
+  if (!old) throw Object.assign(new Error('Job not found'), { status: 404 });
+  if (!['error', 'interrupted'].includes(old.status)) throw Object.assign(new Error('Only a failed or interrupted job can be tried again.'), { status: 400 });
+  if (!RUNNERS[old.kind] || !(await loadProject(old.projectId))) throw Object.assign(new Error('That job can no longer be run.'), { status: 400 });
+  if (activeJobFor(old.projectId)) throw Object.assign(new Error('Wait for the current job to finish first.'), { status: 409 });
+  const job = startJob(old.projectId, old.kind, old.args || {});
+  res.json({ jobId: job.id, kind: job.kind });
+}));
 
 // --- animated ads -------------------------------------------------------------
 
@@ -309,7 +362,7 @@ app.post('/api/projects/:id/ads/generate', wrap(async (req, res) => {
   const project = await requireProject(req);
   noJob(project);
   const opts = req.body || {};
-  const job = enqueueJob(project.id, 'ads', (ctx) => generateAds(project.id, opts, ctx));
+  const job = startJob(project.id, 'ads', opts);
   res.json({ jobId: job.id });
 }));
 
@@ -321,7 +374,7 @@ app.post('/api/projects/:id/ads/revise', wrap(async (req, res) => {
   if (!request) throw Object.assign(new Error('Type what you want changed.'), { status: 400 });
   const adIndex = Number.isInteger(req.body?.adIndex) ? req.body.adIndex : null;
   const mode = req.body?.mode === 'auto' ? 'auto' : 'ai';
-  const job = enqueueJob(project.id, 'ads-revise', (ctx) => reviseAdsJob(project.id, { request, adIndex, mode }, ctx));
+  const job = startJob(project.id, 'ads-revise', { request, adIndex, mode });
   res.json({ jobId: job.id });
 }));
 
@@ -329,7 +382,7 @@ app.post('/api/projects/:id/ads/:index/render', wrap(async (req, res) => {
   const project = await requireProject(req);
   noJob(project);
   if (!project.adPlan?.ads?.[Number(req.params.index)]) throw Object.assign(new Error('Ad not found'), { status: 404 });
-  const job = enqueueJob(project.id, 'ad-render', (ctx) => rerenderAd(project.id, req.params.index, req.body?.ad || {}, ctx));
+  const job = startJob(project.id, 'ad-render', { index: Number(req.params.index), ad: req.body?.ad || {} });
   res.json({ jobId: job.id });
 }));
 
@@ -343,7 +396,7 @@ app.post('/api/projects/:id/revise', wrap(async (req, res) => {
   if (!request) throw Object.assign(new Error('Type what you want changed.'), { status: 400 });
   const clipIndex = Number.isInteger(req.body?.clipIndex) ? req.body.clipIndex : null;
   const mode = req.body?.mode === 'auto' ? 'auto' : 'ai';
-  const job = enqueueJob(project.id, 'revise', (ctx) => revise(project.id, { request, clipIndex, mode }, ctx));
+  const job = startJob(project.id, 'revise', { request, clipIndex, mode });
   res.json({ jobId: job.id });
 }));
 
@@ -377,13 +430,16 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
 app.use((err, req, res, next) => {
   const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 413 : err.code === 'SETUP_REQUIRED' ? 400 : 500);
-  if (status >= 500) console.error(err);
+  if (status >= 500) log('error', `${req.method} ${req.originalUrl}`, err);
   if (res.headersSent) return next(err);
   if (/^\/(media|music-files)\//.test(req.originalUrl)) return res.status(status).end();
   res.status(status).json({ error: err.message || 'Something went wrong', code: err.code || null });
 });
 
+process.on('unhandledRejection', (err) => log('error', 'unhandled rejection', err));
+
 const server = app.listen(PORT, HOST, async () => {
+  log('info', `Cutline ${APP_VERSION} started on ${HOST}:${PORT}`);
   console.log(`\n  Cutline is running → http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}\n`);
   const ff = await checkFfmpeg();
   console.log(`  FFmpeg:        ${ff.available ? `ok (${ff.version})` : 'NOT FOUND — install FFmpeg to edit videos'}`);

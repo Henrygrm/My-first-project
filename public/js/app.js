@@ -465,6 +465,7 @@ async function pollJob(jobId, kind = null) {
     }
     if (state.job && !state.job.kind) state.job.kind = job.kind;
     setJobUi({ stage: job.stage, pct: job.progress });
+    if (job.status === 'interrupted') job.status = 'error';
     if (job.status === 'done' || job.status === 'error') {
       state.job = null;
       finished = job;
