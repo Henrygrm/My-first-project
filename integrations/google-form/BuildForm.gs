@@ -7,11 +7,18 @@
  *  2. Click save, then Run (function: buildCutlineForm). Allow access.
  *  3. Open the link printed in the Execution log and add the 3 File upload
  *     questions it lists (Google doesn't let scripts create upload questions).
- * Run it once: each run makes a new form.
+ * Run it once: each run adds the questions again.
  */
+
+// Already made a form? Paste its EDIT link between the quotes (the address
+// you see while editing it, ending in /edit) and the questions are added to
+// that form. Leave it empty to make a brand-new form called "Client Video Brief".
+const ADD_TO_FORM_URL = '';
+
 function buildCutlineForm() {
-  const form = FormApp.create('Client Video Brief');
-  form.setDescription("Thanks for choosing us! Please fill this in for each video you'd like. It takes about 5 minutes. The more detail and the better your photos and clips, the better your video will be.");
+  const existing = Boolean(ADD_TO_FORM_URL);
+  const form = existing ? FormApp.openByUrl(ADD_TO_FORM_URL) : FormApp.create('Client Video Brief');
+  if (!existing) form.setDescription("Thanks for choosing us! Please fill this in for each video you'd like. It takes about 5 minutes. The more detail and the better your photos and clips, the better your video will be.");
   try { form.setCollectEmail(true); } catch (err) {}
   form.setProgressBar(true);
   const notSure = 'Not sure, you decide';
@@ -20,7 +27,8 @@ function buildCutlineForm() {
   const choice = (t, options, req, other) => { const q = form.addMultipleChoiceItem().setTitle(t).setChoiceValues(options).setRequired(Boolean(req)); if (other) q.showOtherOption(true); return q; };
 
   // 1. About your business
-  form.addSectionHeaderItem().setTitle('About your business');
+  if (existing) form.addPageBreakItem().setTitle('About your business');
+  else form.addSectionHeaderItem().setTitle('About your business');
   text('Business name', '', true);
   text('Your name', '', true);
   text('Phone number, website or social handle', 'e.g. 0400 000 000, yourbusiness.com.au or @yourbusiness');
@@ -66,7 +74,7 @@ function buildCutlineForm() {
 
   Logger.log([
     '',
-    '===== YOUR FORM IS READY =====',
+    existing ? '===== QUESTIONS ADDED TO YOUR FORM =====' : '===== YOUR FORM IS READY =====',
     'Edit it here: ' + form.getEditUrl(),
     '',
     'Last step: open that link, go to the section "Your logo, photos and clips",',
