@@ -67,6 +67,9 @@ export function registerOps(app) {
     res.json(await intakeStatus());
   }));
   app.post('/api/intake/check', wrap(async (req, res) => res.json(await cp.checkNow())));
+  app.get('/api/intake/build-script', wrap(async (req, res) => {
+    res.type('text/plain').send(await fs.readFile(path.join(path.dirname(SCRIPT_FILE), 'BuildForm.gs'), 'utf8'));
+  }));
   app.get('/api/intake/script', wrap(async (req, res) => {
     res.type('text/plain').set('Content-Disposition', req.query.download ? 'attachment; filename="Cutline-Google.gs"' : 'inline').send(await fs.readFile(SCRIPT_FILE, 'utf8'));
   }));
